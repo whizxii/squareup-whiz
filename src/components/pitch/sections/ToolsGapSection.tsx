@@ -2,10 +2,10 @@ import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import type { SlideMode } from "@/lib/slides";
 
 const TOOLS = [
-  { name: "Dashboards", desc: "Shows what happened. Not why.", icon: "📊" },
-  { name: "Surveys", desc: "Low response. No depth. No follow-up.", icon: "📋" },
-  { name: "Support Tools", desc: "Reactive. Noisy. Not decision-grade.", icon: "🎫" },
-  { name: "Research Firms", desc: "6–8 weeks. $50K+. Too late.", icon: "🔬" },
+  { name: "Dashboards & BI", desc: "Shows what happened. Not why.", verdict: "Explains the past" },
+  { name: "Surveys", desc: "Low response rates. No depth. No follow-up. No real conversation.", verdict: "Collects opinions" },
+  { name: "Support Tools", desc: "Reactive. Noisy. Not decision-grade. You already know customers are unhappy.", verdict: "Manages complaints" },
+  { name: "Research Agencies", desc: "6–8 weeks. ₹30–50L. Findings arrive after the decision was made.", verdict: "Too slow, too expensive" },
 ];
 
 export default function ToolsGapSection({ mode = "detailed" }: { mode?: SlideMode }) {
@@ -15,46 +15,66 @@ export default function ToolsGapSection({ mode = "detailed" }: { mode?: SlideMod
   return (
     <section
       id="toolsgap"
-      className={`bg-sq-off-white ${isPresenter ? "h-full flex items-center px-16" : "py-24 px-6"}`}
+      className={`${isPresenter ? "h-full flex items-center px-16" : "py-28 px-6"}`}
+      style={{ background: "hsl(var(--sq-off-white))" }}
     >
       <div className="max-w-5xl mx-auto w-full" ref={ref}>
-        <h2
-          className={`font-black text-sq-text tracking-tight leading-tight text-center mb-12 ${
-            isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"
-          } ${revealed ? "animate-fade-up" : "opacity-0"}`}
-        >
-          There is no system to turn conversations into{" "}
-          <span className="text-sq-orange">decision-grade data at scale.</span>
-        </h2>
 
-        <div className={`grid grid-cols-2 gap-5 mb-8 transition-all duration-600 delay-200 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+        {/* Header */}
+        <div className={`mb-14 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
+          <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
+            The Gap
+          </p>
+          <h2
+            className={`font-black tracking-tight leading-tight max-w-3xl ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"}`}
+            style={{ color: "hsl(var(--sq-text))" }}
+          >
+            Every existing tool tells you what happened.{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>None tell you why.</span>
+          </h2>
+          <p className="mt-4 text-base" style={{ color: "hsl(var(--sq-muted))" }}>
+            There is no system to generate decision-grade signal at scale. Until now.
+          </p>
+        </div>
+
+        {/* Tool comparison — table-style investor format */}
+        <div className={`rounded-2xl overflow-hidden mb-8 transition-all duration-600 delay-200 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+          style={{ border: "1px solid hsl(var(--sq-subtle))" }}>
+
+          {/* Table header */}
+          <div className="grid grid-cols-3 px-6 py-3" style={{ background: "hsl(var(--sq-subtle))" }}>
+            <span className="font-black text-xs uppercase tracking-wider" style={{ color: "hsl(var(--sq-text))" }}>Tool</span>
+            <span className="font-black text-xs uppercase tracking-wider" style={{ color: "hsl(var(--sq-text))" }}>What it does</span>
+            <span className="font-black text-xs uppercase tracking-wider" style={{ color: "hsl(var(--sq-text))" }}>The gap</span>
+          </div>
+
           {TOOLS.map((t, i) => (
             <div
               key={t.name}
-              className="bg-sq-card rounded-2xl p-6 border border-sq-subtle flex items-start gap-4"
-              style={{ transitionDelay: `${i * 100}ms` }}
+              className={`grid grid-cols-3 px-6 py-4 items-start gap-4 ${i < TOOLS.length - 1 ? "border-b" : ""}`}
+              style={{
+                background: "hsl(var(--sq-card))",
+                borderColor: "hsl(var(--sq-subtle))"
+              }}
             >
-              <span className="text-3xl">{t.icon}</span>
-              <div>
-                <h3 className="font-bold text-sq-text mb-1">{t.name}</h3>
-                <p className="text-sq-muted text-sm">{t.desc}</p>
-              </div>
+              <p className="font-bold text-sm" style={{ color: "hsl(var(--sq-text))" }}>{t.name}</p>
+              <p className="text-sm" style={{ color: "hsl(var(--sq-muted))" }}>{t.desc}</p>
+              <span className="inline-block font-bold text-xs px-3 py-1.5 rounded-full w-fit"
+                style={{ background: "#FEF2F2", color: "#B91C1C" }}>
+                {t.verdict}
+              </span>
             </div>
           ))}
-        </div>
 
-        {/* Decision void → SquareUp */}
-        <div className={`flex flex-col sm:flex-row items-center justify-center gap-4 transition-all duration-500 delay-500 ${revealed ? "opacity-100" : "opacity-0"}`}>
-          <div className="bg-sq-subtle rounded-2xl p-5 text-center border-2 border-dashed border-sq-muted/30">
-            <p className="font-black text-sq-muted/50 text-xl uppercase tracking-widest">Decision Void</p>
-            <p className="text-sq-muted text-xs mt-1">No unified system. Decisions made blind.</p>
-          </div>
-
-          <div className="text-sq-orange font-black text-3xl hidden sm:block">→</div>
-
-          <div className="bg-sq-orange rounded-2xl p-5 text-center shadow-lg shadow-sq-orange/20 border-2 border-sq-orange animate-pulse-logo" style={{ animation: "none" }}>
-            <p className="font-black text-white text-xl">SquareUp</p>
-            <p className="text-white/80 text-xs mt-1">The missing system.</p>
+          {/* SquareUp row — highlighted */}
+          <div className="grid grid-cols-3 px-6 py-4 items-start gap-4"
+            style={{ background: "hsl(var(--sq-orange) / 0.06)", borderTop: "2px solid hsl(var(--sq-orange) / 0.3)" }}>
+            <p className="font-black text-sm" style={{ color: "hsl(var(--sq-orange))" }}>SquareUp</p>
+            <p className="text-sm font-bold" style={{ color: "hsl(var(--sq-text))" }}>AI-led conversations that generate signal on demand</p>
+            <span className="inline-block font-bold text-xs px-3 py-1.5 rounded-full w-fit text-white"
+              style={{ background: "hsl(var(--sq-orange))" }}>
+              Generates signal ✓
+            </span>
           </div>
         </div>
       </div>
