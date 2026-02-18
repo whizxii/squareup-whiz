@@ -37,7 +37,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
         }}>
           <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "hsl(var(--sq-orange))" }} />
           <span className="font-bold text-sm tracking-wide" style={{ color: "hsl(var(--sq-orange))" }}>
-            AI Customer Research · Seed Round 2026
+            Built in India · Built for the World · Seed Round 2026
           </span>
         </div>
 
@@ -57,7 +57,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
           SquareUp runs AI-led customer interviews and turns them into{" "}
           <span className="text-white font-bold">a decision-ready Insight Brief — in 7 days, not 7 weeks.</span>
           <br className="hidden sm:block" />
-          <span className="text-white/35 text-base"> For Growth, NPD, and CX teams at consumer brands.</span>
+          <span className="text-white/35 text-base"> Starting with India's most demanding consumer brands. Designed to scale globally.</span>
         </p>
 
         {/* CTAs */}
