@@ -1,6 +1,8 @@
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import AvatarAIAgent from "../avatars/AvatarAIAgent";
 import AvatarGrowthLead from "../avatars/AvatarGrowthLead";
+import AvatarNPDManager from "../avatars/AvatarNPDManager";
+import AvatarCXLead from "../avatars/AvatarCXLead";
 import type { SlideMode } from "@/lib/slides";
 
 const STEPS = [
@@ -8,33 +10,29 @@ const STEPS = [
     num: "01",
     title: "Brief",
     sub: "You define the decision",
-    body: "Tell us what you're trying to decide — segment to target, product to launch, CX gap to fix. We screen and recruit the right respondents. Zero coordination on your end.",
-    avatar: null,
-    icon: "🗺️",
+    body: "Tell us what to decide. We recruit the right respondents.",
+    AvatarComponent: AvatarCXLead,
   },
   {
     num: "02",
     title: "Interview",
     sub: "AI runs every conversation",
-    body: "Our AI interviews respondents — probing naturally, following threads, adapting in real time. No moderator. No scheduling. Depth that surveys never reach, at cents per interview.",
-    avatar: "ai",
-    icon: "🤖",
+    body: "No moderator. No scheduling. Depth surveys never reach.",
+    AvatarComponent: AvatarAIAgent,
   },
   {
     num: "03",
     title: "Synthesise",
     sub: "Signal, not transcripts",
-    body: "Every conversation is processed automatically. Severity scores, risk flags, verbatim quotes, validated patterns. No manual analysis. No research homework for your team.",
-    avatar: null,
-    icon: "⚡",
+    body: "Severity scores. Risk flags. Verbatim quotes. No homework.",
+    AvatarComponent: AvatarNPDManager,
   },
   {
     num: "04",
     title: "Route",
     sub: "Right brief, right team",
-    body: "Growth gets their campaign pointers. Product gets their launch risks. Founders get the full picture. Each team gets what's relevant — nothing more, nothing less.",
-    avatar: "growth",
-    icon: "📬",
+    body: "Growth gets campaign pointers. Product gets launch risks.",
+    AvatarComponent: AvatarGrowthLead,
   },
 ];
 
@@ -51,7 +49,7 @@ export default function HowItWorksSection({ mode = "detailed" }: { mode?: SlideM
       <div className="max-w-6xl mx-auto w-full" ref={ref}>
 
         {/* Header */}
-        <div className={`mb-16 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
+        <div className={`mb-16 text-center transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
             How It Works
           </p>
@@ -59,91 +57,73 @@ export default function HowItWorksSection({ mode = "detailed" }: { mode?: SlideM
             className={`font-black tracking-tight leading-tight ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl lg:text-5xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}
           >
-            Brief → AI Interviews → Routed Insights.<br />
-            <span style={{ color: "hsl(var(--sq-orange))" }}>Each team gets their brief. No coordination. No noise.</span>
+            Brief → Interviews → Synthesis → Routed Briefs.<br />
+            <span style={{ color: "hsl(var(--sq-orange))" }}>No coordination. No noise.</span>
           </h2>
         </div>
 
         {/* 4-step grid */}
-        <div className={`${isPresenter ? "grid grid-cols-4 gap-6" : "grid grid-cols-2 lg:grid-cols-4 gap-5"}`}>
+        <div className={`${isPresenter ? "grid grid-cols-4 gap-5" : "grid grid-cols-2 lg:grid-cols-4 gap-5"}`}>
           {STEPS.map((step, i) => (
             <div
               key={step.num}
               className={`relative transition-all duration-600 ${
                 revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
               }`}
-              style={{ transitionDelay: `${i * 150}ms` }}
+              style={{ transitionDelay: `${i * 130}ms` }}
             >
-              {/* Connector line desktop */}
+              {/* Connector arrow between steps */}
               {i < 3 && (
                 <div
-                  className="hidden lg:block absolute top-8 z-0"
-                  style={{
-                    left: "calc(100% - 8px)",
-                    width: "calc(100% - 32px)",
-                    height: "2px",
-                    background: `linear-gradient(90deg, hsl(var(--sq-orange) / 0.4), hsl(var(--sq-orange) / 0.1))`
-                  }}
-                />
+                  className="hidden lg:flex absolute top-10 z-20 items-center justify-center"
+                  style={{ left: "calc(100% - 10px)", width: "20px" }}
+                >
+                  <span className="font-black text-xs" style={{ color: "hsl(var(--sq-orange) / 0.5)" }}>→</span>
+                </div>
               )}
 
-              <div className="rounded-2xl p-5 h-full relative z-10 flex flex-col" style={{
+              <div className="rounded-3xl overflow-hidden h-full flex flex-col relative" style={{
                 background: "hsl(var(--sq-off-white))",
-                border: "1px solid hsl(var(--sq-subtle))"
+                border: "1px solid hsl(var(--sq-subtle))",
+                boxShadow: "0 2px 16px rgba(0,0,0,0.04)"
               }}>
-                {/* Number pill */}
-                <div
-                  className="inline-flex items-center justify-center w-12 h-12 rounded-full font-black text-lg text-white mb-4 shadow-md flex-shrink-0"
-                  style={{ background: "hsl(var(--sq-orange))", boxShadow: "0 6px 18px hsl(var(--sq-orange) / 0.3)" }}
-                >
-                  {step.num}
+                {/* Orange top strip */}
+                <div className="h-1 w-full" style={{ background: "hsl(var(--sq-orange))", opacity: 0.6 }} />
+
+                {/* Top content */}
+                <div className="px-5 pt-5 pb-2 flex-1">
+                  {/* Step pill */}
+                  <div
+                    className="inline-flex items-center justify-center w-10 h-10 rounded-full font-black text-sm text-white mb-4"
+                    style={{ background: "hsl(var(--sq-orange))", boxShadow: "0 4px 14px hsl(var(--sq-orange) / 0.35)" }}
+                  >
+                    {step.num}
+                  </div>
+
+                  <h3 className="font-black text-xl mb-1" style={{ color: "hsl(var(--sq-text))" }}>{step.title}</h3>
+                  <p className="font-bold text-xs uppercase tracking-wider mb-3" style={{ color: "hsl(var(--sq-orange))" }}>{step.sub}</p>
+                  <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--sq-muted))" }}>{step.body}</p>
                 </div>
 
-                <h3 className="font-black text-lg mb-1" style={{ color: "hsl(var(--sq-text))" }}>{step.title}</h3>
-                <p className="font-bold text-xs uppercase tracking-wider mb-3" style={{ color: "hsl(var(--sq-orange))" }}>{step.sub}</p>
-                <p className="text-sm leading-relaxed mb-4 flex-1" style={{ color: "hsl(var(--sq-muted))" }}>{step.body}</p>
-
-                {step.avatar === "ai" && (
-                  <div className="flex justify-center mt-auto">
-                    <AvatarAIAgent size={isPresenter ? 100 : 90} />
-                  </div>
-                )}
-                {step.avatar === "growth" && (
-                  <div className="flex justify-center mt-auto">
-                    <AvatarGrowthLead size={isPresenter ? 100 : 90} />
-                  </div>
-                )}
-                {!step.avatar && (
-                  <div className="text-4xl text-center mt-auto">{step.icon}</div>
-                )}
+                {/* Avatar — blends into card bg */}
+                <div className="flex justify-center pb-2 pt-3" style={{
+                  background: `linear-gradient(to bottom, transparent, hsl(var(--sq-subtle) / 0.5))`
+                }}>
+                  <step.AvatarComponent size={isPresenter ? 110 : 120} />
+                </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Platform Vision callout strip */}
+        {/* Simple bottom callout — tight */}
         <div
-          className={`mt-10 rounded-2xl px-8 py-6 transition-all duration-500 delay-700 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
-          style={{
-            background: "hsl(var(--sq-off-white))",
-            borderLeft: "4px solid hsl(var(--sq-orange))",
-            border: "1px solid hsl(var(--sq-subtle))",
-            borderLeftWidth: "4px",
-            borderLeftColor: "hsl(var(--sq-orange))",
-          }}
+          className={`mt-10 text-center transition-all duration-500 delay-700 ${revealed ? "opacity-100" : "opacity-0"}`}
         >
-          <div className="flex items-start gap-4">
-            <span className="text-2xl flex-shrink-0 mt-0.5">🧱</span>
-            <div>
-              <p className="font-black text-base mb-1" style={{ color: "hsl(var(--sq-text))" }}>
-                Built to grow with you.{" "}
-                <span style={{ color: "hsl(var(--sq-orange))" }}>Platform as Lego blocks.</span>
-              </p>
-              <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--sq-muted))" }}>
-                Each new block makes your customer intelligence stronger and easier to act on — AI Copilot for your own interviews, automatic call processing, always-on synthesis across every customer conversation. One platform. Every signal. Routed to whoever needs to act.
-              </p>
-            </div>
-          </div>
+          <p className="font-black text-base" style={{ color: "hsl(var(--sq-text))" }}>
+            One platform. Every signal.{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>Routed to whoever needs to act.</span>
+          </p>
         </div>
 
       </div>

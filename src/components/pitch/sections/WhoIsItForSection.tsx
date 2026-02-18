@@ -8,8 +8,8 @@ const PERSONAS = [
   {
     Avatar: AvatarGrowthLead,
     role: "Growth & Marketing Lead",
-    industry: "D2C · QSR · Consumer Platforms",
-    pain: "Running campaigns blind. Which segment actually drove that lift?",
+    industry: "D2C · QSR · Platforms",
+    pain: "Running campaigns blind. Which segment drove that lift?",
     outcome: "Know your highest-value cohort before the next campaign drops.",
     tag: "CAMPAIGN DECISIONS",
   },
@@ -17,8 +17,8 @@ const PERSONAS = [
     Avatar: AvatarNPDManager,
     role: "NPD & Product Manager",
     industry: "FMCG · QSR · Consumer Tech",
-    pain: "6 months of dev on the line. Real signal or gut feel?",
-    outcome: "Validate before you commit. Catch wrong assumptions in week 1, not month 6.",
+    pain: "6 months of dev on the line. Gut feel or real signal?",
+    outcome: "Validate before you commit. Catch wrong assumptions in week 1.",
     tag: "LAUNCH DECISIONS",
   },
   {
@@ -26,7 +26,7 @@ const PERSONAS = [
     role: "CX & Experience Lead",
     industry: "Platforms · Retail · QSR",
     pain: "100 tickets. One real problem. Can't find it fast enough.",
-    outcome: "Surface the #1 fix your leadership needs to hear — backed by real customer voice.",
+    outcome: "Surface the #1 fix your leadership needs to hear.",
     tag: "PRIORITY DECISIONS",
   },
 ];
@@ -44,7 +44,7 @@ export default function WhoIsItForSection({ mode = "detailed" }: { mode?: SlideM
       <div className="max-w-6xl mx-auto w-full" ref={ref}>
 
         {/* Header */}
-        <div className={`mb-14 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
+        <div className={`mb-14 text-center transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
             Who It's For
           </p>
@@ -53,9 +53,6 @@ export default function WhoIsItForSection({ mode = "detailed" }: { mode?: SlideM
             The teams where being wrong{" "}
             <span style={{ color: "hsl(var(--sq-orange))" }}>costs the most.</span>
           </h2>
-          <p className="mt-3 text-base max-w-xl" style={{ color: "hsl(var(--sq-muted))" }}>
-            QSR chain, D2C brand, consumer platform — the decision problem is the same.
-          </p>
         </div>
 
         {/* Persona cards */}
@@ -63,37 +60,36 @@ export default function WhoIsItForSection({ mode = "detailed" }: { mode?: SlideM
           {PERSONAS.map(({ Avatar, role, industry, pain, outcome, tag }, i) => (
             <div
               key={role}
-              className={`group relative rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
+              className={`group relative rounded-3xl overflow-hidden transition-all duration-500 hover:-translate-y-2 ${
                 revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
               }`}
               style={{
-                transitionDelay: `${i * 150}ms`,
+                transitionDelay: `${i * 130}ms`,
                 background: "hsl(var(--sq-off-white))",
                 border: "1px solid hsl(var(--sq-subtle))",
-                boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.05)"
               }}
             >
-              {/* Tag strip */}
-              <div className="px-5 pt-5 pb-2 flex items-center justify-between">
+              {/* Tag + industry header */}
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
                 <span className="font-black text-xs tracking-[0.15em]" style={{ color: "hsl(var(--sq-orange))" }}>
                   {tag}
                 </span>
                 <span className="text-xs font-medium" style={{ color: "hsl(var(--sq-muted))" }}>{industry}</span>
               </div>
 
-              {/* Avatar */}
-              <div className="flex justify-center px-6 pt-2 pb-4"
-                style={{ background: "linear-gradient(180deg, hsl(var(--sq-off-white)) 0%, hsl(var(--sq-subtle)) 100%)" }}>
-                <Avatar size={isPresenter ? 150 : 180} />
+              {/* Avatar — flat white bg, no gradient, blends cleanly */}
+              <div className="flex justify-center px-4 pb-2 pt-1" style={{ background: "hsl(var(--sq-card))" }}>
+                <Avatar size={isPresenter ? 140 : 170} />
               </div>
 
               {/* Role */}
-              <div className="px-5 pb-2">
+              <div className="px-5 pt-4 pb-2">
                 <h3 className="font-black text-sm" style={{ color: "hsl(var(--sq-text))" }}>{role}</h3>
               </div>
 
-              {/* Pain — the pull quote */}
-              <div className="mx-5 mb-4 rounded-xl px-4 py-3"
+              {/* Pain quote */}
+              <div className="mx-5 mb-3 rounded-xl px-4 py-3"
                 style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))" }}>
                 <p className="font-bold text-sm leading-snug italic" style={{ color: "hsl(var(--sq-text))" }}>
                   "{pain}"
