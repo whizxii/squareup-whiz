@@ -93,10 +93,9 @@ export default function TeamSection({ mode = "detailed" }: { mode?: SlideMode })
             border: "1px solid hsl(var(--sq-subtle))"
           }}>
             <p className="font-medium leading-relaxed text-sm sm:text-base" style={{ color: "hsl(var(--sq-text))" }}>
-              We met at{" "}
-              <span className="font-bold" style={{ color: "hsl(var(--sq-orange))" }}>Mesa School of Business</span>
-              {" "}— where we both took a year off to build full-time.{" "}
-              <span className="font-bold">7 months in. Full-time since December.</span>
+              Two founders. No team. No overhead.{" "}
+              <span className="font-bold" style={{ color: "hsl(var(--sq-orange))" }}>Build and sell — that's the entire playbook until we have proof.</span>
+              {" "}We met at Mesa, took a year off to build full-time, and shipped an MVP in 15 days. Lean by design, not by default.
             </p>
           </div>
 
