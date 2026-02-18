@@ -144,10 +144,6 @@ export default function TractionSection({ mode = "detailed" }: { mode?: SlideMod
               style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))", color: "hsl(var(--sq-text))" }}>
               Mesa School of Business
             </div>
-            <div className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold"
-              style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))", color: "hsl(var(--sq-text))" }}>
-              Elevation Capital · Partner Network
-            </div>
           </div>
 
           <p className="text-center font-medium text-xs uppercase tracking-widest mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
