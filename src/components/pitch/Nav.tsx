@@ -1,4 +1,5 @@
 import { useReadingProgress } from "@/lib/useScrollAnimation";
+import iconSvg from "@/assets/icon.svg";
 import { DECK_LENGTHS, type DeckLength, type SlideMode } from "@/lib/slides";
 import { Menu, X, Download } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -54,6 +55,7 @@ export default function Nav({ mode, onModeChange, deckLength, onDeckLengthChange
 
             {/* Logo wordmark */}
             <a href="#hero" className="flex items-center gap-2 flex-shrink-0">
+              <img src={iconSvg} alt="SquareUp" className="h-6 w-auto" />
               <span className="text-white font-black text-xl tracking-tight">
                 Square<span className="text-sq-orange">Up</span>
               </span>
