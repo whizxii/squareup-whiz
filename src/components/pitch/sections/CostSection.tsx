@@ -8,7 +8,7 @@ export default function CostSection({ mode = "detailed" }: { mode?: SlideMode })
   return (
     <section
       id="cost"
-      className={`${isPresenter ? "h-full flex items-center px-16" : "py-28 px-6"}`}
+      className={`${isPresenter ? "h-full flex items-center px-16" : "py-24 px-6"}`}
       style={{ background: "hsl(var(--sq-card))" }}
     >
       <div className="max-w-5xl mx-auto w-full" ref={ref}>

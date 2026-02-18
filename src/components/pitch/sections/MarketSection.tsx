@@ -31,8 +31,8 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
   return (
     <section
       id="market"
-      className={`${isPresenter ? "h-full flex items-center px-16" : "py-28 px-6"}`}
-      style={{ background: "hsl(var(--sq-off-white))" }}
+      className={`${isPresenter ? "h-full flex items-center px-16" : "py-24 px-6"}`}
+      style={{ background: "hsl(var(--sq-card))" }}
     >
       <div className="max-w-5xl mx-auto w-full" ref={ref}>
 

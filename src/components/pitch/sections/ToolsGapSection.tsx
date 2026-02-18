@@ -15,7 +15,7 @@ export default function ToolsGapSection({ mode = "detailed" }: { mode?: SlideMod
   return (
     <section
       id="toolsgap"
-      className={`${isPresenter ? "h-full flex items-center px-16" : "py-28 px-6"}`}
+      className={`${isPresenter ? "h-full flex items-center px-16" : "py-24 px-6"}`}
       style={{ background: "hsl(var(--sq-off-white))" }}
     >
       <div className="max-w-4xl mx-auto w-full" ref={ref}>

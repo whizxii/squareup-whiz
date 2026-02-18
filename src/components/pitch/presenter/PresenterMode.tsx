@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { getSlidesForLength, DECK_LENGTHS, type DeckLength, type SlideDefinition } from "@/lib/slides";
 import HeroSection from "../sections/HeroSection";
 import ProblemSection from "../sections/ProblemSection";
