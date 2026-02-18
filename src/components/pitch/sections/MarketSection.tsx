@@ -2,19 +2,22 @@ import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import type { SlideMode } from "@/lib/slides";
 
+// Bottoms-up: ~4,000 mid-market consumer brands in India × ~₹40L avg annual research spend = ~₹16,000Cr (~$2B TAM)
+// SAM: brands actively outsourcing qual research today (~25%) → ~₹4,000Cr (~$480M)
+// SOM: brands in metro cities with ₹100–500Cr revenue, already using agencies → ~₹800Cr (~$96M)
 const BAR_DATA = [
-  { year: "2024", value: 26 },
-  { year: "2026", value: 38 },
-  { year: "2028", value: 54 },
-  { year: "2030", value: 71 },
-  { year: "2034", value: 84 },
+  { year: "Yr 1", value: 0.8 },
+  { year: "Yr 2", value: 2.1 },
+  { year: "Yr 3", value: 5.4 },
+  { year: "Yr 4", value: 11 },
+  { year: "Yr 5", value: 22 },
 ];
 
 const TAM_BREAKDOWN = [
-  { label: "Global CX & Insights Market", value: "$142B", sub: "TAM — Grand View Research, 2024", highlight: false },
-  { label: "AI-Powered Research Tools", value: "$18B", sub: "SAM — tools replacing human-led research", highlight: false },
-  { label: "Consumer Brands (SquareUp ICP)", value: "$2.8B", sub: "SOM — mid-market consumer, India + SEA first", highlight: false },
-  { label: "0.5% of SOM in 5 years", value: "$710M", sub: "Our target — highly conservative at that capture rate", highlight: true },
+  { label: "~4,000 mid-market Indian consumer brands", value: "~₹16,000Cr", sub: "TAM — avg ₹40L/yr research spend each (bottoms-up)", highlight: false },
+  { label: "Brands actively buying qual research today", value: "~₹4,000Cr", sub: "SAM — ~25% currently outsource to agencies", highlight: false },
+  { label: "Metro brands, ₹100–500Cr revenue, agency-ready", value: "~₹800Cr", sub: "SOM — our initial ICP: reachable, high urgency, fast sales", highlight: false },
+  { label: "5% SOM capture in 5 years", value: "~₹40Cr ARR", sub: "~$5M — conservative, fully fundable at seed", highlight: true },
 ];
 
 export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode }) {
@@ -37,11 +40,11 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
             className={`font-black tracking-tight leading-tight ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}
           >
-            India first. $142B market.<br />
-            <span style={{ color: "hsl(var(--sq-orange))" }}>The same problem exists everywhere.</span>
+          India has ~4,000 mid-market consumer brands.<br />
+            <span style={{ color: "hsl(var(--sq-orange))" }}>Most spend ₹40L/yr on research. Most of it is wasted.</span>
           </h2>
           <p className="mt-3 text-sm max-w-lg" style={{ color: "hsl(var(--sq-muted))" }}>
-            We're starting with India — the highest density of fast-moving consumer brands, the deepest gap in affordable research, and a playbook that ports directly to SEA, MENA, and beyond.
+            We sized this bottoms-up — not from a global analyst report. ₹16,000Cr TAM in India alone. 25% are already spending on qual research today. We're replacing the agency with an AI that costs 10x less and delivers in 72 hours.
           </p>
         </div>
 
@@ -77,8 +80,8 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
           {/* Bar chart */}
           <div>
             <p className="font-bold text-xs uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
-              CX Management Market Growth ($B) — Grand View Research
-            </p>
+            SquareUp ARR trajectory — India SOM capture (₹Cr)
+          </p>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={BAR_DATA} barCategoryGap="30%">
                 <XAxis
@@ -89,7 +92,7 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
                 />
                 <YAxis hide />
                 <Tooltip
-                  formatter={(v) => [`$${v}B`, "Market Size"]}
+                  formatter={(v) => [`₹${v}Cr ARR`, "SquareUp"]}
                   contentStyle={{
                     background: "white",
                     border: "1px solid hsl(0,0%,90%)",
@@ -116,10 +119,10 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
         <div className={`mt-10 text-center transition-all duration-500 delay-400 ${revealed ? "opacity-100" : "opacity-0"}`}>
           <p className="font-black" style={{ fontSize: "clamp(1.2rem, 3vw, 1.75rem)", color: "hsl(var(--sq-text))" }}>
             Prove it in India.{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>Scale it everywhere.</span>
+            <span style={{ color: "hsl(var(--sq-orange))" }}>Port the playbook everywhere.</span>
           </p>
           <p className="text-sm mt-2 max-w-xl mx-auto" style={{ color: "hsl(var(--sq-muted))" }}>
-            0.5% of our India SOM = $710M. The same playbook ports directly to SEA, MENA, and global consumer markets. India is the hardest proving ground — if it works here, it works anywhere.
+            5% of India SOM = ₹40Cr ARR (~$5M). Then SEA and MENA — same ICP, same problem, same playbook. India is the hardest proving ground. If it works here, it works anywhere.
           </p>
         </div>
       </div>
