@@ -1,5 +1,8 @@
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import type { SlideMode } from "@/lib/slides";
+import paramImg from "@/assets/param.png";
+import kunjImg from "@/assets/kunj.png";
+import mesaLogo from "@/assets/mesa-logo.png";
 
 export default function TeamSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
@@ -11,14 +14,14 @@ export default function TeamSection({ mode = "detailed" }: { mode?: SlideMode })
       role: "Co-founder — Product & Engineering",
       bio: "Former Tech Lead at EA Sports. Shipped products at scale. Most painful failure: 6 months of build, no customer truth. That's why SquareUp exists.",
       linkedin: "https://www.linkedin.com/in/param-jain/",
-      initials: "P",
+      photo: paramImg,
     },
     {
       name: "Kunj Dhamsaniya",
       role: "Co-founder — GTM & AI Workflows",
       bio: "Builds in consumer and ops-heavy environments. Architects the automation layer that takes SquareUp from voice agent to Insight Brief — end-to-end.",
       linkedin: "https://linkedin.com/in/kunjdhamsaniya/",
-      initials: "K",
+      photo: kunjImg,
     },
   ];
 
@@ -51,17 +54,17 @@ export default function TeamSection({ mode = "detailed" }: { mode?: SlideMode })
               background: "hsl(var(--sq-card))",
               border: "1px solid hsl(var(--sq-subtle))"
             }}>
-              {/* Avatar ring */}
+              {/* Photo */}
               <div className="flex-shrink-0">
                 <div
-                  className="w-20 h-20 rounded-full border-[3px] flex items-center justify-center font-black text-3xl"
-                  style={{
-                    borderColor: "hsl(var(--sq-orange))",
-                    background: "hsl(var(--sq-orange) / 0.08)",
-                    color: "hsl(var(--sq-orange))"
-                  }}
+                  className="w-24 h-24 rounded-full border-[3px] overflow-hidden"
+                  style={{ borderColor: "hsl(var(--sq-orange))" }}
                 >
-                  {member.initials}
+                  <img
+                    src={member.photo}
+                    alt={member.name}
+                    className="w-full h-full object-cover object-top"
+                  />
                 </div>
               </div>
 
@@ -83,7 +86,7 @@ export default function TeamSection({ mode = "detailed" }: { mode?: SlideMode })
           ))}
         </div>
 
-        {/* Origin + badges */}
+        {/* Origin + Mesa badge */}
         <div className={`transition-all duration-500 delay-400 ${revealed ? "opacity-100" : "opacity-0"}`}>
           <div className="rounded-2xl px-8 py-6 max-w-2xl mx-auto text-center" style={{
             background: "hsl(var(--sq-card))",
@@ -97,15 +100,18 @@ export default function TeamSection({ mode = "detailed" }: { mode?: SlideMode })
             </p>
           </div>
 
-          <div className="flex items-center justify-center gap-3 mt-6 flex-wrap">
-            {["Mesa School of Business"].map((badge) => (
-              <div key={badge} className="rounded-full px-4 py-2 text-sm font-bold" style={{
-                background: "hsl(var(--sq-subtle))",
-                color: "hsl(var(--sq-text))"
-              }}>
-                {badge}
-              </div>
-            ))}
+          <div className="flex items-center justify-center mt-6">
+            <div className="rounded-2xl px-6 py-3 flex items-center gap-3" style={{
+              background: "hsl(var(--sq-card))",
+              border: "1px solid hsl(var(--sq-subtle))"
+            }}>
+              <img
+                src={mesaLogo}
+                alt="Mesa School of Business"
+                className="h-8 w-auto object-contain"
+              />
+              <span className="text-sm font-bold" style={{ color: "hsl(var(--sq-text))" }}>Mesa School of Business</span>
+            </div>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useScrollAnimation, useCountUp } from "@/lib/useScrollAnimation";
+import mesaLogo from "@/assets/mesa-logo.png";
 import { useRef, useEffect, useState } from "react";
 import type { SlideMode } from "@/lib/slides";
 
@@ -140,9 +141,10 @@ export default function TractionSection({ mode = "detailed" }: { mode?: SlideMod
         {/* Trust + logos */}
         <div className={`transition-all duration-500 delay-500 ${revealed ? "opacity-100" : "opacity-0"}`}>
           <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
-            <div className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold"
-              style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))", color: "hsl(var(--sq-text))" }}>
-              Mesa School of Business
+            <div className="flex items-center gap-3 rounded-2xl px-5 py-2.5"
+              style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))" }}>
+              <img src={mesaLogo} alt="Mesa School of Business" className="h-7 w-auto object-contain" />
+              <span className="text-sm font-bold" style={{ color: "hsl(var(--sq-text))" }}>Mesa School of Business</span>
             </div>
           </div>
 
