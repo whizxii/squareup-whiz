@@ -69,7 +69,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
       }} />
 
       <div className={`relative z-10 w-full max-w-7xl mx-auto ${isPresenter ? "" : "pt-20 pb-0"}`}>
-        <div className={`grid gap-0 items-center ${isPresenter ? "grid-cols-2" : "grid-cols-1 lg:grid-cols-[1fr_1fr]"}`}>
+        <div className={`grid gap-0 items-center ${isPresenter ? "grid-cols-2" : "grid-cols-[1fr_1fr]"}`}>
 
           {/* LEFT — copy */}
           <div className="flex flex-col justify-center gap-7 pr-0 lg:pr-12 py-8">
@@ -160,7 +160,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
 
           {/* RIGHT — Avatar stage */}
           <div
-            className={`relative ${isPresenter ? "" : "hidden lg:block"}`}
+            className={`relative ${isPresenter ? "" : "block"}`}
             style={{ minHeight: 640 }}
           >
             {/* Warm glow behind avatar */}
