@@ -133,8 +133,7 @@ export default function TractionSection({ mode = "detailed" }: { mode?: SlideMod
             <span className="text-white font-black text-xl">3</span>
           </div>
           <div>
-            <p className="text-white font-black text-lg leading-tight">Design Partners. Letters of Intent. Signed.</p>
-            <p className="text-white/75 text-sm mt-0.5">Not "interested." Not "piloting." Committed.</p>
+            <p className="text-white font-black text-lg leading-tight">3 Letters of Intent. Signed.</p>
           </div>
         </div>
 
@@ -149,7 +148,7 @@ export default function TractionSection({ mode = "detailed" }: { mode?: SlideMod
           </div>
 
           <p className="text-center font-medium text-xs uppercase tracking-widest mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
-            Brands whose leaders shaped what we built
+            Discovery conversations with leaders at
           </p>
           <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
             {LOGOS.map((logo) => (

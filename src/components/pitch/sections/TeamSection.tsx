@@ -12,14 +12,14 @@ export default function TeamSection({ mode = "detailed" }: { mode?: SlideMode })
     {
       name: "Param Jain",
       role: "Co-founder — Product & Engineering",
-      bio: "Former Tech Lead at EA Sports. Shipped products at scale. Most painful failure: 6 months of build, no customer truth. That's why SquareUp exists.",
+      bio: "Former Tech Lead at EA Sports. Shipped products at scale. Built SquareUp's AI interview engine — voice to synthesis to Insight Brief.",
       linkedin: "https://www.linkedin.com/in/param-jain/",
       photo: paramImg,
     },
     {
       name: "Kunj Dhamsaniya",
       role: "Co-founder — GTM & AI Workflows",
-      bio: "Builds in consumer and ops-heavy environments. Architects the automation layer that takes SquareUp from voice agent to Insight Brief — end-to-end.",
+      bio: "Consumer and ops environment builder. Owns end-to-end workflow: screening, calling, synthesising, routing briefs to the right teams.",
       linkedin: "https://linkedin.com/in/kunjdhamsaniya/",
       photo: kunjImg,
     },
@@ -95,7 +95,7 @@ export default function TeamSection({ mode = "detailed" }: { mode?: SlideMode })
             <p className="font-medium leading-relaxed text-sm sm:text-base" style={{ color: "hsl(var(--sq-text))" }}>
               Two founders. No team. No overhead.{" "}
               <span className="font-bold" style={{ color: "hsl(var(--sq-orange))" }}>Build and sell — that's the entire playbook until we have proof.</span>
-              {" "}We met at Mesa, took a year off to build full-time, and shipped an MVP in 15 days. Lean by design, not by default.
+              {" "}We met at Mesa, took a year off to build full-time, and shipped an MVP in 15 days.
             </p>
           </div>
 

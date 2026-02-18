@@ -2,15 +2,15 @@ import { useScrollAnimation, useCountUp } from "@/lib/useScrollAnimation";
 import type { SlideMode } from "@/lib/slides";
 
 const FUNDS = [
-  { pct: "50%", label: "Build", detail: "Deepen the AI core. Voice agent reliability, insight brief quality, model fine-tuning. The product has to be undeniably good.", icon: "⚙️" },
-  { pct: "40%", label: "Sell", detail: "Convert 3 LOIs → paying customers → case studies. Direct outreach, founder-led sales, Mesa network.", icon: "🚀" },
-  { pct: "10%", label: "Ops", detail: "Tools, infra, legal. Team stays lean. No bloat.", icon: "🔩" },
+  { pct: "50%", label: "Build", detail: "Deepen the AI core. Voice agent reliability, insight brief quality, model fine-tuning." },
+  { pct: "40%", label: "Sell", detail: "Convert 3 LOIs → paying customers → case studies. Founder-led sales, Mesa network." },
+  { pct: "10%", label: "Ops", detail: "Tools, infra, legal. Team stays lean." },
 ];
 
 const MILESTONES = [
   { label: "First Revenue", desc: "3 LOI partners → paid in 90 days" },
   { label: "Proof on Paper", desc: "Published case studies with real brand names" },
-  { label: "Series A Ready", desc: "10 paying brands, clear unit economics, repeatable motion" },
+  { label: "Series A Ready", desc: "10 paying brands, clear unit economics" },
 ];
 
 function AskCounter() {
@@ -31,7 +31,7 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
     <section
       id="ask"
       className={`${isPresenter ? "h-full flex items-center px-16" : "py-28 px-6"}`}
-      style={{ background: "hsl(var(--sq-dark))" }}
+      style={{ background: "hsl(var(--sq-off-white))" }}
     >
       <div className="max-w-5xl mx-auto w-full" ref={ref}>
 
@@ -40,11 +40,12 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
             The Ask
           </p>
-          <h2 className={`font-black text-white tracking-tight leading-tight mb-2 ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"}`}>
+          <h2 className={`font-black tracking-tight leading-tight mb-2 ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"}`}
+            style={{ color: "hsl(var(--sq-text))" }}>
             $500K. Two founders.{" "}
             <span style={{ color: "hsl(var(--sq-orange))" }}>One job: build and sell.</span>
           </h2>
-          <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <p className="text-sm" style={{ color: "hsl(var(--sq-muted))" }}>
             Seed Round 2026 · No team buildout until the motion is proven
           </p>
         </div>
@@ -55,7 +56,7 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
           <div>
             <div className="mb-8">
               <AskCounter />
-              <p className="text-sm mt-2" style={{ color: "rgba(255,255,255,0.4)" }}>
+              <p className="text-sm mt-2" style={{ color: "hsl(var(--sq-muted))" }}>
                 Two founders. No overhead. Revenue in 90 days.
               </p>
             </div>
@@ -65,17 +66,17 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
               {FUNDS.map((f) => (
                 <div key={f.label}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-bold text-white text-sm">{f.label}</span>
+                    <span className="font-bold text-sm" style={{ color: "hsl(var(--sq-text))" }}>{f.label}</span>
                     <span className="font-black text-sm" style={{ color: "hsl(var(--sq-orange))" }}>{f.pct}</span>
                   </div>
-                  <div className="h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <div className="h-1.5 rounded-full" style={{ background: "hsl(var(--sq-subtle))" }}>
                     <div className="h-full rounded-full" style={{
                       width: f.pct,
                       background: "hsl(var(--sq-orange))",
-                      boxShadow: "0 0 8px hsl(var(--sq-orange) / 0.5)"
+                      boxShadow: "0 0 8px hsl(var(--sq-orange) / 0.3)"
                     }} />
                   </div>
-                  <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>{f.detail}</p>
+                  <p className="text-xs mt-1" style={{ color: "hsl(var(--sq-muted))" }}>{f.detail}</p>
                 </div>
               ))}
             </div>
@@ -83,15 +84,15 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
 
           {/* Right — milestones + moat */}
           <div className="space-y-5">
-            <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <p className="font-black text-white text-sm uppercase tracking-wider mb-4">18-month targets</p>
+            <div className="rounded-2xl p-6" style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))" }}>
+              <p className="font-black text-sm uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-text))" }}>18-month targets</p>
               <div className="space-y-3">
                 {MILESTONES.map((m) => (
                   <div key={m.label} className="flex items-start gap-3">
                     <span className="mt-0.5 flex-shrink-0" style={{ color: "hsl(var(--sq-orange))" }}>→</span>
                     <div>
-                      <p className="font-bold text-white text-sm">{m.label}</p>
-                      <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>{m.desc}</p>
+                      <p className="font-bold text-sm" style={{ color: "hsl(var(--sq-text))" }}>{m.label}</p>
+                      <p className="text-xs" style={{ color: "hsl(var(--sq-muted))" }}>{m.desc}</p>
                     </div>
                   </div>
                 ))}
@@ -101,7 +102,7 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
             {/* Moat */}
             <div className="rounded-2xl p-6" style={{
               border: "1px solid hsl(var(--sq-orange) / 0.3)",
-              background: "hsl(var(--sq-orange) / 0.05)"
+              background: "hsl(var(--sq-orange) / 0.04)"
             }}>
               <p className="font-black text-sm uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
                 Why we win long-term
@@ -109,12 +110,12 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
               <div className="space-y-3">
                 {[
                   { title: "Data flywheel", body: "Every conversation trains our models. Nobody can buy this dataset." },
-                  { title: "Workflow lock-in", body: "Teams that run their research on SquareUp increase switching cost with every brief." },
-                  { title: "Mesa distribution", body: "Warm access across Mesa's portfolio, cohort, and LP companies. Not replicable." },
+                  { title: "Workflow lock-in", body: "Switching cost grows with every brief a team runs on SquareUp." },
+                  { title: "Mesa distribution", body: "Warm access across Mesa's portfolio, cohort, and LP companies." },
                 ].map((m) => (
                   <div key={m.title}>
-                    <p className="font-bold text-white text-xs mb-0.5">{m.title}</p>
-                    <p className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>{m.body}</p>
+                    <p className="font-bold text-xs mb-0.5" style={{ color: "hsl(var(--sq-text))" }}>{m.title}</p>
+                    <p className="text-xs" style={{ color: "hsl(var(--sq-muted))" }}>{m.body}</p>
                   </div>
                 ))}
               </div>

@@ -1,5 +1,4 @@
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
-import AvatarNPDManager from "../avatars/AvatarNPDManager";
 import type { SlideMode } from "@/lib/slides";
 
 export default function CostSection({ mode = "detailed" }: { mode?: SlideMode }) {
@@ -87,21 +86,6 @@ export default function CostSection({ mode = "detailed" }: { mode?: SlideMode })
           </div>
         </div>
 
-        {/* Pull quote + avatar */}
-        <div className={`mt-10 flex flex-col sm:flex-row items-center gap-8 transition-all duration-600 delay-400 ${revealed ? "opacity-100" : "opacity-0"}`}>
-          <blockquote
-            className="border-l-4 pl-5 py-1 flex-1"
-            style={{ borderColor: "hsl(var(--sq-orange))" }}
-          >
-            <p className="font-bold text-lg leading-snug italic" style={{ color: "hsl(var(--sq-text))" }}>
-              "We talked to 50+ leaders across Zepto, Meesho, Swiggy, Titan, Rebel Foods. Same story, every time."
-            </p>
-            <p className="text-sm mt-2 font-medium" style={{ color: "hsl(var(--sq-muted))" }}>
-              — Founders, after 90 days of discovery
-            </p>
-          </blockquote>
-          {!isPresenter && <AvatarNPDManager size={140} />}
-        </div>
       </div>
     </section>
   );
