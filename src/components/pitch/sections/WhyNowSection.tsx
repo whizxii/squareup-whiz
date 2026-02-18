@@ -19,7 +19,7 @@ const PILLARS = [
   {
     num: "03",
     title: "Traditional research firms can't compete — and they know it",
-    body: "6–8 weeks. ₹30–50L. Findings that land after the decision was made. The same AI disrupting every knowledge-work category is now disrupting the ₹142B research industry. The incumbents are too slow to adapt.",
+    body: "6–8 weeks. ₹30–50L. Findings that land after the decision was made. India exposed this gap first — the pace of consumer brand decision-making here makes slow research completely unusable. The incumbents are too slow to adapt globally.",
     stat: "6–8 weeks",
     statLabel: "average time-to-insight from a traditional research agency",
   },
@@ -46,9 +46,12 @@ export default function WhyNowSection({ mode = "detailed" }: { mode?: SlideMode 
               isPresenter ? "text-5xl" : "text-3xl sm:text-4xl lg:text-5xl"
             }`}
           >
-            Three things are true{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>at the same time, for the first time.</span>
+            India is the right market to prove this.{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>Then take it everywhere.</span>
           </h2>
+          <p className="mt-4 text-base max-w-2xl" style={{ color: "rgba(255,255,255,0.4)" }}>
+            The density of consumer brands, the pace of decision-making, and the complete absence of affordable customer research tools — India is the perfect proving ground. What works here scales globally.
+          </p>
         </div>
 
         <div className="space-y-4">

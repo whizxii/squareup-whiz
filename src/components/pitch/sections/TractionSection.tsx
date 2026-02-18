@@ -62,11 +62,11 @@ export default function TractionSection({ mode = "detailed" }: { mode?: SlideMod
           </p>
           <h2 className={`font-black tracking-tight leading-tight ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl lg:text-5xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}>
-            From idea to paid design partners —{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>in under 90 days.</span>
+            Validated in India.{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>Idea to LOI in under 90 days.</span>
           </h2>
           <p className="mt-3 text-sm" style={{ color: "hsl(var(--sq-muted))" }}>
-            This is what an AI-native team moves like.
+            50+ leaders at India's fastest consumer brands. The problem is real, it's urgent, and it's everywhere.
           </p>
         </div>
 

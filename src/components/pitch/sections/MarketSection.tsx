@@ -37,11 +37,11 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
             className={`font-black tracking-tight leading-tight ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}
           >
-            $142B market. Disrupted by AI.<br />
-            <span style={{ color: "hsl(var(--sq-orange))" }}>We're going in at the seam.</span>
+            India first. $142B market.<br />
+            <span style={{ color: "hsl(var(--sq-orange))" }}>The same problem exists everywhere.</span>
           </h2>
           <p className="mt-3 text-sm max-w-lg" style={{ color: "hsl(var(--sq-muted))" }}>
-            We're not chasing the whole market. We're starting with the slice traditional firms are worst at serving: consumer brands who need insight in days, not months.
+            We're starting with India — the highest density of fast-moving consumer brands, the deepest gap in affordable research, and a playbook that ports directly to SEA, MENA, and beyond.
           </p>
         </div>
 
@@ -115,11 +115,11 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
 
         <div className={`mt-10 text-center transition-all duration-500 delay-400 ${revealed ? "opacity-100" : "opacity-0"}`}>
           <p className="font-black" style={{ fontSize: "clamp(1.2rem, 3vw, 1.75rem)", color: "hsl(var(--sq-text))" }}>
-            0.5% of our SOM ={" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>$710M.</span>
+            Prove it in India.{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>Scale it everywhere.</span>
           </p>
           <p className="text-sm mt-2 max-w-xl mx-auto" style={{ color: "hsl(var(--sq-muted))" }}>
-            We're not betting on capturing the whole market. We're betting on being the only credible tool in the top-right quadrant.
+            0.5% of our India SOM = $710M. The same playbook ports directly to SEA, MENA, and global consumer markets. India is the hardest proving ground — if it works here, it works anywhere.
           </p>
         </div>
       </div>

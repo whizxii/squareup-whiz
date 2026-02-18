@@ -30,8 +30,11 @@ export default function CTASection({ mode = "detailed" }: { mode?: SlideMode }) 
           <span style={{ color: "hsl(var(--sq-orange))" }}>a live product, and 20 minutes.</span>
         </h2>
 
-        <p className="text-lg mb-10" style={{ color: "rgba(255,255,255,0.45)" }}>
+        <p className="text-lg mb-4" style={{ color: "rgba(255,255,255,0.45)" }}>
           Book a call. We'll show you the product with real data<br />from our design partner sessions.
+        </p>
+        <p className="text-sm mb-10 font-medium" style={{ color: "hsl(var(--sq-orange) / 0.7)" }}>
+          Built in India · For the world's consumer brands.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
