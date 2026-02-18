@@ -179,7 +179,7 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
                   alt="Overwhelmed brand manager"
                   className="select-none"
                   style={{
-                    width: 400,
+                    width: 520,
                     height: "auto",
                     objectFit: "contain",
                     maskImage: "linear-gradient(to top, transparent 0%, white 12%)",
