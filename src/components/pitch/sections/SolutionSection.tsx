@@ -8,68 +8,87 @@ export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMod
   return (
     <section
       id="solution"
-      className={`relative bg-sq-off-white overflow-hidden ${isPresenter ? "h-full flex items-center px-20" : "py-24 px-6"}`}
+      className={`relative overflow-hidden ${isPresenter ? "h-full flex items-center px-20" : "py-28 px-6"}`}
+      style={{ background: "hsl(var(--sq-off-white))" }}
     >
-      {/* Pulsing watermark */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-40 h-40 rounded-2xl bg-sq-orange/10 animate-pulse-logo flex items-center justify-center">
-          <span className="font-black text-sq-orange/20 text-6xl">S</span>
-        </div>
-      </div>
-
       <div className="max-w-5xl mx-auto relative z-10 w-full" ref={ref}>
-        <h2
-          className={`font-black text-sq-text tracking-tight leading-tight text-center mb-12 ${
-            isPresenter ? "text-5xl" : "text-3xl sm:text-4xl lg:text-5xl"
-          } ${revealed ? "animate-fade-up" : "opacity-0"}`}
-        >
-          A <span className="text-sq-orange">decision-risk reduction layer</span>
-          <br />for consumer brands.
-        </h2>
 
-        {/* Without / With split */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-700 delay-200 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-          {/* Without */}
-          <div className="bg-red-50 border border-red-100 rounded-2xl p-6 space-y-3">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-3 h-3 rounded-full bg-red-400" />
-              <span className="font-bold text-red-700 text-sm uppercase tracking-widest">Without SquareUp</span>
+        {/* Header */}
+        <div className={`mb-16 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
+          <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
+            The Solution
+          </p>
+          <h2
+            className={`font-black tracking-tight leading-tight max-w-3xl ${
+              isPresenter ? "text-5xl" : "text-3xl sm:text-4xl lg:text-5xl"
+            }`}
+            style={{ color: "hsl(var(--sq-text))" }}
+          >
+            A{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>decision-risk reduction</span>{" "}
+            layer for consumer brands.
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed" style={{ color: "hsl(var(--sq-muted))" }}>
+            SquareUp makes talking to customers friction-free — voice agents screen, schedule, and run interviews. AI synthesizes everything. Your team gets clarity, not transcripts.
+          </p>
+        </div>
+
+        {/* Before / After — investor-familiar format */}
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-all duration-700 delay-200 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+
+          {/* Before */}
+          <div className="rounded-2xl p-7 relative overflow-hidden" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}>
+            <div className="absolute top-0 left-0 right-0 h-1 bg-red-400" />
+            <p className="font-black text-xs uppercase tracking-[0.15em] mb-6" style={{ color: "#B91C1C" }}>
+              Today — Without SquareUp
+            </p>
+            <div className="space-y-4">
+              {[
+                { stat: "6–8 weeks", desc: "to get research you can actually trust" },
+                { stat: "₹30–50L", desc: "for a traditional research firm engagement" },
+                { stat: "After launch", desc: "is when most teams discover the wrong assumption" },
+                { stat: "Gut feel", desc: "drives most go/no-go calls at consumer brands" },
+              ].map((item) => (
+                <div key={item.stat} className="flex items-baseline gap-3">
+                  <span className="font-black text-red-700 text-sm flex-shrink-0 w-24">{item.stat}</span>
+                  <span className="text-sm text-red-800">{item.desc}</span>
+                </div>
+              ))}
             </div>
-            {["Decisions made on gut feel & internal metrics", "6–8 weeks to get research you can trust", "Insights scattered across recordings & docs", "Risk only visible after launch — when it's too late"].map((item) => (
-              <div key={item} className="flex items-start gap-2.5">
-                <span className="text-red-400 mt-0.5 font-bold">✕</span>
-                <p className="text-red-800 text-sm">{item}</p>
-              </div>
-            ))}
           </div>
 
-          {/* Arrow */}
-          <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-            <div className="bg-sq-orange text-white w-10 h-10 rounded-full flex items-center justify-center font-black text-lg shadow-lg">
-              →
+          {/* After */}
+          <div className="rounded-2xl p-7 relative overflow-hidden" style={{
+            background: "hsl(var(--sq-orange) / 0.05)",
+            border: "1px solid hsl(var(--sq-orange) / 0.2)"
+          }}>
+            <div className="absolute top-0 left-0 right-0 h-1" style={{ background: "hsl(var(--sq-orange))" }} />
+            <p className="font-black text-xs uppercase tracking-[0.15em] mb-6" style={{ color: "hsl(var(--sq-orange))" }}>
+              With SquareUp
+            </p>
+            <div className="space-y-4">
+              {[
+                { stat: "7 days", desc: "from brief to boardroom-ready Insight Brief" },
+                { stat: "₹1–3L", desc: "per deep-dive study. Fraction of traditional cost" },
+                { stat: "Before week 1", desc: "risks surfaced before you commit resources" },
+                { stat: "Real signal", desc: "from actual conversations, not internal guesswork" },
+              ].map((item) => (
+                <div key={item.stat} className="flex items-baseline gap-3">
+                  <span className="font-black text-sm flex-shrink-0 w-24" style={{ color: "hsl(var(--sq-orange))" }}>{item.stat}</span>
+                  <span className="text-sm" style={{ color: "hsl(var(--sq-text))" }}>{item.desc}</span>
+                </div>
+              ))}
             </div>
-          </div>
-
-          {/* With */}
-          <div className="bg-orange-50 border border-sq-orange/20 rounded-2xl p-6 space-y-3">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-3 h-3 rounded-full bg-sq-orange" />
-              <span className="font-bold text-sq-orange text-sm uppercase tracking-widest">With SquareUp</span>
-            </div>
-            {["Decision-grade signal from real customer conversations", "7 days from brief to boardroom-ready insights", "One system of record: calls, tickets, reviews, socials", "Risk flagged before you commit — not after"].map((item) => (
-              <div key={item} className="flex items-start gap-2.5">
-                <span className="text-sq-orange mt-0.5 font-bold">✓</span>
-                <p className="text-sq-text text-sm">{item}</p>
-              </div>
-            ))}
           </div>
         </div>
 
-        <p
-          className={`text-center text-sq-muted mt-8 max-w-3xl mx-auto text-sm sm:text-base leading-relaxed transition-all duration-500 delay-500 ${revealed ? "opacity-100" : "opacity-0"}`}
-        >
-          SquareUp makes talking to customers friction-free — using voice agents to screen, schedule, and co-pilot interviews. Then runs AI-led campaigns to validate at scale. Then connects calls, tickets, reviews, socials, and product data into one system of record.
-        </p>
+        {/* One-liner callout */}
+        <div className={`mt-8 text-center transition-all duration-500 delay-500 ${revealed ? "opacity-100" : "opacity-0"}`}>
+          <p className="font-black text-xl" style={{ color: "hsl(var(--sq-text))" }}>
+            The only system that actively <span style={{ color: "hsl(var(--sq-orange))" }}>generates</span> decision-grade signal.<br />
+            <span className="font-normal text-base" style={{ color: "hsl(var(--sq-muted))" }}>Not organizes it. Not analyzes existing data. Creates it from scratch.</span>
+          </p>
+        </div>
       </div>
     </section>
   );

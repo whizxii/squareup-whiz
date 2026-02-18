@@ -1,17 +1,20 @@
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import type { SlideMode } from "@/lib/slides";
 
-const PIE_DATA = [
-  { name: "SquareUp TAM", value: 0.5 },
-  { name: "Rest of Market", value: 99.5 },
-];
 const BAR_DATA = [
   { year: "2024", value: 26 },
   { year: "2026", value: 38 },
   { year: "2028", value: 54 },
   { year: "2030", value: 71 },
   { year: "2034", value: 84 },
+];
+
+const TAM_BREAKDOWN = [
+  { label: "Global CX & Insights Market", value: "$142B", sub: "Total Addressable Market", highlight: false },
+  { label: "AI-Powered Research Tools", value: "$18B", sub: "Serviceable Addressable Market", highlight: false },
+  { label: "Consumer Brands (SquareUp ICP)", value: "$2.8B", sub: "Serviceable Obtainable Market", highlight: false },
+  { label: "0.5% capture", value: "$710M", sub: "Our 5-year target", highlight: true },
 ];
 
 export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode }) {
@@ -21,53 +24,110 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
   return (
     <section
       id="market"
-      className={`bg-sq-off-white ${isPresenter ? "h-full flex items-center px-16" : "py-24 px-6"}`}
+      className={`${isPresenter ? "h-full flex items-center px-16" : "py-28 px-6"}`}
+      style={{ background: "hsl(var(--sq-off-white))" }}
     >
       <div className="max-w-5xl mx-auto w-full" ref={ref}>
-        <h2
-          className={`font-black text-sq-text tracking-tight leading-tight text-center mb-12 ${
-            isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"
-          } ${revealed ? "animate-fade-up" : "opacity-0"}`}
-        >
-          A <span className="text-sq-orange">$142B industry</span> ready for disruption.
-        </h2>
 
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-12 items-center transition-all duration-600 delay-200 ${revealed ? "opacity-100" : "opacity-0 translate-y-8"}`}>
-          {/* Pie */}
-          <div className="text-center">
-            <p className="font-bold text-sq-muted text-sm uppercase tracking-wider mb-4">Global CX Insights Market</p>
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={PIE_DATA} cx="50%" cy="50%" innerRadius={65} outerRadius={105} startAngle={90} endAngle={-270} dataKey="value">
-                  <Cell fill="hsl(18,100%,60%)" />
-                  <Cell fill="hsl(0,0%,90%)" />
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <p className="font-black text-sq-text text-lg mt-2">$142B total market</p>
-            <p className="text-sq-orange font-bold text-sm">0.5% capture = <span className="text-xl">$710M</span></p>
+        {/* Header */}
+        <div className={`mb-14 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
+          <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
+            Market Size
+          </p>
+          <h2
+            className={`font-black tracking-tight leading-tight ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"}`}
+            style={{ color: "hsl(var(--sq-text))" }}
+          >
+            A{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>$142B industry</span>{" "}
+            ready for disruption.
+          </h2>
+        </div>
+
+        <div className={`grid grid-cols-1 ${isPresenter ? "grid-cols-2" : "md:grid-cols-2"} gap-10 items-start transition-all duration-600 delay-200 ${revealed ? "opacity-100" : "opacity-0 translate-y-8"}`}>
+
+          {/* TAM breakdown — investor table format */}
+          <div className="space-y-2">
+            <p className="font-bold text-xs uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
+              Market Sizing
+            </p>
+            {TAM_BREAKDOWN.map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center justify-between rounded-xl px-5 py-4"
+                style={{
+                  background: item.highlight
+                    ? "hsl(var(--sq-orange) / 0.08)"
+                    : "hsl(var(--sq-card))",
+                  border: `1px solid ${item.highlight ? "hsl(var(--sq-orange) / 0.25)" : "hsl(var(--sq-subtle))"}`,
+                }}
+              >
+                <div>
+                  <p className={`font-bold text-sm ${item.highlight ? "" : ""}`}
+                    style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>
+                    {item.label}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: "hsl(var(--sq-muted))" }}>{item.sub}</p>
+                </div>
+                <span
+                  className="font-black text-lg"
+                  style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}
+                >
+                  {item.value}
+                </span>
+              </div>
+            ))}
           </div>
 
-          {/* Bar */}
+          {/* Bar chart — market growth */}
           <div>
-            <p className="font-bold text-sq-muted text-sm uppercase tracking-wider mb-4 text-center">CX Management Market Growth ($B)</p>
-            <ResponsiveContainer width="100%" height={240}>
+            <p className="font-bold text-xs uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
+              CX Management Market Growth ($B)
+            </p>
+            <ResponsiveContainer width="100%" height={260}>
               <BarChart data={BAR_DATA} barCategoryGap="30%">
-                <XAxis dataKey="year" tick={{ fill: "hsl(0,0%,50%)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <XAxis
+                  dataKey="year"
+                  tick={{ fill: "hsl(0,0%,50%)", fontSize: 11, fontWeight: 600 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <YAxis hide />
-                <Tooltip formatter={(v) => [`$${v}B`, "Market Size"]} contentStyle={{ background: "white", border: "1px solid hsl(0,0%,90%)", borderRadius: 8, fontSize: 12 }} />
-                <Bar dataKey="value" fill="hsl(18,100%,60%)" radius={[6, 6, 0, 0]} />
+                <Tooltip
+                  formatter={(v) => [`$${v}B`, "Market Size"]}
+                  contentStyle={{
+                    background: "white",
+                    border: "1px solid hsl(0,0%,90%)",
+                    borderRadius: 10,
+                    fontSize: 12,
+                    fontWeight: 700
+                  }}
+                />
+                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                  {BAR_DATA.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={index === BAR_DATA.length - 1
+                        ? "hsl(var(--sq-orange))"
+                        : "hsl(var(--sq-orange) / 0.35)"}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
+            <p className="text-center text-xs mt-2 font-medium" style={{ color: "hsl(var(--sq-muted))" }}>
+              Source: Grand View Research, 2024
+            </p>
           </div>
         </div>
 
         <div className={`mt-10 text-center transition-all duration-500 delay-400 ${revealed ? "opacity-100" : "opacity-0"}`}>
-          <p className="font-black text-sq-text text-xl sm:text-2xl">
-            Capturing <span className="text-sq-orange">0.5% = $710M.</span>
+          <p className="font-black" style={{ fontSize: "clamp(1.2rem, 3vw, 1.75rem)", color: "hsl(var(--sq-text))" }}>
+            0.5% capture ={" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>$710M.</span>
           </p>
-          <p className="text-sq-muted text-sm mt-2 max-w-xl mx-auto">
-            We're starting with the hardest, most underserved part of this market — and building the distribution moat to own it.
+          <p className="text-sm mt-2 max-w-xl mx-auto" style={{ color: "hsl(var(--sq-muted))" }}>
+            We're starting with the hardest, most underserved slice — and building the distribution moat to own it.
           </p>
         </div>
       </div>
