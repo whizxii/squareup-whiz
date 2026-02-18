@@ -55,8 +55,7 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
               }`}
               style={{ color: "hsl(var(--sq-text))", animationDelay: "60ms" }}
             >
-              Every brand says they<br />
-              talk to customers.<br />
+              Every brand says they talk to customers.{" "}
               <span
                 style={{
                   color: "hsl(var(--sq-orange))",
@@ -66,7 +65,7 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
                   textUnderlineOffset: "6px",
                 }}
               >
-                Almost none do it<br />enough to matter.
+                Almost none do it enough to matter.
               </span>
             </h2>
 
