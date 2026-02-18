@@ -126,7 +126,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
             {!isPresenter && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-md sm:max-w-none">
                 <ProofCard stat="3" label="LOIs signed" delay={200} />
-                <ProofCard stat="50+" label="leaders interviewed" delay={280} />
+                <ProofCard stat="50" label="leaders interviewed" delay={280} />
                 <ProofCard stat="< 90d" label="idea to LOI" delay={360} />
                 <ProofCard stat="MVP" label="live now" delay={440} />
               </div>
