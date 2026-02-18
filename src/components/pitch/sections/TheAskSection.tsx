@@ -2,15 +2,15 @@ import { useScrollAnimation, useCountUp } from "@/lib/useScrollAnimation";
 import type { SlideMode } from "@/lib/slides";
 
 const FUNDS = [
-  { pct: "50%", label: "Product", detail: "AI infrastructure depth. Voice agent reliability. Insight brief quality. The core.", icon: "⚙️" },
-  { pct: "40%", label: "GTM", detail: "Convert 3 design partners → paying case studies. Mesa network activation.", icon: "🚀" },
-  { pct: "10%", label: "Ops", detail: "Team, tools, legal. Lean until we don't need to be.", icon: "🔩" },
+  { pct: "50%", label: "Build", detail: "Deepen the AI core. Voice agent reliability, insight brief quality, model fine-tuning. The product has to be undeniably good.", icon: "⚙️" },
+  { pct: "40%", label: "Sell", detail: "Convert 3 LOIs → paying customers → case studies. Direct outreach, founder-led sales, Mesa network.", icon: "🚀" },
+  { pct: "10%", label: "Ops", detail: "Tools, infra, legal. Team stays lean. No bloat.", icon: "🔩" },
 ];
 
 const MILESTONES = [
-  { label: "Revenue", desc: "First paying customers in 90 days" },
-  { label: "Case Studies", desc: "3 design partners → published proof" },
-  { label: "Series A Setup", desc: "Repeatable sales motion through Mesa + Elevation network" },
+  { label: "First Revenue", desc: "3 LOI partners → paid in 90 days" },
+  { label: "Proof on Paper", desc: "Published case studies with real brand names" },
+  { label: "Series A Ready", desc: "Repeatable motion: 10 paying brands, clear unit economics" },
 ];
 
 function AskCounter() {
@@ -55,8 +55,8 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
             {/* Big number */}
             <div className="mb-8">
               <AskCounter />
-              <p className="text-sm mt-2" style={{ color: "rgba(255,255,255,0.4)" }}>
-                This capital buys us revenue in 90 days and a repeatable sales motion.
+          <p className="text-sm mt-2" style={{ color: "rgba(255,255,255,0.4)" }}>
+                Two founders. One focus: build and sell. No hiring until the motion is proven.
               </p>
             </div>
 
@@ -85,7 +85,7 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
           <div className="space-y-5">
             {/* What this unlocks */}
             <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <p className="font-black text-white text-sm uppercase tracking-wider mb-4">What this unlocks</p>
+              <p className="font-black text-white text-sm uppercase tracking-wider mb-4">18-month targets</p>
               <div className="space-y-3">
                 {MILESTONES.map((m) => (
                   <div key={m.label} className="flex items-start gap-3">
