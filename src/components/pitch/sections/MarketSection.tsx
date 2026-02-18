@@ -11,10 +11,10 @@ const BAR_DATA = [
 ];
 
 const TAM_BREAKDOWN = [
-  { label: "Global CX & Insights Market", value: "$142B", sub: "Total Addressable Market", highlight: false },
-  { label: "AI-Powered Research Tools", value: "$18B", sub: "Serviceable Addressable Market", highlight: false },
-  { label: "Consumer Brands (SquareUp ICP)", value: "$2.8B", sub: "Serviceable Obtainable Market", highlight: false },
-  { label: "0.5% capture", value: "$710M", sub: "Our 5-year target", highlight: true },
+  { label: "Global CX & Insights Market", value: "$142B", sub: "TAM — Grand View Research, 2024", highlight: false },
+  { label: "AI-Powered Research Tools", value: "$18B", sub: "SAM — tools replacing human-led research", highlight: false },
+  { label: "Consumer Brands (SquareUp ICP)", value: "$2.8B", sub: "SOM — mid-market consumer, India + SEA first", highlight: false },
+  { label: "0.5% of SOM in 5 years", value: "$710M", sub: "Our target — highly conservative at that capture rate", highlight: true },
 ];
 
 export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode }) {
@@ -29,7 +29,6 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
     >
       <div className="max-w-5xl mx-auto w-full" ref={ref}>
 
-        {/* Header */}
         <div className={`mb-14 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
             Market Size
@@ -38,51 +37,47 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
             className={`font-black tracking-tight leading-tight ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}
           >
-            A{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>$142B industry</span>{" "}
-            ready for disruption.
+            $142B market. Disrupted by AI.<br />
+            <span style={{ color: "hsl(var(--sq-orange))" }}>We're going in at the seam.</span>
           </h2>
+          <p className="mt-3 text-sm max-w-lg" style={{ color: "hsl(var(--sq-muted))" }}>
+            We're not chasing the whole market. We're starting with the slice traditional firms are worst at serving: consumer brands who need insight in days, not months.
+          </p>
         </div>
 
         <div className={`grid grid-cols-1 ${isPresenter ? "grid-cols-2" : "md:grid-cols-2"} gap-10 items-start transition-all duration-600 delay-200 ${revealed ? "opacity-100" : "opacity-0 translate-y-8"}`}>
 
-          {/* TAM breakdown — investor table format */}
+          {/* TAM breakdown */}
           <div className="space-y-2">
             <p className="font-bold text-xs uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
-              Market Sizing
+              Market Sizing (TAM → SOM)
             </p>
             {TAM_BREAKDOWN.map((item) => (
               <div
                 key={item.label}
                 className="flex items-center justify-between rounded-xl px-5 py-4"
                 style={{
-                  background: item.highlight
-                    ? "hsl(var(--sq-orange) / 0.08)"
-                    : "hsl(var(--sq-card))",
+                  background: item.highlight ? "hsl(var(--sq-orange) / 0.08)" : "hsl(var(--sq-card))",
                   border: `1px solid ${item.highlight ? "hsl(var(--sq-orange) / 0.25)" : "hsl(var(--sq-subtle))"}`,
                 }}
               >
                 <div>
-                  <p className={`font-bold text-sm ${item.highlight ? "" : ""}`}
-                    style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>
+                  <p className="font-bold text-sm" style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>
                     {item.label}
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: "hsl(var(--sq-muted))" }}>{item.sub}</p>
                 </div>
-                <span
-                  className="font-black text-lg"
-                  style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}
-                >
+                <span className="font-black text-lg ml-4 flex-shrink-0" style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>
                   {item.value}
                 </span>
               </div>
             ))}
           </div>
 
-          {/* Bar chart — market growth */}
+          {/* Bar chart */}
           <div>
             <p className="font-bold text-xs uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
-              CX Management Market Growth ($B)
+              CX Management Market Growth ($B) — Grand View Research
             </p>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={BAR_DATA} barCategoryGap="30%">
@@ -115,19 +110,16 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-            <p className="text-center text-xs mt-2 font-medium" style={{ color: "hsl(var(--sq-muted))" }}>
-              Source: Grand View Research, 2024
-            </p>
           </div>
         </div>
 
         <div className={`mt-10 text-center transition-all duration-500 delay-400 ${revealed ? "opacity-100" : "opacity-0"}`}>
           <p className="font-black" style={{ fontSize: "clamp(1.2rem, 3vw, 1.75rem)", color: "hsl(var(--sq-text))" }}>
-            0.5% capture ={" "}
+            0.5% of our SOM ={" "}
             <span style={{ color: "hsl(var(--sq-orange))" }}>$710M.</span>
           </p>
           <p className="text-sm mt-2 max-w-xl mx-auto" style={{ color: "hsl(var(--sq-muted))" }}>
-            We're starting with the hardest, most underserved slice — and building the distribution moat to own it.
+            We're not betting on capturing the whole market. We're betting on being the only credible tool in the top-right quadrant.
           </p>
         </div>
       </div>

@@ -14,9 +14,9 @@ export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMod
       <div className="max-w-5xl mx-auto relative z-10 w-full" ref={ref}>
 
         {/* Header */}
-        <div className={`mb-16 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
+        <div className={`mb-14 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
-            The Solution
+            What We Do
           </p>
           <h2
             className={`font-black tracking-tight leading-tight max-w-3xl ${
@@ -24,34 +24,35 @@ export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMod
             }`}
             style={{ color: "hsl(var(--sq-text))" }}
           >
-            A{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>decision-risk reduction</span>{" "}
-            layer for consumer brands.
+            SquareUp runs AI customer interviews<br />
+            and delivers a{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>decision-ready brief in 7 days.</span>
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-relaxed" style={{ color: "hsl(var(--sq-muted))" }}>
-            SquareUp makes talking to customers friction-free — voice agents screen, schedule, and run interviews. AI synthesizes everything. Your team gets clarity, not transcripts.
+            Not a survey. Not a transcript. An Insight Brief — with severity scores, validated risks, and a recommended next step.
+            Your team gets clarity, not homework.
           </p>
         </div>
 
-        {/* Before / After — investor-familiar format */}
+        {/* Before / After */}
         <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-all duration-700 delay-200 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
 
           {/* Before */}
           <div className="rounded-2xl p-7 relative overflow-hidden" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}>
             <div className="absolute top-0 left-0 right-0 h-1 bg-red-400" />
-            <p className="font-black text-xs uppercase tracking-[0.15em] mb-6" style={{ color: "#B91C1C" }}>
-              Today — Without SquareUp
+            <p className="font-black text-xs uppercase tracking-[0.15em] mb-6 text-red-800">
+              Without SquareUp
             </p>
             <div className="space-y-4">
               {[
-                { stat: "6–8 weeks", desc: "to get research you can actually trust" },
-                { stat: "₹30–50L", desc: "for a traditional research firm engagement" },
+                { stat: "6–8 weeks", desc: "to get research you can trust" },
+                { stat: "₹30–50L", desc: "for a research agency — if you can afford one" },
                 { stat: "After launch", desc: "is when most teams discover the wrong assumption" },
-                { stat: "Gut feel", desc: "drives most go/no-go calls at consumer brands" },
+                { stat: "Gut feel", desc: "drives go/no-go calls at most consumer brands" },
               ].map((item) => (
                 <div key={item.stat} className="flex items-baseline gap-3">
-                  <span className="font-black text-red-700 text-sm flex-shrink-0 w-24">{item.stat}</span>
-                  <span className="text-sm text-red-800">{item.desc}</span>
+                  <span className="font-black text-red-700 text-sm flex-shrink-0 w-28">{item.stat}</span>
+                  <span className="text-sm text-red-900">{item.desc}</span>
                 </div>
               ))}
             </div>
@@ -68,13 +69,13 @@ export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMod
             </p>
             <div className="space-y-4">
               {[
-                { stat: "7 days", desc: "from brief to boardroom-ready Insight Brief" },
-                { stat: "₹1–3L", desc: "per deep-dive study. Fraction of traditional cost" },
+                { stat: "7 days", desc: "from brief to Insight Brief on your desk" },
+                { stat: "₹1–3L", desc: "per study — fraction of a traditional firm" },
                 { stat: "Before week 1", desc: "risks surfaced before you commit resources" },
-                { stat: "Real signal", desc: "from actual conversations, not internal guesswork" },
+                { stat: "Real signal", desc: "from AI-led conversations, not internal guesses" },
               ].map((item) => (
                 <div key={item.stat} className="flex items-baseline gap-3">
-                  <span className="font-black text-sm flex-shrink-0 w-24" style={{ color: "hsl(var(--sq-orange))" }}>{item.stat}</span>
+                  <span className="font-black text-sm flex-shrink-0 w-28" style={{ color: "hsl(var(--sq-orange))" }}>{item.stat}</span>
                   <span className="text-sm" style={{ color: "hsl(var(--sq-text))" }}>{item.desc}</span>
                 </div>
               ))}
@@ -82,11 +83,15 @@ export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMod
           </div>
         </div>
 
-        {/* One-liner callout */}
-        <div className={`mt-8 text-center transition-all duration-500 delay-500 ${revealed ? "opacity-100" : "opacity-0"}`}>
-          <p className="font-black text-xl" style={{ color: "hsl(var(--sq-text))" }}>
-            The only system that actively <span style={{ color: "hsl(var(--sq-orange))" }}>generates</span> decision-grade signal.<br />
-            <span className="font-normal text-base" style={{ color: "hsl(var(--sq-muted))" }}>Not organizes it. Not analyzes existing data. Creates it from scratch.</span>
+        {/* The wedge */}
+        <div className={`mt-8 rounded-2xl px-7 py-5 text-center transition-all duration-500 delay-500 ${revealed ? "opacity-100" : "opacity-0"}`}
+          style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))" }}>
+          <p className="font-black text-lg" style={{ color: "hsl(var(--sq-text))" }}>
+            Every other tool organizes feedback you already have.{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>SquareUp generates signal from scratch.</span>
+          </p>
+          <p className="text-sm mt-1" style={{ color: "hsl(var(--sq-muted))" }}>
+            AI-led interviews. Screened respondents. Synthesized findings. No agency required.
           </p>
         </div>
       </div>
