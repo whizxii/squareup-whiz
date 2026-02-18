@@ -2,22 +2,22 @@ import { useScrollAnimation, useCountUp } from "@/lib/useScrollAnimation";
 import type { SlideMode } from "@/lib/slides";
 
 const FUNDS = [
-  { pct: "50%", label: "Build", detail: "Deepen the AI core. Voice agent reliability, insight brief quality, model fine-tuning." },
-  { pct: "40%", label: "Sell", detail: "Convert 3 LOIs → paying customers → case studies. Founder-led sales, Mesa network." },
-  { pct: "10%", label: "Ops", detail: "Tools, infra, legal. Team stays lean." },
+  { pct: "50%", label: "Product", detail: "AI core depth — voice reliability, brief quality, fine-tuning.", width: "50%" },
+  { pct: "40%", label: "GTM", detail: "Convert 3 LOIs → paying customers → case studies.", width: "40%" },
+  { pct: "10%", label: "Ops", detail: "Tools, infra, legal. Stays lean.", width: "10%" },
 ];
 
 const MILESTONES = [
-  { label: "First Revenue", desc: "3 LOI partners → paid in 90 days" },
-  { label: "Proof on Paper", desc: "Published case studies with real brand names" },
-  { label: "Series A Ready", desc: "10 paying brands, clear unit economics" },
+  { label: "First Revenue", desc: "3 LOI partners → paid in 90 days", icon: "💰" },
+  { label: "Proof on Paper", desc: "Case studies with real brand names published", icon: "📄" },
+  { label: "Series A Ready", desc: "10 paying brands, clear unit economics", icon: "🚀" },
 ];
 
 function AskCounter() {
   const { ref, display } = useCountUp(500, 2000, "$", "K");
   return (
     <div ref={ref as React.RefObject<HTMLDivElement>} className="font-black tracking-tight leading-none"
-      style={{ fontSize: "clamp(4rem, 12vw, 7rem)", color: "hsl(var(--sq-orange))" }}>
+      style={{ fontSize: "clamp(4.5rem, 12vw, 8rem)", color: "hsl(var(--sq-orange))" }}>
       {display}
     </div>
   );
@@ -52,44 +52,41 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
 
         <div className={`grid ${isPresenter ? "grid-cols-2" : "lg:grid-cols-2"} gap-10 transition-all duration-600 delay-200 ${revealed ? "opacity-100" : "opacity-0 translate-y-8"}`}>
 
-          {/* Left — amount + use of funds */}
+          {/* Left — amount + fund chips */}
           <div>
-            <div className="mb-8">
+            <div className="mb-10">
               <AskCounter />
               <p className="text-sm mt-2" style={{ color: "hsl(var(--sq-muted))" }}>
                 Two founders. No overhead. Revenue in 90 days.
               </p>
             </div>
 
-            {/* Use of funds bars */}
-            <div className="space-y-4">
+            {/* Fund allocation — stat chips */}
+            <div className="flex flex-wrap gap-3 mb-8">
               {FUNDS.map((f) => (
-                <div key={f.label}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-bold text-sm" style={{ color: "hsl(var(--sq-text))" }}>{f.label}</span>
-                    <span className="font-black text-sm" style={{ color: "hsl(var(--sq-orange))" }}>{f.pct}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full" style={{ background: "hsl(var(--sq-subtle))" }}>
-                    <div className="h-full rounded-full" style={{
-                      width: f.pct,
-                      background: "hsl(var(--sq-orange))",
-                      boxShadow: "0 0 8px hsl(var(--sq-orange) / 0.3)"
-                    }} />
-                  </div>
-                  <p className="text-xs mt-1" style={{ color: "hsl(var(--sq-muted))" }}>{f.detail}</p>
+                <div key={f.label} className="rounded-2xl px-5 py-3" style={{
+                  background: "hsl(var(--sq-card))",
+                  border: "1px solid hsl(var(--sq-subtle))"
+                }}>
+                  <div className="font-black text-xl mb-0.5" style={{ color: "hsl(var(--sq-orange))" }}>{f.pct}</div>
+                  <div className="font-bold text-xs" style={{ color: "hsl(var(--sq-text))" }}>{f.label}</div>
+                  <div className="text-xs mt-0.5 max-w-[100px]" style={{ color: "hsl(var(--sq-muted))" }}>{f.detail}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Right — milestones + moat */}
-          <div className="space-y-5">
-            <div className="rounded-2xl p-6" style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))" }}>
-              <p className="font-black text-sm uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-text))" }}>18-month targets</p>
-              <div className="space-y-3">
-                {MILESTONES.map((m) => (
-                  <div key={m.label} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex-shrink-0" style={{ color: "hsl(var(--sq-orange))" }}>→</span>
+          {/* Right — 18-month milestones */}
+          <div>
+            <div className="rounded-2xl p-6 mb-5" style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))" }}>
+              <p className="font-black text-xs uppercase tracking-wider mb-5" style={{ color: "hsl(var(--sq-text))" }}>18-month proof points</p>
+              <div className="space-y-4">
+                {MILESTONES.map((m, i) => (
+                  <div key={m.label} className="flex items-start gap-4">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{
+                      background: "hsl(var(--sq-off-white))",
+                      border: "1px solid hsl(var(--sq-subtle))"
+                    }}>{m.icon}</div>
                     <div>
                       <p className="font-bold text-sm" style={{ color: "hsl(var(--sq-text))" }}>{m.label}</p>
                       <p className="text-xs" style={{ color: "hsl(var(--sq-muted))" }}>{m.desc}</p>
@@ -99,23 +96,23 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
               </div>
             </div>
 
-            {/* Moat */}
-            <div className="rounded-2xl p-6" style={{
-              border: "1px solid hsl(var(--sq-orange) / 0.3)",
-              background: "hsl(var(--sq-orange) / 0.04)"
+            {/* Data flywheel moat — condensed */}
+            <div className="rounded-2xl p-5" style={{
+              background: "hsl(var(--sq-orange) / 0.06)",
+              border: "1px solid hsl(var(--sq-orange) / 0.2)"
             }}>
-              <p className="font-black text-sm uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
+              <p className="font-black text-xs uppercase tracking-wider mb-3" style={{ color: "hsl(var(--sq-orange))" }}>
                 Why we win long-term
               </p>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {[
-                  { title: "Data flywheel", body: "Every conversation trains our models. Nobody can buy this dataset." },
-                  { title: "Workflow lock-in", body: "Switching cost grows with every brief a team runs on SquareUp." },
-                  { title: "Mesa distribution", body: "Warm access across Mesa's portfolio, cohort, and LP companies." },
+                  "Data flywheel — every call trains our models",
+                  "Workflow lock-in — switching cost compounds",
+                  "Mesa distribution — warm portfolio access",
                 ].map((m) => (
-                  <div key={m.title}>
-                    <p className="font-bold text-xs mb-0.5" style={{ color: "hsl(var(--sq-text))" }}>{m.title}</p>
-                    <p className="text-xs" style={{ color: "hsl(var(--sq-muted))" }}>{m.body}</p>
+                  <div key={m} className="flex items-start gap-2">
+                    <span className="flex-shrink-0 mt-0.5 font-bold" style={{ color: "hsl(var(--sq-orange))" }}>→</span>
+                    <p className="text-xs" style={{ color: "hsl(var(--sq-text))" }}>{m}</p>
                   </div>
                 ))}
               </div>
