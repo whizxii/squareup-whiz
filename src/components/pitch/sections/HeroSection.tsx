@@ -1,5 +1,4 @@
 import { ChevronDown } from "lucide-react";
-import avatarMain from "@/assets/avatar-hero-main.png";
 import avatarAnalyst from "@/assets/avatar-hero-analyst-white.png";
 import type { SlideMode } from "@/lib/slides";
 
@@ -160,38 +159,16 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
           </div>
 
           {/* RIGHT — Avatar stage */}
-          <div className={`relative ${isPresenter ? "" : "hidden lg:block"}`}
-            style={{ minHeight: 640 }}>
-
-            {/* Warm glow behind avatars */}
+          <div
+            className={`relative ${isPresenter ? "" : "hidden lg:block"}`}
+            style={{ minHeight: 640 }}
+          >
+            {/* Warm glow behind avatar */}
             <div className="absolute inset-0 pointer-events-none" style={{
-              backgroundImage: "radial-gradient(ellipse 70% 60% at 50% 90%, hsl(var(--sq-orange) / 0.08) 0%, transparent 70%)",
+              backgroundImage: "radial-gradient(ellipse 70% 60% at 55% 90%, hsl(var(--sq-orange) / 0.08) 0%, transparent 70%)",
             }} />
 
-            {/* Secondary avatar — male, left, ghost — slow float offset */}
-            <div
-              className="absolute bottom-0 left-0 animate-fade-up z-10"
-              style={{ animationDelay: "300ms" }}
-            >
-              <div className="animate-avatar-float-slow" style={{ animationDelay: "1.2s" }}>
-                <img
-                  src={avatarMain}
-                  alt="Brand strategist"
-                  className="select-none"
-                  style={{
-                    width: 180,
-                    height: "auto",
-                    objectFit: "contain",
-                    maskImage: "linear-gradient(to top, transparent 0%, white 30%)",
-                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 30%)",
-                    opacity: 0.45,
-                    filter: "saturate(0.6)",
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Primary avatar — female analyst, float animation */}
+            {/* Single primary avatar — female analyst, floating */}
             <div
               className="absolute bottom-0 right-4 animate-fade-up z-20"
               style={{ animationDelay: "160ms" }}
@@ -202,7 +179,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
                   alt="Consumer insights analyst"
                   className="select-none"
                   style={{
-                    width: 320,
+                    width: 360,
                     height: "auto",
                     objectFit: "contain",
                     maskImage: "linear-gradient(to top, transparent 0%, white 10%)",
@@ -211,6 +188,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
                 />
               </div>
             </div>
+          
 
             {/* Floating insight cards */}
             <div className="absolute top-10 right-2 z-30">
