@@ -2,87 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
+    /* SquareUp Brand Tokens */
+    --sq-dark: 0 0% 5%;           /* #0D0D0D */
+    --sq-off-white: 45 14% 96%;   /* #F7F6F2 */
+    --sq-orange: 18 100% 60%;     /* #FF6B35 */
+    --sq-amber: 35 100% 65%;      /* #FFAA4D */
+    --sq-text: 0 0% 10%;          /* #1A1A1A */
+    --sq-muted: 0 0% 29%;         /* #4A4A4A */
+    --sq-card: 0 0% 100%;         /* #FFFFFF */
+    --sq-subtle: 42 14% 93%;      /* #F0EFE9 */
+    --sq-skin: 30 56% 77%;        /* #E8C4A0 avatar skin */
+
+    /* shadcn/ui system */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
-
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
+    --primary: 18 100% 60%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
-
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
-
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
+    --ring: 18 100% 60%;
+    --radius: 0.75rem;
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
-
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
+    --primary: 18 100% 60%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --ring: 18 100% 60%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -98,8 +81,91 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* SquareUp hero blob animations */
+@keyframes blob-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(60px, -40px) scale(1.08); }
+  66% { transform: translate(-30px, 50px) scale(0.95); }
+}
+@keyframes blob-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-50px, 30px) scale(0.92); }
+  66% { transform: translate(40px, -60px) scale(1.06); }
+}
+@keyframes bounce-chevron {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+@keyframes ping-orange {
+  0% { transform: scale(1); opacity: 1; }
+  75%, 100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes counter-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(32px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes timeline-fill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+@keyframes pulse-logo {
+  0%, 100% { opacity: 0.06; transform: scale(1); }
+  50% { opacity: 0.10; transform: scale(1.03); }
+}
+
+.animate-blob-1 { animation: blob-drift-1 12s ease-in-out infinite; }
+.animate-blob-2 { animation: blob-drift-2 17s ease-in-out infinite; }
+.animate-bounce-chevron { animation: bounce-chevron 1.6s ease-in-out infinite; }
+.animate-ping-orange { animation: ping-orange 2s cubic-bezier(0,0,0.2,1) infinite; }
+.animate-fade-up { animation: fade-up 0.6s ease-out forwards; }
+.animate-slide-right { animation: slide-in-right 0.5s ease-out forwards; }
+.animate-timeline-fill { animation: timeline-fill 1.5s ease-out forwards; }
+.animate-pulse-logo { animation: pulse-logo 4s ease-in-out infinite; }
+
+/* Presenter mode slide transitions */
+.slide-enter {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.slide-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 350ms ease-out, transform 350ms ease-out;
+}
+.slide-exit {
+  opacity: 1;
+  transform: scale(1);
+}
+.slide-exit-active {
+  opacity: 0;
+  transform: scale(1.04);
+  transition: opacity 250ms ease-in, transform 250ms ease-in;
+}
+
+/* Scroll animation utility */
+.sq-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.sq-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
 }
