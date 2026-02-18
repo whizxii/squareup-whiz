@@ -34,7 +34,7 @@ export default function FAQSection({ mode = "detailed" }: { mode?: SlideMode }) 
   const { ref, revealed } = useScrollAnimation();
 
   return (
-    <section id="faq" className="py-28 px-6" style={{ background: "hsl(var(--sq-card))" }}>
+    <section id="faq" className="py-24 px-6" style={{ background: "hsl(var(--sq-off-white))" }}>
       <div className="max-w-3xl mx-auto" ref={ref}>
         <div className={`mb-12 text-center transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
