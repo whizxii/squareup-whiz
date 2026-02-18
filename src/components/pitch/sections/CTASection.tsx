@@ -1,4 +1,5 @@
 import type { SlideMode } from "@/lib/slides";
+import iconSvg from "@/assets/icon.svg";
 
 export default function CTASection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
@@ -19,8 +20,11 @@ export default function CTASection({ mode = "detailed" }: { mode?: SlideMode }) 
       />
 
       <div className="relative z-10 text-center max-w-2xl mx-auto">
-        <div className="mb-8 text-white font-black text-2xl tracking-tight">
-          Square<span style={{ color: "hsl(var(--sq-orange))" }}>Up</span>
+        <div className="mb-8 flex items-center justify-center gap-2.5">
+          <img src={iconSvg} alt="SquareUp" className="h-8 w-auto" />
+          <span className="text-white font-black text-2xl tracking-tight">
+            Square<span style={{ color: "hsl(var(--sq-orange))" }}>Up</span>
+          </span>
         </div>
 
         <h2

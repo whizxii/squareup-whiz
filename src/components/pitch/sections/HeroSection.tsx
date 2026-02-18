@@ -1,4 +1,5 @@
 import { ChevronDown } from "lucide-react";
+import iconSvg from "@/assets/icon.svg";
 import type { SlideMode } from "@/lib/slides";
 
 interface HeroSectionProps { mode?: SlideMode; }
@@ -25,8 +26,11 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
       <div className={`relative z-10 max-w-5xl mx-auto ${isPresenter ? "space-y-10" : "space-y-7"}`}>
         {/* Wordmark */}
         <div className="flex justify-center mb-2">
-          <div className="text-white font-black text-2xl tracking-tight">
-            Square<span style={{ color: "hsl(var(--sq-orange))" }}>Up</span>
+          <div className="flex items-center justify-center gap-2.5">
+            <img src={iconSvg} alt="SquareUp" className="h-8 w-auto" />
+            <span className="text-white font-black text-2xl tracking-tight">
+              Square<span style={{ color: "hsl(var(--sq-orange))" }}>Up</span>
+            </span>
           </div>
         </div>
 
