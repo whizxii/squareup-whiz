@@ -22,7 +22,7 @@ export default function BusinessModelSection({ mode = "detailed" }: { mode?: Sli
             style={{ color: "hsl(var(--sq-text))" }}
           >
             Entry at ₹1–3L per study.{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>Subscription once they're hooked.</span>
+            <span style={{ color: "hsl(var(--sq-orange))" }}>₹75K–1.5L/month once they're in.</span>
           </h2>
           <p className="mt-3 text-base" style={{ color: "hsl(var(--sq-muted))" }}>
             A traditional agency charges ₹30–50L and takes 8 weeks. We charge ₹1–3L and deliver in 7 days. The ROI case writes itself.
@@ -83,10 +83,8 @@ export default function BusinessModelSection({ mode = "detailed" }: { mode?: Sli
             <p className="text-xs mb-5" style={{ color: "hsl(var(--sq-muted))" }}>Switching cost grows with every brief. This is where the moat builds.</p>
             <div className="space-y-3">
               {[
-                "Ongoing signal across campaigns, launches, CX",
-                "Calls, tickets, reviews, socials — unified",
-                "Monthly executive debrief",
-                "Full team access + workflow integration",
+                "Ongoing signal across campaigns, launches, and CX",
+                "Monthly executive debrief — routed to each team",
                 "Data flywheel: every conversation trains our models",
               ].map((f) => (
                 <div key={f} className="flex items-start gap-3">

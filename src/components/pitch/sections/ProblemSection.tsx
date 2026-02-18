@@ -43,16 +43,16 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
                 Same story every time."
               </p>
               <p className="text-sm mt-2 font-medium" style={{ color: "hsl(var(--sq-muted))" }}>
-                — Param & Kunj, SquareUp founders, after 90 days of discovery
+                — 50+ leaders at Zepto, Swiggy, Meesho, Titan, Rebel Foods
               </p>
             </blockquote>
 
             {/* 3 root causes */}
             <div className="space-y-5">
               {[
-                { n: "01", title: "Scheduling kills it", body: "Coordinating 10 customer calls takes a week. Most teams give up before they start." },
-                { n: "02", title: "Insights rot in recordings", body: "Hours of audio exist. Nobody synthesizes it. The truth is in there — inaccessible." },
-                { n: "03", title: "No single source of truth", body: "Calls, tickets, reviews, socials — all disconnected. Decisions get made in the dark." },
+                { n: "01", title: "Scheduling kills it", body: "Coordinating 10 customer calls takes a week. Teams give up." },
+                { n: "02", title: "Insights rot in recordings", body: "Hours of audio sit unlistened. The insight is there — inaccessible." },
+                { n: "03", title: "No single source of truth", body: "Calls, tickets, reviews, socials — all disconnected. Decisions happen in the dark." },
               ].map((item, i) => (
                 <div
                   key={item.n}

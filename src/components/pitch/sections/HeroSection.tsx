@@ -37,7 +37,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
         }}>
           <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "hsl(var(--sq-orange))" }} />
           <span className="font-bold text-sm tracking-wide" style={{ color: "hsl(var(--sq-orange))" }}>
-            Built in India · Built for the World · Seed Round 2026
+            India-first · Seed Round 2026
           </span>
         </div>
 
@@ -57,12 +57,28 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
           SquareUp runs AI-led customer interviews and turns them into{" "}
           <span className="text-white font-bold">a decision-ready Insight Brief — in 7 days, not 7 weeks.</span>
           <br className="hidden sm:block" />
-          <span className="text-white/35 text-base"> Starting with India's most demanding consumer brands. Designed to scale globally.</span>
+          
         </p>
+
+        {/* Stat chips */}
+        {!isPresenter && (
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+            {["<90 days — Idea to LOI", "50+ Leaders Interviewed", "MVP Live"].map((chip) => (
+              <span key={chip} className="rounded-full px-3 py-1 font-bold text-xs"
+                style={{
+                  background: "hsl(var(--sq-orange) / 0.08)",
+                  border: "1px solid hsl(var(--sq-orange) / 0.2)",
+                  color: "hsl(var(--sq-orange))"
+                }}>
+                {chip}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* CTAs */}
         {!isPresenter && (
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a
               href="https://almost.joinsquareup.com"
               target="_blank"
@@ -85,12 +101,6 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
           </div>
         )}
 
-        {/* Social proof line */}
-        {!isPresenter && (
-          <p className="text-white/20 text-xs font-medium pt-4">
-            3 LOIs signed · 50+ leaders interviewed at Zepto, Swiggy, Meesho, Titan · MVP live
-          </p>
-        )}
       </div>
 
       {!isPresenter && (

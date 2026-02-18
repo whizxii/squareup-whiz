@@ -9,36 +9,24 @@ const FAQS = [
     a: "Qualtrics and Dovetail help you tag and organize data you already have. SquareUp goes and gets it — AI runs the interviews, screens the respondents, synthesizes the findings, and delivers an Insight Brief in 7 days. You're not tagging recordings. You're getting a decision.",
   },
   {
-    q: "Who writes the code?",
-    a: "Param leads product and engineering. He was Tech Lead at EA Sports — shipped products used by millions. Kunj architects the AI workflow layer: the end-to-end system that conducts, processes, and synthesizes interviews. Both are full-time since December 2025.",
-  },
-  {
-    q: "No revenue yet — why should I invest?",
-    a: "3 Letters of Intent signed. 50+ customer conversations before building. MVP live at almost.joinsquareup.com. The problem is validated. The product works. The round is to convert LOIs to paying customers — revenue in 90 days is the plan.",
-  },
-  {
     q: "What does the $500K actually buy?",
     a: "50% product: deeper AI, better voice agent, sharper insight briefs. 40% GTM: convert 3 LOIs to paying customers, build case studies, Mesa network activation. 10% ops — tools, infra, legal. No team buildout until the motion is proven.",
   },
   {
+    q: "What does first revenue look like?",
+    a: "3 LOIs converted to paying customers in 90 days. First case studies published with real brand names. That's the plan for this seed round — proof of willingness to pay, not just intent.",
+  },
+  {
     q: "What's the long-term moat?",
-    a: "Three things stacking: (1) Data flywheel — every conversation trains our models, nobody can buy this dataset. (2) Workflow lock-in — switching cost compounds with every brief. (3) Mesa distribution — warm access across their portfolio and LP companies. No VC can replicate that.",
-  },
-  {
-    q: "Can I see the product now?",
-    a: "Yes. almost.joinsquareup.com — or book 20 minutes and we'll walk you through a live session with real data from our design partner calls.",
-  },
-  {
-    q: "What's your current traction?",
-    a: "3 Letters of Intent signed with design partners. 50+ discovery conversations at Zepto, Meesho, Swiggy, Titan Consumer, Rebel Foods, Swish. MVP shipped in 15 days. No revenue yet — that's what this raise is for.",
+    a: "Three things stacking: (1) Data flywheel — every conversation trains our models, nobody can buy this dataset. (2) Workflow lock-in — switching cost compounds with every brief. (3) Mesa distribution — warm access across their portfolio and LP companies.",
   },
   {
     q: "How do you go-to-market?",
     a: "Warm outbound through Mesa's founder and VC network first. Design partner case studies → referral flywheel. Then direct to Growth, CX, and NPD leads at mid-market consumer brands across QSR, D2C, and platforms.",
   },
   {
-    q: "Why Bengaluru, why now?",
-    a: "The density of consumer brands here is unmatched — Zepto, Swiggy, Rebel Foods, Meesho. Our first 50 conversations were all within reach. The AI infrastructure matured in 2024. The research firm model is cracking. The window is open right now.",
+    q: "Can I see the product now?",
+    a: "Yes. almost.joinsquareup.com — or book 20 minutes and we'll walk you through a live session with real data from our design partner calls.",
   },
 ];
 

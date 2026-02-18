@@ -5,21 +5,21 @@ const PILLARS = [
   {
     num: "01",
     title: "AI can now interview at human quality — at cents per conversation",
-    body: "GPT-4-class models can probe, follow up, and synthesize like a senior researcher. The technology to do this at scale didn't exist 2 years ago. The window just opened.",
+    body: "GPT-4-class models probe and synthesise at human depth. The technology arrived in 2024.",
     stat: "~₹800",
-    statLabel: "cost per AI-led 30-min interview vs ₹15,000+ for a human recruiter + researcher",
+    statLabel: "cost per AI-led 30-min interview vs ₹15,000+ for a human researcher",
   },
   {
     num: "02",
     title: "Brands are committing crores with zero customer validation",
-    body: "CAC is rising. Margins are tighter. Teams at Zepto, Swiggy, Meesho told us the same thing: they launch on internal dashboards and gut feel, then find out after. One bad launch doesn't just fail — it burns runway and board trust.",
+    body: "CAC is rising. Teams at Zepto, Swiggy, Meesho launch on dashboards and gut feel.",
     stat: "₹10Cr+",
-    statLabel: "average investment in a new product or campaign before validation happens",
+    statLabel: "average investment before validation happens",
   },
   {
     num: "03",
     title: "Traditional research firms can't compete — and they know it",
-    body: "6–8 weeks. ₹30–50L. Findings that land after the decision was made. India exposed this gap first — the pace of consumer brand decision-making here makes slow research completely unusable. The incumbents are too slow to adapt globally.",
+    body: "6–8 weeks. ₹30–50L. Findings arrive after the decision was already made.",
     stat: "6–8 weeks",
     statLabel: "average time-to-insight from a traditional research agency",
   },
@@ -33,7 +33,7 @@ export default function WhyNowSection({ mode = "detailed" }: { mode?: SlideMode 
     <section
       id="whynow"
       className={`${isPresenter ? "h-full flex items-center px-16" : "py-28 px-6"}`}
-      style={{ background: "hsl(var(--sq-dark))" }}
+      style={{ background: "hsl(var(--sq-off-white))" }}
     >
       <div className="max-w-5xl mx-auto w-full" ref={ref}>
 
@@ -42,15 +42,16 @@ export default function WhyNowSection({ mode = "detailed" }: { mode?: SlideMode 
             Why Now
           </p>
           <h2
-            className={`font-black text-white tracking-tight leading-tight ${
+            className={`font-black tracking-tight leading-tight ${
               isPresenter ? "text-5xl" : "text-3xl sm:text-4xl lg:text-5xl"
             }`}
+            style={{ color: "hsl(var(--sq-text))" }}
           >
             India is the right market to prove this.{" "}
             <span style={{ color: "hsl(var(--sq-orange))" }}>Then take it everywhere.</span>
           </h2>
-          <p className="mt-4 text-base max-w-2xl" style={{ color: "rgba(255,255,255,0.4)" }}>
-            The density of consumer brands, the pace of decision-making, and the complete absence of affordable customer research tools — India is the perfect proving ground. What works here scales globally.
+          <p className="mt-4 text-base max-w-2xl" style={{ color: "hsl(var(--sq-muted))" }}>
+            The density of consumer brands, the pace of decision-making, and the complete absence of affordable customer research tools — India is the perfect proving ground.
           </p>
         </div>
 
@@ -63,34 +64,27 @@ export default function WhyNowSection({ mode = "detailed" }: { mode?: SlideMode 
               }`}
               style={{
                 transitionDelay: `${i * 160}ms`,
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)"
+                background: "hsl(var(--sq-card))",
+                border: "1px solid hsl(var(--sq-subtle))"
               }}
             >
-              {/* Large number watermark */}
-              <span
-                className="absolute right-6 top-1/2 -translate-y-1/2 font-black text-[7rem] leading-none select-none pointer-events-none"
-                style={{ color: "hsl(var(--sq-orange) / 0.05)" }}
-              >
-                {p.num}
-              </span>
-
               {/* Number badge */}
               <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-black text-sm"
-                style={{ background: "hsl(var(--sq-orange) / 0.15)", color: "hsl(var(--sq-orange))" }}>
+                style={{ background: "hsl(var(--sq-orange) / 0.1)", color: "hsl(var(--sq-orange))" }}>
                 {p.num}
               </div>
 
-              <div className="flex-1 relative z-10">
-                <h3 className={`font-black text-white leading-snug mb-2 ${isPresenter ? "text-2xl" : "text-lg sm:text-xl"}`}>
+              <div className="flex-1">
+                <h3 className={`font-black leading-snug mb-2 ${isPresenter ? "text-2xl" : "text-lg sm:text-xl"}`}
+                  style={{ color: "hsl(var(--sq-text))" }}>
                   {p.title}
                 </h3>
-                <p className="leading-relaxed text-sm sm:text-base mb-4" style={{ color: "rgba(255,255,255,0.5)" }}>
+                <p className="leading-relaxed text-sm sm:text-base mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
                   {p.body}
                 </p>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-black text-sm" style={{ color: "hsl(var(--sq-amber))" }}>{p.stat}</span>
-                  <span className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>— {p.statLabel}</span>
+                  <span className="font-black text-sm" style={{ color: "hsl(var(--sq-orange))" }}>{p.stat}</span>
+                  <span className="text-xs" style={{ color: "hsl(var(--sq-muted))" }}>— {p.statLabel}</span>
                 </div>
               </div>
             </div>
