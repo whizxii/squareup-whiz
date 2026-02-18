@@ -9,7 +9,6 @@ export default function CTASection({ mode = "detailed" }: { mode?: SlideMode }) 
       className={`relative overflow-hidden ${isPresenter ? "h-full flex items-center justify-center" : "py-32 px-6"}`}
       style={{ background: "hsl(var(--sq-dark))" }}
     >
-      {/* Background blobs */}
       <div
         className="animate-blob-1 absolute top-1/4 left-1/3 w-[500px] h-[500px] rounded-full pointer-events-none"
         style={{ background: "radial-gradient(circle, hsl(var(--sq-orange)) 0%, transparent 70%)", opacity: 0.07 }}
@@ -20,7 +19,6 @@ export default function CTASection({ mode = "detailed" }: { mode?: SlideMode }) 
       />
 
       <div className="relative z-10 text-center max-w-2xl mx-auto">
-        {/* Wordmark */}
         <div className="mb-8 text-white font-black text-2xl tracking-tight">
           Square<span style={{ color: "hsl(var(--sq-orange))" }}>Up</span>
         </div>
@@ -28,12 +26,12 @@ export default function CTASection({ mode = "detailed" }: { mode?: SlideMode }) 
         <h2
           className={`font-black text-white tracking-tight leading-tight mb-4 ${isPresenter ? "text-6xl" : "text-4xl sm:text-5xl"}`}
         >
-          Curious?<br />
-          <span style={{ color: "hsl(var(--sq-orange))" }}>Let's talk.</span>
+          We have 3 LOIs,<br />
+          <span style={{ color: "hsl(var(--sq-orange))" }}>a live product, and 20 minutes.</span>
         </h2>
 
         <p className="text-lg mb-10" style={{ color: "rgba(255,255,255,0.45)" }}>
-          20 minutes. We'll show you what we're building<br />and what it can do for the brands you back.
+          Book a call. We'll show you the product with real data<br />from our design partner sessions.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
@@ -45,17 +43,19 @@ export default function CTASection({ mode = "detailed" }: { mode?: SlideMode }) 
               boxShadow: "0 10px 30px hsl(var(--sq-orange) / 0.35)"
             }}
           >
-            Book 20 Minutes
+            Book 20 Minutes →
           </a>
           <a
-            href="mailto:hello@joinsquareup.com"
+            href="https://almost.joinsquareup.com"
+            target="_blank"
+            rel="noopener noreferrer"
             className="font-bold px-8 py-4 rounded-full transition-all text-base"
             style={{
               border: "1px solid rgba(255,255,255,0.2)",
               color: "rgba(255,255,255,0.7)"
             }}
           >
-            hello@joinsquareup.com
+            See Live Demo
           </a>
         </div>
 
@@ -73,9 +73,8 @@ export default function CTASection({ mode = "detailed" }: { mode?: SlideMode }) 
           ))}
         </div>
 
-        {/* Footer */}
         <p className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
-          joinsquareup.com · © 2026 SquareUp
+          joinsquareup.com · hello@joinsquareup.com · © 2026 SquareUp
         </p>
       </div>
     </section>

@@ -44,7 +44,7 @@ export default function WhoIsItForSection({ mode = "detailed" }: { mode?: SlideM
       <div className="max-w-6xl mx-auto w-full" ref={ref}>
 
         {/* Header */}
-        <div className={`mb-16 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
+        <div className={`mb-14 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
             Who It's For
           </p>
@@ -54,11 +54,11 @@ export default function WhoIsItForSection({ mode = "detailed" }: { mode?: SlideM
             <span style={{ color: "hsl(var(--sq-orange))" }}>costs the most.</span>
           </h2>
           <p className="mt-3 text-base max-w-xl" style={{ color: "hsl(var(--sq-muted))" }}>
-            QSR chain, D2C brand, consumer platform — the decision problem is identical.
+            QSR chain, D2C brand, consumer platform — the decision problem is the same.
           </p>
         </div>
 
-        {/* Persona cards — avatar dominant */}
+        {/* Persona cards */}
         <div className={`grid grid-cols-1 ${isPresenter ? "grid-cols-3" : "md:grid-cols-3"} gap-5`}>
           {PERSONAS.map(({ Avatar, role, industry, pain, outcome, tag }, i) => (
             <div
@@ -81,7 +81,7 @@ export default function WhoIsItForSection({ mode = "detailed" }: { mode?: SlideM
                 <span className="text-xs font-medium" style={{ color: "hsl(var(--sq-muted))" }}>{industry}</span>
               </div>
 
-              {/* Avatar — large, centered, takes up vertical space */}
+              {/* Avatar */}
               <div className="flex justify-center px-6 pt-2 pb-4"
                 style={{ background: "linear-gradient(180deg, hsl(var(--sq-off-white)) 0%, hsl(var(--sq-subtle)) 100%)" }}>
                 <Avatar size={isPresenter ? 150 : 180} />
@@ -104,7 +104,7 @@ export default function WhoIsItForSection({ mode = "detailed" }: { mode?: SlideM
               <div className="mx-5 mb-5 rounded-xl px-4 py-3"
                 style={{ background: "hsl(var(--sq-orange) / 0.07)", border: "1px solid hsl(var(--sq-orange) / 0.15)" }}>
                 <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: "hsl(var(--sq-orange))" }}>
-                  SquareUp gives you
+                  With SquareUp
                 </p>
                 <p className="text-xs leading-relaxed font-medium" style={{ color: "hsl(var(--sq-text))" }}>{outcome}</p>
               </div>

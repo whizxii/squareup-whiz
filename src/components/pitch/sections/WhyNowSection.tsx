@@ -4,24 +4,24 @@ import type { SlideMode } from "@/lib/slides";
 const PILLARS = [
   {
     num: "01",
-    title: "AI crossed the threshold",
-    body: "LLMs can now conduct human-quality interviews at scale — at cents per conversation. This wasn't possible 24 months ago. The window just opened.",
-    stat: "100x cheaper than human researchers",
-    statLabel: "cost per insight",
+    title: "AI can now interview at human quality — at cents per conversation",
+    body: "GPT-4-class models can probe, follow up, and synthesize like a senior researcher. The technology to do this at scale didn't exist 2 years ago. The window just opened.",
+    stat: "~₹800",
+    statLabel: "cost per AI-led 30-min interview vs ₹15,000+ for a human recruiter + researcher",
   },
   {
     num: "02",
-    title: "Teams are making ₹10Cr decisions with ₹0 of real customer signal",
-    body: "Budgets are tighter. CAC is rising. Consumer brands across QSR, platforms, and direct channels are committing millions to launches built on internal metrics and gut feel. When it goes wrong, it burns runway and credibility.",
-    stat: "72% of product launches",
-    statLabel: "fail due to poor customer understanding",
+    title: "Brands are committing crores with zero customer validation",
+    body: "CAC is rising. Margins are tighter. Teams at Zepto, Swiggy, Meesho told us the same thing: they launch on internal dashboards and gut feel, then find out after. One bad launch doesn't just fail — it burns runway and board trust.",
+    stat: "₹10Cr+",
+    statLabel: "average investment in a new product or campaign before validation happens",
   },
   {
     num: "03",
-    title: "The old research model is broken beyond repair",
-    body: "6–8 week timelines. ₹40L+ price tags. Findings that arrive after the decision was already made. Research firms are being disrupted by the same AI that's disrupting everything else.",
+    title: "Traditional research firms can't compete — and they know it",
+    body: "6–8 weeks. ₹30–50L. Findings that land after the decision was made. The same AI disrupting every knowledge-work category is now disrupting the ₹142B research industry. The incumbents are too slow to adapt.",
     stat: "6–8 weeks",
-    statLabel: "average time-to-insight with traditional research",
+    statLabel: "average time-to-insight from a traditional research agency",
   },
 ];
 
@@ -37,7 +37,6 @@ export default function WhyNowSection({ mode = "detailed" }: { mode?: SlideMode 
     >
       <div className="max-w-5xl mx-auto w-full" ref={ref}>
 
-        {/* Header — on dark */}
         <div className={`mb-14 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
             Why Now
@@ -47,8 +46,8 @@ export default function WhyNowSection({ mode = "detailed" }: { mode?: SlideMode 
               isPresenter ? "text-5xl" : "text-3xl sm:text-4xl lg:text-5xl"
             }`}
           >
-            Three forces converging.{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>Right now.</span>
+            Three things are true{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>at the same time, for the first time.</span>
           </h2>
         </div>
 
@@ -86,7 +85,6 @@ export default function WhyNowSection({ mode = "detailed" }: { mode?: SlideMode 
                 <p className="leading-relaxed text-sm sm:text-base mb-4" style={{ color: "rgba(255,255,255,0.5)" }}>
                   {p.body}
                 </p>
-                {/* Inline stat */}
                 <div className="flex items-baseline gap-2">
                   <span className="font-black text-sm" style={{ color: "hsl(var(--sq-amber))" }}>{p.stat}</span>
                   <span className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>— {p.statLabel}</span>

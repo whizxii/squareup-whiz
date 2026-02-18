@@ -6,17 +6,17 @@ import type { SlideMode } from "@/lib/slides";
 const STEPS = [
   {
     num: "01",
-    title: "Map",
-    sub: "Brief → Screened respondents",
-    body: "You write the research brief. Our voice agent screens, schedules, and briefs respondents. Zero coordination overhead. Respondents show up ready.",
+    title: "Brief",
+    sub: "You define the decision",
+    body: "Tell us the decision you're trying to make. We screen and schedule the right respondents. Zero coordination overhead on your side.",
     avatar: null,
     icon: "🗺️",
   },
   {
     num: "02",
-    title: "Conversate",
-    sub: "AI-led interviews at scale",
-    body: "Our AI interviews respondents autonomously — or co-pilots your team's calls. It probes naturally, adapts in real-time, and captures depth that surveys never could.",
+    title: "Interview",
+    sub: "AI runs the conversations",
+    body: "Our AI interviews respondents autonomously — probing naturally, following threads, adapting in real-time. Depth that surveys never get. At cents per interview.",
     avatar: "ai",
     icon: "🤖",
   },
@@ -24,7 +24,7 @@ const STEPS = [
     num: "03",
     title: "Decide",
     sub: "Insight Brief in 7 days",
-    body: "Executive-ready brief with severity scoring, validated risks, key quotes, and recommended next steps. Your team gets clarity to commit — or course-correct — before it's too late.",
+    body: "You get an executive-ready brief with severity scoring, validated risks, verbatim quotes, and a recommended next step. Commit or course-correct — before you burn runway.",
     avatar: "growth",
     icon: "📊",
   },
@@ -51,9 +51,8 @@ export default function HowItWorksSection({ mode = "detailed" }: { mode?: SlideM
             className={`font-black tracking-tight leading-tight ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl lg:text-5xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}
           >
-            Raw conversation →{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>boardroom-ready insight.</span>
-            <br />In 7 days. No research agency needed.
+            Brief → AI interviews → Insight Brief.<br />
+            <span style={{ color: "hsl(var(--sq-orange))" }}>7 days. No agency. No coordination overhead.</span>
           </h2>
         </div>
 
@@ -95,7 +94,6 @@ export default function HowItWorksSection({ mode = "detailed" }: { mode?: SlideM
                 <p className="font-bold text-xs uppercase tracking-wider mb-3" style={{ color: "hsl(var(--sq-orange))" }}>{step.sub}</p>
                 <p className="text-sm leading-relaxed mb-5" style={{ color: "hsl(var(--sq-muted))" }}>{step.body}</p>
 
-                {/* Avatar */}
                 {step.avatar === "ai" && (
                   <div className="flex justify-center">
                     <AvatarAIAgent size={isPresenter ? 120 : 110} />

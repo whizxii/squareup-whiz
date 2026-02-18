@@ -10,7 +10,7 @@ const FUNDS = [
 const MILESTONES = [
   { label: "First Revenue", desc: "3 LOI partners → paid in 90 days" },
   { label: "Proof on Paper", desc: "Published case studies with real brand names" },
-  { label: "Series A Ready", desc: "Repeatable motion: 10 paying brands, clear unit economics" },
+  { label: "Series A Ready", desc: "10 paying brands, clear unit economics, repeatable motion" },
 ];
 
 function AskCounter() {
@@ -41,26 +41,26 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
             The Ask
           </p>
           <h2 className={`font-black text-white tracking-tight leading-tight mb-2 ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"}`}>
-            We're raising{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>$500K</span>{" "}
-            to turn pilots into a repeatable engine.
+            $500K. Two founders.{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>One job: build and sell.</span>
           </h2>
-          <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>Seed Round 2026</p>
+          <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>
+            Seed Round 2026 · No team buildout until the motion is proven
+          </p>
         </div>
 
         <div className={`grid ${isPresenter ? "grid-cols-2" : "lg:grid-cols-2"} gap-10 transition-all duration-600 delay-200 ${revealed ? "opacity-100" : "opacity-0 translate-y-8"}`}>
 
           {/* Left — amount + use of funds */}
           <div>
-            {/* Big number */}
             <div className="mb-8">
               <AskCounter />
-          <p className="text-sm mt-2" style={{ color: "rgba(255,255,255,0.4)" }}>
-                Two founders. One focus: build and sell. No hiring until the motion is proven.
+              <p className="text-sm mt-2" style={{ color: "rgba(255,255,255,0.4)" }}>
+                Two founders. No overhead. Revenue in 90 days.
               </p>
             </div>
 
-            {/* Use of funds — clean bars */}
+            {/* Use of funds bars */}
             <div className="space-y-4">
               {FUNDS.map((f) => (
                 <div key={f.label}>
@@ -83,7 +83,6 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
 
           {/* Right — milestones + moat */}
           <div className="space-y-5">
-            {/* What this unlocks */}
             <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <p className="font-black text-white text-sm uppercase tracking-wider mb-4">18-month targets</p>
               <div className="space-y-3">
@@ -109,9 +108,9 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
               </p>
               <div className="space-y-3">
                 {[
-                  { title: "Data flywheel", body: "Every conversation trains our models. Proprietary dataset compounds." },
-                  { title: "Workflow lock-in", body: "Teams that build their research process on SquareUp increase switching cost with every brief." },
-                  { title: "Mesa distribution", body: "Unfair access across Mesa's portfolio — and their LPs' companies." },
+                  { title: "Data flywheel", body: "Every conversation trains our models. Nobody can buy this dataset." },
+                  { title: "Workflow lock-in", body: "Teams that run their research on SquareUp increase switching cost with every brief." },
+                  { title: "Mesa distribution", body: "Warm access across Mesa's portfolio, cohort, and LP companies. Not replicable." },
                 ].map((m) => (
                   <div key={m.title}>
                     <p className="font-bold text-white text-xs mb-0.5">{m.title}</p>
