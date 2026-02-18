@@ -98,7 +98,7 @@ export default function TeamSection({ mode = "detailed" }: { mode?: SlideMode })
           </div>
 
           <div className="flex items-center justify-center gap-3 mt-6 flex-wrap">
-            {["Mesa School of Business", "Elevation Capital · Partner Network"].map((badge) => (
+            {["Mesa School of Business"].map((badge) => (
               <div key={badge} className="rounded-full px-4 py-2 text-sm font-bold" style={{
                 background: "hsl(var(--sq-subtle))",
                 color: "hsl(var(--sq-text))"
