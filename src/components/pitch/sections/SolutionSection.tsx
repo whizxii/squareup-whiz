@@ -49,6 +49,8 @@ export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMod
                 { stat: "₹30–50L", desc: "for a research agency — if you can afford one" },
                 { stat: "After launch", desc: "is when most teams discover the wrong assumption" },
                 { stat: "Gut feel", desc: "drives go/no-go calls at most consumer brands" },
+                { stat: "No trail", desc: "decisions made on calls — no record of what customer said or why" },
+                { stat: "Who decided?", desc: "no one can trace a bad launch back to the assumption that caused it" },
               ].map((item) => (
                 <div key={item.stat} className="flex items-baseline gap-3">
                   <span className="font-black text-red-700 text-sm flex-shrink-0 w-28">{item.stat}</span>
@@ -73,6 +75,8 @@ export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMod
                 { stat: "₹1–3L", desc: "per study — fraction of a traditional firm" },
                 { stat: "Before week 1", desc: "risks surfaced before you commit resources" },
                 { stat: "Real signal", desc: "from AI-led conversations, not internal guesses" },
+                { stat: "Full audit trail", desc: "every decision tied to verbatim quotes and severity scores" },
+                { stat: "Team briefs", desc: "Growth, Product, and Founders each get only what's relevant to them" },
               ].map((item) => (
                 <div key={item.stat} className="flex items-baseline gap-3">
                   <span className="font-black text-sm flex-shrink-0 w-28" style={{ color: "hsl(var(--sq-orange))" }}>{item.stat}</span>
