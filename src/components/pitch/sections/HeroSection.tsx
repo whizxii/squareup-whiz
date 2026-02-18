@@ -168,44 +168,48 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
               backgroundImage: "radial-gradient(ellipse 70% 60% at 50% 90%, hsl(var(--sq-orange) / 0.08) 0%, transparent 70%)",
             }} />
 
-            {/* Secondary avatar — male, left, ghost */}
+            {/* Secondary avatar — male, left, ghost — slow float offset */}
             <div
               className="absolute bottom-0 left-0 animate-fade-up z-10"
               style={{ animationDelay: "300ms" }}
             >
-              <img
-                src={avatarMain}
-                alt="Brand strategist"
-                className="select-none"
-                style={{
-                  width: 180,
-                  height: "auto",
-                  objectFit: "contain",
-                  maskImage: "linear-gradient(to top, transparent 0%, white 30%)",
-                  WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 30%)",
-                  opacity: 0.45,
-                  filter: "saturate(0.6)",
-                }}
-              />
+              <div className="animate-avatar-float-slow" style={{ animationDelay: "1.2s" }}>
+                <img
+                  src={avatarMain}
+                  alt="Brand strategist"
+                  className="select-none"
+                  style={{
+                    width: 180,
+                    height: "auto",
+                    objectFit: "contain",
+                    maskImage: "linear-gradient(to top, transparent 0%, white 30%)",
+                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 30%)",
+                    opacity: 0.45,
+                    filter: "saturate(0.6)",
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Primary avatar — female analyst, center, full size */}
+            {/* Primary avatar — female analyst, float animation */}
             <div
               className="absolute bottom-0 right-4 animate-fade-up z-20"
               style={{ animationDelay: "160ms" }}
             >
-              <img
-                src={avatarAnalyst}
-                alt="Consumer insights analyst"
-                className="select-none"
-                style={{
-                  width: 320,
-                  height: "auto",
-                  objectFit: "contain",
-                  maskImage: "linear-gradient(to top, transparent 0%, white 10%)",
-                  WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 10%)",
-                }}
-              />
+              <div className="animate-avatar-float">
+                <img
+                  src={avatarAnalyst}
+                  alt="Consumer insights analyst"
+                  className="select-none"
+                  style={{
+                    width: 320,
+                    height: "auto",
+                    objectFit: "contain",
+                    maskImage: "linear-gradient(to top, transparent 0%, white 10%)",
+                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 10%)",
+                  }}
+                />
+              </div>
             </div>
 
             {/* Floating insight cards */}
