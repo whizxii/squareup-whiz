@@ -143,6 +143,20 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
               )}
             </div>
 
+            {/* "10x slower" chip — inline, after friction list */}
+            <div className="animate-fade-up" style={{ animationDelay: "220ms" }}>
+              <span
+                className="inline-flex items-center rounded-full px-4 py-2"
+                style={{
+                  background: "hsl(var(--sq-orange) / 0.09)",
+                  border: "1px solid hsl(var(--sq-orange) / 0.22)"
+                }}>
+                <p style={{ color: "hsl(var(--sq-orange))", fontSize: "13px", fontWeight: 900 }}>
+                  10× slower than it should be
+                </p>
+              </span>
+            </div>
+
             {/* Quote / credibility card */}
             <div
               className="animate-fade-up rounded-2xl px-6 py-5"
@@ -231,36 +245,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                   }}>
 
                   & ₹30–50L per agency
-                </p>
-              </div>
-            </div>
-
-            {/* "10x slower" chip — anchored below the stat card */}
-            <div
-              className="animate-fade-up"
-              style={{
-                animationDelay: "400ms",
-                position: "absolute",
-                top: 88,
-                right: 0,
-                zIndex: 30
-              }}>
-
-              <div
-                className="rounded-full px-4 py-2"
-                style={{
-                  background: "hsl(var(--sq-orange) / 0.09)",
-                  border: "1px solid hsl(var(--sq-orange) / 0.22)"
-                }}>
-
-                <p
-                  style={{
-                    color: "hsl(var(--sq-orange))",
-                    fontSize: "13px",
-                    fontWeight: 900
-                  }}>
-
-                  10× slower than it should be
                 </p>
               </div>
             </div>
