@@ -80,7 +80,7 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
           }} />
 
         {/* ── MAIN GRID: 7/12 left + 5/12 right ── */}
-        <div className="flex flex-col lg:flex-row lg:items-start gap-8 lg:gap-0">
+        <div className="flex flex-col lg:flex-row lg:items-stretch gap-8 lg:gap-0">
 
           {/* ── LEFT COLUMN (7/12) ── */}
           <div className="w-full lg:w-7/12 lg:pr-14 flex flex-col gap-6">
@@ -167,18 +167,12 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
           </div>
 
           {/* ── RIGHT COLUMN (5/12) ── */}
-          <div className="w-full lg:w-5/12 relative" style={{ minHeight: 520 }}>
+          <div className="w-full lg:w-5/12 flex flex-col items-end justify-between">
 
             {/* Stat card — top-right */}
             <div
-              className="animate-fade-up"
-              style={{
-                animationDelay: "180ms",
-                position: "absolute",
-                top: 0,
-                right: 0,
-                zIndex: 30
-              }}>
+              className="animate-fade-up self-end"
+              style={{ animationDelay: "180ms" }}>
               <div
                 className="rounded-2xl px-5 py-4"
                 style={{
@@ -186,83 +180,47 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                   border: "1px solid hsl(var(--sq-subtle))",
                   boxShadow: "0 4px 24px hsl(0 0% 0% / 0.06)"
                 }}>
-                <p
-                  style={{
-                    color: "hsl(var(--sq-muted))",
-                    fontSize: "9px",
-                    fontWeight: 700,
-                    letterSpacing: "0.16em",
-                    textTransform: "uppercase",
-                    marginBottom: 4
-                  }}>
+                <p style={{ color: "hsl(var(--sq-muted))", fontSize: "9px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 4 }}>
                   Avg. research cycle
                 </p>
-                <p
-                  style={{
-                    color: "hsl(var(--sq-orange))",
-                    fontSize: "2rem",
-                    fontWeight: 900,
-                    lineHeight: 1
-                  }}>
+                <p style={{ color: "hsl(var(--sq-orange))", fontSize: "2rem", fontWeight: 900, lineHeight: 1 }}>
                   6–8 weeks
                 </p>
-                <p
-                  style={{
-                    color: "hsl(var(--sq-muted))",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    marginTop: 4
-                  }}>
+                <p style={{ color: "hsl(var(--sq-muted))", fontSize: "11px", fontWeight: 600, marginTop: 4 }}>
                   & ₹30–50L per agency
                 </p>
               </div>
             </div>
 
-            {/* "10× slower" chip — pedestal at the bottom-left, avatar stands on it */}
-            <div
-              className="animate-fade-up"
-              style={{
-                animationDelay: "400ms",
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                zIndex: 30
-              }}>
-              <div
-                className="rounded-full px-5 py-2.5"
-                style={{
-                  background: "hsl(var(--sq-orange) / 0.09)",
-                  border: "1px solid hsl(var(--sq-orange) / 0.22)"
-                }}>
-                <p style={{ color: "hsl(var(--sq-orange))", fontSize: "13px", fontWeight: 900, whiteSpace: "nowrap" }}>
-                  10× slower than it should be
-                </p>
-              </div>
-            </div>
-
-            {/* Avatar — grounded just above the chip (~44px chip height) */}
-            <div
-              className="animate-fade-up"
-              style={{
-                animationDelay: "120ms",
-                position: "absolute",
-                bottom: 44,
-                right: 0,
-                zIndex: 20
-              }}>
-              <div className="animate-avatar-float">
+            {/* Avatar + chip stacked — avatar sits directly on chip */}
+            <div className="animate-fade-up flex flex-col items-center w-full" style={{ animationDelay: "120ms" }}>
+              {/* Avatar — negative bottom margin pulls chip flush to feet */}
+              <div className="animate-avatar-float" style={{ marginBottom: -60 }}>
                 <img
                   src={avatarProblem}
                   alt="Overwhelmed brand manager"
                   className="select-none"
                   style={{
                     width: "auto",
-                    height: isPresenter ? 380 : 440,
+                    height: isPresenter ? 360 : 420,
                     objectFit: "contain",
-                    maskImage: "linear-gradient(to top, transparent 0%, white 3%)",
-                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 3%)",
+                    objectPosition: "bottom",
+                    display: "block",
                     filter: "drop-shadow(0 20px 40px hsl(0 0% 0% / 0.08))"
                   }} />
+              </div>
+              {/* Chip pedestal */}
+              <div className="animate-fade-up" style={{ animationDelay: "400ms", position: "relative", zIndex: 10 }}>
+                <div
+                  className="rounded-full px-5 py-2.5"
+                  style={{
+                    background: "hsl(var(--sq-orange) / 0.09)",
+                    border: "1px solid hsl(var(--sq-orange) / 0.22)"
+                  }}>
+                  <p style={{ color: "hsl(var(--sq-orange))", fontSize: "13px", fontWeight: 900, whiteSpace: "nowrap" }}>
+                    10× slower than it should be
+                  </p>
+                </div>
               </div>
             </div>
 
