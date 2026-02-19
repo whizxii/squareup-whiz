@@ -4,7 +4,7 @@ import type { SlideMode } from "@/lib/slides";
 const frictions = [
   { icon: "📅", label: "Scheduling calls is slow." },
   { icon: "🎙️", label: "Analyzing audio is manual." },
-  { icon: "💬", label: "Data trapped in Slack or memory." },
+  { icon: "💬", label: "Data trapped in slack channels, email threads or in memory." },
 ];
 
 export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode }) {
