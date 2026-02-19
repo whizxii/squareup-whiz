@@ -22,45 +22,46 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
           "radial-gradient(ellipse 65% 60% at 80% 85%, hsl(18 100% 60% / 0.07) 0%, transparent 65%)",
       }} />
 
-      <div className={`relative z-10 w-full max-w-7xl mx-auto px-8 sm:px-14 ${isPresenter ? "py-8" : "pt-24 pb-4"}`}>
-        <div className="grid grid-cols-[52%_48%] gap-0 items-center">
+      <div className={`relative z-10 w-full max-w-7xl mx-auto px-8 sm:px-14 flex flex-col gap-8 ${isPresenter ? "py-8" : "pt-24 pb-6"}`}>
 
-          {/* ── LEFT ── */}
-          <div className="flex flex-col gap-6 pr-8 py-4">
+        {/* ── TOP: Full-width headline ── */}
+        <div className="flex flex-col gap-4">
+          <p
+            className="font-bold text-[11px] uppercase tracking-[0.22em] animate-fade-up"
+            style={{ color: "hsl(var(--sq-orange))", animationDelay: "0ms" }}
+          >
+            The Problem
+          </p>
 
-            {/* Eyebrow */}
-            <p
-              className="font-bold text-[11px] uppercase tracking-[0.22em] animate-fade-up"
-              style={{ color: "hsl(var(--sq-orange))", animationDelay: "0ms" }}
-            >
-              The Problem
-            </p>
-
-            {/* MEGA Headline */}
-            <h2
-              className="font-black tracking-tight leading-[0.97] animate-fade-up"
+          <h2
+            className="font-black tracking-tight leading-[0.95] animate-fade-up w-full"
+            style={{
+              color: "hsl(var(--sq-text))",
+              animationDelay: "60ms",
+              fontSize: isPresenter ? "3.6rem" : "clamp(3.2rem, 5.5vw, 6rem)",
+            }}
+          >
+            Every brand says they talk to customers.{" "}
+            <span
               style={{
-                color: "hsl(var(--sq-text))",
-                animationDelay: "60ms",
-                fontSize: isPresenter ? "3.2rem" : "clamp(2.8rem, 4.2vw, 4.4rem)",
+                color: "hsl(var(--sq-orange))",
+                textDecoration: "underline",
+                textDecorationStyle: "wavy",
+                textDecorationColor: "hsl(var(--sq-orange) / 0.4)",
+                textUnderlineOffset: "8px",
               }}
             >
-              Every brand says they<br />
-              talk to customers.{" "}
-              <span
-                style={{
-                  color: "hsl(var(--sq-orange))",
-                  textDecoration: "underline",
-                  textDecorationStyle: "wavy",
-                  textDecorationColor: "hsl(var(--sq-orange) / 0.4)",
-                  textUnderlineOffset: "7px",
-                }}
-              >
-                Almost none do it enough to matter.
-              </span>
-            </h2>
+              Almost none do it enough to matter.
+            </span>
+          </h2>
+        </div>
 
-            {/* THE FRICTION label */}
+        {/* ── BOTTOM: Frictions left, Avatar right ── */}
+        <div className="grid grid-cols-[48%_52%] gap-0 items-end">
+
+          {/* LEFT — frictions + quote */}
+          <div className="flex flex-col gap-4 pr-10 pb-2">
+
             <p
               className="font-bold text-[11px] uppercase tracking-[0.2em] animate-fade-up"
               style={{ color: "hsl(var(--sq-muted))", animationDelay: "140ms" }}
@@ -68,7 +69,6 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
               The Friction
             </p>
 
-            {/* Friction rows — big and readable */}
             <div className="flex flex-col gap-3 animate-fade-up" style={{ animationDelay: "180ms" }}>
               {frictions.map((item, i) => (
                 <div
@@ -81,7 +81,7 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
                   }}
                 >
                   <span
-                    className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-lg"
+                    className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-xl"
                     style={{
                       background: "hsl(var(--sq-orange) / 0.08)",
                       border: "1px solid hsl(var(--sq-orange) / 0.18)",
@@ -93,7 +93,7 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
                     className="font-bold leading-snug"
                     style={{
                       color: "hsl(var(--sq-text))",
-                      fontSize: "clamp(0.95rem, 1.1vw, 1.1rem)",
+                      fontSize: "clamp(1rem, 1.2vw, 1.15rem)",
                     }}
                   >
                     {item.label}
@@ -102,14 +102,14 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
               ))}
             </div>
 
-            {/* Divider + Quote */}
-            <div className="animate-fade-up" style={{ animationDelay: "420ms" }}>
-              <div className="h-px mb-5" style={{ background: "hsl(var(--sq-subtle))" }} />
+            {/* Quote */}
+            <div className="animate-fade-up mt-2" style={{ animationDelay: "420ms" }}>
+              <div className="h-px mb-4" style={{ background: "hsl(var(--sq-subtle))" }} />
               <p
                 className="font-black leading-snug"
                 style={{
                   color: "hsl(var(--sq-text))",
-                  fontSize: "clamp(1.1rem, 1.4vw, 1.35rem)",
+                  fontSize: "clamp(1.05rem, 1.3vw, 1.3rem)",
                 }}
               >
                 "Decisions default to intuition.{" "}
@@ -123,12 +123,12 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
             </div>
           </div>
 
-          {/* ── RIGHT — avatar stage ── */}
-          <div className="relative" style={{ minHeight: 660 }}>
+          {/* RIGHT — avatar stage */}
+          <div className="relative" style={{ minHeight: 520 }}>
 
             {/* Stat card — top right */}
             <div
-              className="absolute top-6 right-0 z-30 animate-fade-up"
+              className="absolute top-0 right-0 z-30 animate-fade-up"
               style={{ animationDelay: "280ms" }}
             >
               <div
@@ -151,7 +151,7 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
             {/* Floating "10x slower" chip */}
             <div
               className="absolute z-30 animate-fade-up"
-              style={{ animationDelay: "480ms", bottom: "28%", left: "8%" }}
+              style={{ animationDelay: "480ms", bottom: "22%", left: "6%" }}
             >
               <div
                 className="rounded-full px-4 py-2"
@@ -178,7 +178,7 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
                   className="select-none"
                   style={{
                     width: "auto",
-                    height: 620,
+                    height: 520,
                     objectFit: "contain",
                     maskImage: "linear-gradient(to top, transparent 0%, white 10%)",
                     WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 10%)",
