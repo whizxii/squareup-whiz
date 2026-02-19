@@ -34,15 +34,14 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
           </p>
 
           <h2
-            className="font-black tracking-tight leading-[0.93] animate-fade-up"
+            className="font-black tracking-tight leading-[0.93] animate-fade-up w-full"
             style={{
               color: "hsl(var(--sq-text))",
               animationDelay: "60ms",
-              fontSize: isPresenter ? "3.6rem" : "clamp(3rem, 5.2vw, 5.6rem)",
-              maxWidth: "88%",
+              fontSize: isPresenter ? "3.6rem" : "clamp(2.8rem, 4.6vw, 5rem)",
             }}
           >
-            Every brand says they talk to customers.{" "}
+            Every brand says they talk to customers.<br />
             <span
               style={{
                 color: "hsl(var(--sq-orange))",
