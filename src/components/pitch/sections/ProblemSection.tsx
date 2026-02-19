@@ -27,7 +27,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
           background: "radial-gradient(ellipse at bottom right, hsl(var(--sq-orange) / 0.07) 0%, transparent 70%)"
         }} />
 
-
       {/* ── Centered container, max 1200px, 12-col grid ── */}
       <div className="relative z-10 w-full mx-auto px-6 sm:px-10 lg:px-12" style={{ maxWidth: 1200 }}>
 
@@ -42,7 +41,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
             textTransform: "uppercase",
             animationDelay: "0ms"
           }}>
-
           The Problem
         </p>
 
@@ -58,7 +56,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
             animationDelay: "50ms",
             marginBottom: "clamp(24px, 3vw, 40px)"
           }}>
-
           Every brand says they talk to customers.{" "}
           <span
             style={{
@@ -69,7 +66,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
               textUnderlineOffset: "6px",
               textDecorationThickness: "2px"
             }}>
-
             Almost none do it enough to matter.
           </span>
         </h2>
@@ -82,7 +78,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
             background: "hsl(var(--sq-subtle))",
             animationDelay: "90ms"
           }} />
-
 
         {/* ── MAIN GRID: 7/12 left + 5/12 right ── */}
         <div className="flex flex-col lg:flex-row lg:items-start gap-8 lg:gap-0">
@@ -101,7 +96,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                 textTransform: "uppercase",
                 animationDelay: "120ms"
               }}>
-
               The Friction
             </p>
 
@@ -112,7 +106,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                 border: "1px solid hsl(var(--sq-subtle))",
                 animationDelay: "150ms"
               }}>
-
               {frictions.map((item, i) =>
               <div key={i}>
                   <div className="flex items-center gap-4 px-5 py-5">
@@ -122,7 +115,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                       background: "hsl(var(--sq-orange) / 0.07)",
                       border: "1px solid hsl(var(--sq-orange) / 0.14)"
                     }}>
-
                       {item.icon}
                     </span>
                     <p
@@ -132,7 +124,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                       fontWeight: 700,
                       lineHeight: 1.35
                     }}>
-
                       {item.label}
                     </p>
                   </div>
@@ -143,20 +134,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
               )}
             </div>
 
-            {/* "10x slower" chip — inline, after friction list */}
-            <div className="animate-fade-up" style={{ animationDelay: "220ms" }}>
-              <span
-                className="inline-flex items-center rounded-full px-4 py-2"
-                style={{
-                  background: "hsl(var(--sq-orange) / 0.09)",
-                  border: "1px solid hsl(var(--sq-orange) / 0.22)"
-                }}>
-                <p style={{ color: "hsl(var(--sq-orange))", fontSize: "13px", fontWeight: 900 }}>
-                  10× slower than it should be
-                </p>
-              </span>
-            </div>
-
             {/* Quote / credibility card */}
             <div
               className="animate-fade-up rounded-2xl px-6 py-5"
@@ -165,7 +142,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                 border: "1px solid hsl(var(--sq-orange) / 0.14)",
                 animationDelay: "300ms"
               }}>
-
               <p
                 style={{
                   color: "hsl(var(--sq-text))",
@@ -173,7 +149,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                   fontWeight: 800,
                   lineHeight: 1.45
                 }}>
-
                 "Decisions default to intuition.{" "}
                 <span style={{ color: "hsl(var(--sq-orange))" }}>
                   Intuition doesn't scale."
@@ -186,16 +161,15 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                   fontSize: "11px",
                   fontWeight: 600
                 }}>
-
-                - 50 leaders at Zepto, Swiggy, Meesho, Titan, Comet, Minimalist, Mosaic Wellness   
+                - 50 leaders at Zepto, Swiggy, Meesho, Titan, Comet, Minimalist, Mosaic Wellness
               </p>
             </div>
           </div>
 
           {/* ── RIGHT COLUMN (5/12) ── */}
-          <div className="w-full lg:w-5/12 relative" style={{ minHeight: 480 }}>
+          <div className="w-full lg:w-5/12 relative" style={{ minHeight: 520 }}>
 
-            {/* Stat card — top, aligned with friction list top */}
+            {/* Stat card — top-right */}
             <div
               className="animate-fade-up"
               style={{
@@ -205,7 +179,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                 right: 0,
                 zIndex: 30
               }}>
-
               <div
                 className="rounded-2xl px-5 py-4"
                 style={{
@@ -213,7 +186,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                   border: "1px solid hsl(var(--sq-subtle))",
                   boxShadow: "0 4px 24px hsl(0 0% 0% / 0.06)"
                 }}>
-
                 <p
                   style={{
                     color: "hsl(var(--sq-muted))",
@@ -223,7 +195,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                     textTransform: "uppercase",
                     marginBottom: 4
                   }}>
-
                   Avg. research cycle
                 </p>
                 <p
@@ -233,7 +204,6 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                     fontWeight: 900,
                     lineHeight: 1
                   }}>
-
                   6–8 weeks
                 </p>
                 <p
@@ -243,23 +213,43 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                     fontWeight: 600,
                     marginTop: 4
                   }}>
-
                   & ₹30–50L per agency
                 </p>
               </div>
             </div>
 
-            {/* Avatar — right-anchored, grounded to baseline */}
+            {/* "10× slower" chip — pedestal at the bottom-left, avatar stands on it */}
+            <div
+              className="animate-fade-up"
+              style={{
+                animationDelay: "400ms",
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                zIndex: 30
+              }}>
+              <div
+                className="rounded-full px-5 py-2.5"
+                style={{
+                  background: "hsl(var(--sq-orange) / 0.09)",
+                  border: "1px solid hsl(var(--sq-orange) / 0.22)"
+                }}>
+                <p style={{ color: "hsl(var(--sq-orange))", fontSize: "13px", fontWeight: 900, whiteSpace: "nowrap" }}>
+                  10× slower than it should be
+                </p>
+              </div>
+            </div>
+
+            {/* Avatar — grounded just above the chip (~44px chip height) */}
             <div
               className="animate-fade-up"
               style={{
                 animationDelay: "120ms",
                 position: "absolute",
-                bottom: 0,
+                bottom: 44,
                 right: 0,
                 zIndex: 20
               }}>
-
               <div className="animate-avatar-float">
                 <img
                   src={avatarProblem}
@@ -267,13 +257,12 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
                   className="select-none"
                   style={{
                     width: "auto",
-                    height: isPresenter ? 400 : 460,
+                    height: isPresenter ? 380 : 440,
                     objectFit: "contain",
-                    maskImage: "linear-gradient(to top, transparent 0%, white 5%)",
-                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 5%)",
+                    maskImage: "linear-gradient(to top, transparent 0%, white 3%)",
+                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 3%)",
                     filter: "drop-shadow(0 20px 40px hsl(0 0% 0% / 0.08))"
                   }} />
-
               </div>
             </div>
 
