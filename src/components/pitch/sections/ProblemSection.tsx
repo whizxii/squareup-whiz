@@ -235,14 +235,14 @@ export default function ProblemSection({ mode = "detailed" }: {mode?: SlideMode;
               </div>
             </div>
 
-            {/* "10x slower" chip — mid-left of avatar column */}
+            {/* "10x slower" chip — anchored below the stat card */}
             <div
               className="animate-fade-up"
               style={{
                 animationDelay: "400ms",
                 position: "absolute",
-                bottom: "30%",
-                left: "0%",
+                top: 88,
+                right: 0,
                 zIndex: 30
               }}>
 
