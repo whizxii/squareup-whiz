@@ -13,174 +13,268 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
   return (
     <section
       id="problem"
-      className="relative overflow-hidden flex flex-col justify-center"
-      style={{ background: "hsl(var(--sq-card))", minHeight: "100vh" }}
+      className="relative overflow-hidden"
+      style={{
+        background: "hsl(var(--sq-card))",
+        paddingTop: isPresenter ? "40px" : "clamp(48px, 8vw, 96px)",
+        paddingBottom: isPresenter ? "0px" : "clamp(48px, 6vw, 80px)",
+      }}
     >
-      {/* Warm tension glow */}
-      <div className="absolute inset-0 pointer-events-none" style={{
-        backgroundImage:
-          "radial-gradient(ellipse 60% 80% at 95% 85%, hsl(18 100% 60% / 0.06) 0%, transparent 60%)",
-      }} />
+      {/* Subtle warm glow — bottom right only */}
+      <div
+        className="absolute bottom-0 right-0 w-[480px] h-[480px] pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse at bottom right, hsl(var(--sq-orange) / 0.07) 0%, transparent 70%)",
+        }}
+      />
 
-      <div className={`relative z-10 w-full max-w-7xl mx-auto px-10 sm:px-16 ${isPresenter ? "py-8" : "pt-24 pb-10"}`}>
+      {/* ── Centered container, max 1200px, 12-col grid ── */}
+      <div className="relative z-10 w-full mx-auto px-6 sm:px-10 lg:px-12" style={{ maxWidth: 1200 }}>
 
-        {/* ── Full-width headline block ── */}
-        <div className="mb-8">
-          <p
-            className="font-bold text-[10px] uppercase tracking-[0.24em] mb-3 animate-fade-up"
-            style={{ color: "hsl(var(--sq-orange))", animationDelay: "0ms" }}
-          >
-            The Problem
-          </p>
+        {/* ── EYEBROW ── */}
+        <p
+          className="animate-fade-up mb-3"
+          style={{
+            color: "hsl(var(--sq-orange))",
+            fontSize: "10px",
+            fontWeight: 700,
+            letterSpacing: "0.22em",
+            textTransform: "uppercase",
+            animationDelay: "0ms",
+          }}
+        >
+          The Problem
+        </p>
 
-          <h2
-            className="font-black tracking-tight leading-[0.92] animate-fade-up w-full"
+        {/* ── HEADLINE — full width, 2 lines ── */}
+        <h2
+          className="animate-fade-up"
+          style={{
+            color: "hsl(var(--sq-text))",
+            fontSize: isPresenter ? "3.5rem" : "clamp(2.6rem, 4.8vw, 5rem)",
+            fontWeight: 900,
+            lineHeight: 1.0,
+            letterSpacing: "-0.025em",
+            animationDelay: "50ms",
+            marginBottom: "clamp(24px, 3vw, 40px)",
+          }}
+        >
+          Every brand says they talk to customers.{" "}
+          <span
             style={{
-              color: "hsl(var(--sq-text))",
-              animationDelay: "60ms",
-              fontSize: isPresenter ? "3.6rem" : "clamp(2.8rem, 4.6vw, 5rem)",
+              color: "hsl(var(--sq-orange))",
+              textDecoration: "underline",
+              textDecorationStyle: "wavy",
+              textDecorationColor: "hsl(var(--sq-orange) / 0.35)",
+              textUnderlineOffset: "6px",
+              textDecorationThickness: "2px",
             }}
           >
-            Every brand says they talk to customers.<br />
-            <span
-              style={{
-                color: "hsl(var(--sq-orange))",
-                textDecoration: "underline",
-                textDecorationStyle: "wavy",
-                textDecorationColor: "hsl(var(--sq-orange) / 0.4)",
-                textUnderlineOffset: "8px",
-              }}
-            >
-              Almost none do it enough to matter.
-            </span>
-          </h2>
-        </div>
+            Almost none do it enough to matter.
+          </span>
+        </h2>
 
         {/* ── Divider ── */}
-        <div className="h-px mb-8 animate-fade-up" style={{ background: "hsl(var(--sq-subtle))", animationDelay: "100ms" }} />
+        <div
+          className="animate-fade-up mb-8"
+          style={{
+            height: 1,
+            background: "hsl(var(--sq-subtle))",
+            animationDelay: "90ms",
+          }}
+        />
 
-        {/* ── Bottom: Frictions left, Avatar right ── */}
-        <div className="grid grid-cols-[52%_48%] items-stretch gap-0">
+        {/* ── MAIN GRID: 7/12 left + 5/12 right ── */}
+        <div className="flex flex-col lg:flex-row lg:items-start gap-8 lg:gap-0">
 
-          {/* LEFT — frictions + quote */}
-          <div className="flex flex-col justify-between pr-14">
+          {/* ── LEFT COLUMN (7/12) ── */}
+          <div className="w-full lg:w-7/12 lg:pr-14 flex flex-col gap-6">
+
+            {/* Friction list label */}
+            <p
+              className="animate-fade-up"
+              style={{
+                color: "hsl(var(--sq-muted))",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                animationDelay: "120ms",
+              }}
+            >
+              The Friction
+            </p>
 
             {/* Friction rows */}
-            <div className="flex flex-col gap-0">
-              <p
-                className="font-bold text-[10px] uppercase tracking-[0.22em] mb-4 animate-fade-up"
-                style={{ color: "hsl(var(--sq-muted))", animationDelay: "140ms" }}
-              >
-                The Friction
-              </p>
-
+            <div
+              className="animate-fade-up rounded-2xl overflow-hidden"
+              style={{
+                border: "1px solid hsl(var(--sq-subtle))",
+                animationDelay: "150ms",
+              }}
+            >
               {frictions.map((item, i) => (
                 <div key={i}>
-                  <div
-                    className="flex items-center gap-4 py-4 animate-fade-up"
-                    style={{ animationDelay: `${200 + i * 70}ms` }}
-                  >
+                  <div className="flex items-center gap-4 px-5 py-5">
                     <span
-                      className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-lg"
+                      className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-[17px]"
                       style={{
                         background: "hsl(var(--sq-orange) / 0.07)",
-                        border: "1px solid hsl(var(--sq-orange) / 0.15)",
+                        border: "1px solid hsl(var(--sq-orange) / 0.14)",
                       }}
                     >
                       {item.icon}
                     </span>
                     <p
-                      className="font-bold leading-snug"
                       style={{
                         color: "hsl(var(--sq-text))",
-                        fontSize: "clamp(1rem, 1.1vw, 1.15rem)",
+                        fontSize: "clamp(0.95rem, 1.05vw, 1.1rem)",
+                        fontWeight: 700,
+                        lineHeight: 1.35,
                       }}
                     >
                       {item.label}
                     </p>
                   </div>
                   {i < frictions.length - 1 && (
-                    <div className="h-px" style={{ background: "hsl(var(--sq-subtle))" }} />
+                    <div style={{ height: 1, background: "hsl(var(--sq-subtle))", marginLeft: 68 }} />
                   )}
                 </div>
               ))}
             </div>
 
-            {/* Quote block */}
-            <div className="animate-fade-up mt-6" style={{ animationDelay: "440ms" }}>
-              <div
-                className="rounded-2xl px-5 py-4"
+            {/* Quote / credibility card */}
+            <div
+              className="animate-fade-up rounded-2xl px-6 py-5"
+              style={{
+                background: "hsl(var(--sq-orange) / 0.04)",
+                border: "1px solid hsl(var(--sq-orange) / 0.14)",
+                animationDelay: "300ms",
+              }}
+            >
+              <p
                 style={{
-                  background: "hsl(var(--sq-orange) / 0.04)",
-                  border: "1px solid hsl(var(--sq-orange) / 0.12)",
+                  color: "hsl(var(--sq-text))",
+                  fontSize: "clamp(0.95rem, 1.05vw, 1.1rem)",
+                  fontWeight: 800,
+                  lineHeight: 1.45,
                 }}
               >
-                <p
-                  className="font-black leading-snug"
-                  style={{
-                    color: "hsl(var(--sq-text))",
-                    fontSize: "clamp(1rem, 1.15vw, 1.2rem)",
-                  }}
-                >
-                  "Decisions default to intuition.{" "}
-                  <span style={{ color: "hsl(var(--sq-orange))" }}>
-                    Intuition doesn't scale."
-                  </span>
-                </p>
-                <p className="text-[11px] font-semibold mt-2" style={{ color: "hsl(var(--sq-muted))" }}>
-                  — 50 leaders at Zepto, Swiggy, Meesho, Titan, Rebel Foods
-                </p>
-              </div>
+                "Decisions default to intuition.{" "}
+                <span style={{ color: "hsl(var(--sq-orange))" }}>
+                  Intuition doesn't scale."
+                </span>
+              </p>
+              <p
+                className="mt-2"
+                style={{
+                  color: "hsl(var(--sq-muted))",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                }}
+              >
+                — 50 leaders at Zepto, Swiggy, Meesho, Titan, Rebel Foods
+              </p>
             </div>
           </div>
 
-          {/* RIGHT — avatar stage */}
-          <div className="relative" style={{ minHeight: 520 }}>
+          {/* ── RIGHT COLUMN (5/12) ── */}
+          <div className="w-full lg:w-5/12 relative" style={{ minHeight: 480 }}>
 
-            {/* Stat card — top right, close to avatar */}
+            {/* Stat card — top, aligned with friction list top */}
             <div
-              className="absolute top-0 right-0 z-30 animate-fade-up"
-              style={{ animationDelay: "280ms" }}
+              className="animate-fade-up"
+              style={{
+                animationDelay: "180ms",
+                position: "absolute",
+                top: 0,
+                right: 0,
+                zIndex: 30,
+              }}
             >
               <div
                 className="rounded-2xl px-5 py-4"
                 style={{
                   background: "hsl(var(--sq-card))",
                   border: "1px solid hsl(var(--sq-subtle))",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.07)",
+                  boxShadow: "0 4px 24px hsl(0 0% 0% / 0.06)",
                 }}
               >
-                <p className="text-[9px] font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "hsl(var(--sq-muted))" }}>Avg. research cycle</p>
-                <p className="font-black leading-none"
-                  style={{ color: "hsl(var(--sq-orange))", fontSize: "2rem" }}>6–8 weeks</p>
-                <p className="text-[11px] font-semibold mt-1"
-                  style={{ color: "hsl(var(--sq-muted))" }}>& ₹30–50L per agency</p>
+                <p
+                  style={{
+                    color: "hsl(var(--sq-muted))",
+                    fontSize: "9px",
+                    fontWeight: 700,
+                    letterSpacing: "0.16em",
+                    textTransform: "uppercase",
+                    marginBottom: 4,
+                  }}
+                >
+                  Avg. research cycle
+                </p>
+                <p
+                  style={{
+                    color: "hsl(var(--sq-orange))",
+                    fontSize: "2rem",
+                    fontWeight: 900,
+                    lineHeight: 1,
+                  }}
+                >
+                  6–8 weeks
+                </p>
+                <p
+                  style={{
+                    color: "hsl(var(--sq-muted))",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    marginTop: 4,
+                  }}
+                >
+                  & ₹30–50L per agency
+                </p>
               </div>
             </div>
 
-            {/* "10x slower" chip — anchored mid-left, near avatar body */}
+            {/* "10x slower" chip — mid-left of avatar column */}
             <div
-              className="absolute z-30 animate-fade-up"
-              style={{ animationDelay: "480ms", bottom: "28%", left: "0%" }}
+              className="animate-fade-up"
+              style={{
+                animationDelay: "400ms",
+                position: "absolute",
+                bottom: "30%",
+                left: "0%",
+                zIndex: 30,
+              }}
             >
               <div
-                className="rounded-full px-4 py-2.5"
+                className="rounded-full px-4 py-2"
                 style={{
                   background: "hsl(var(--sq-orange) / 0.09)",
                   border: "1px solid hsl(var(--sq-orange) / 0.22)",
                 }}
               >
-                <p className="font-black text-sm" style={{ color: "hsl(var(--sq-orange))" }}>
+                <p
+                  style={{
+                    color: "hsl(var(--sq-orange))",
+                    fontSize: "13px",
+                    fontWeight: 900,
+                  }}
+                >
                   10× slower than it should be
                 </p>
               </div>
             </div>
 
-            {/* Avatar — tall, right-anchored, bleeds to bottom */}
+            {/* Avatar — right-anchored, grounded to baseline */}
             <div
-              className="absolute bottom-0 right-0 z-20 animate-fade-up"
-              style={{ animationDelay: "160ms" }}
+              className="animate-fade-up"
+              style={{
+                animationDelay: "120ms",
+                position: "absolute",
+                bottom: 0,
+                right: 0,
+                zIndex: 20,
+              }}
             >
               <div className="animate-avatar-float">
                 <img
@@ -189,10 +283,11 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
                   className="select-none"
                   style={{
                     width: "auto",
-                    height: 500,
+                    height: isPresenter ? 400 : 460,
                     objectFit: "contain",
-                    maskImage: "linear-gradient(to top, transparent 0%, white 6%)",
-                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 6%)",
+                    maskImage: "linear-gradient(to top, transparent 0%, white 5%)",
+                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 5%)",
+                    filter: "drop-shadow(0 20px 40px hsl(0 0% 0% / 0.08))",
                   }}
                 />
               </div>
