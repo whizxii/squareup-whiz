@@ -19,26 +19,27 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
       {/* Warm tension glow */}
       <div className="absolute inset-0 pointer-events-none" style={{
         backgroundImage:
-          "radial-gradient(ellipse 65% 60% at 80% 85%, hsl(18 100% 60% / 0.07) 0%, transparent 65%)",
+          "radial-gradient(ellipse 55% 70% at 90% 100%, hsl(18 100% 60% / 0.07) 0%, transparent 65%)",
       }} />
 
-      <div className={`relative z-10 w-full max-w-7xl mx-auto px-8 sm:px-14 flex flex-col gap-8 ${isPresenter ? "py-8" : "pt-24 pb-6"}`}>
+      <div className={`relative z-10 w-full max-w-7xl mx-auto px-8 sm:px-14 ${isPresenter ? "py-8" : "pt-28 pb-0"}`}>
 
-        {/* ── TOP: Full-width headline ── */}
-        <div className="flex flex-col gap-4">
+        {/* ── Full-width headline block ── */}
+        <div className="mb-10">
           <p
-            className="font-bold text-[11px] uppercase tracking-[0.22em] animate-fade-up"
+            className="font-bold text-[11px] uppercase tracking-[0.22em] mb-4 animate-fade-up"
             style={{ color: "hsl(var(--sq-orange))", animationDelay: "0ms" }}
           >
             The Problem
           </p>
 
           <h2
-            className="font-black tracking-tight leading-[0.95] animate-fade-up w-full"
+            className="font-black tracking-tight leading-[0.93] animate-fade-up"
             style={{
               color: "hsl(var(--sq-text))",
               animationDelay: "60ms",
-              fontSize: isPresenter ? "3.6rem" : "clamp(3.2rem, 5.5vw, 6rem)",
+              fontSize: isPresenter ? "3.6rem" : "clamp(3rem, 5.2vw, 5.6rem)",
+              maxWidth: "88%",
             }}
           >
             Every brand says they talk to customers.{" "}
@@ -56,11 +57,11 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
           </h2>
         </div>
 
-        {/* ── BOTTOM: Frictions left, Avatar right ── */}
-        <div className="grid grid-cols-[48%_52%] gap-0 items-end">
+        {/* ── Bottom: Frictions left, Avatar right ── */}
+        <div className="grid grid-cols-[55%_45%] items-end">
 
           {/* LEFT — frictions + quote */}
-          <div className="flex flex-col gap-4 pr-10 pb-2">
+          <div className="flex flex-col gap-5 pr-12 pb-16">
 
             <p
               className="font-bold text-[11px] uppercase tracking-[0.2em] animate-fade-up"
@@ -69,13 +70,13 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
               The Friction
             </p>
 
-            <div className="flex flex-col gap-3 animate-fade-up" style={{ animationDelay: "180ms" }}>
+            <div className="flex flex-col gap-3">
               {frictions.map((item, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-4 rounded-2xl px-4 py-3.5 animate-fade-up"
+                  className="flex items-center gap-4 rounded-2xl px-5 py-4 animate-fade-up"
                   style={{
-                    animationDelay: `${220 + i * 70}ms`,
+                    animationDelay: `${200 + i * 70}ms`,
                     background: "hsl(var(--sq-orange) / 0.04)",
                     border: "1px solid hsl(var(--sq-orange) / 0.12)",
                   }}
@@ -93,7 +94,7 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
                     className="font-bold leading-snug"
                     style={{
                       color: "hsl(var(--sq-text))",
-                      fontSize: "clamp(1rem, 1.2vw, 1.15rem)",
+                      fontSize: "clamp(1rem, 1.15vw, 1.15rem)",
                     }}
                   >
                     {item.label}
@@ -103,13 +104,13 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
             </div>
 
             {/* Quote */}
-            <div className="animate-fade-up mt-2" style={{ animationDelay: "420ms" }}>
+            <div className="animate-fade-up mt-1" style={{ animationDelay: "440ms" }}>
               <div className="h-px mb-4" style={{ background: "hsl(var(--sq-subtle))" }} />
               <p
                 className="font-black leading-snug"
                 style={{
                   color: "hsl(var(--sq-text))",
-                  fontSize: "clamp(1.05rem, 1.3vw, 1.3rem)",
+                  fontSize: "clamp(1.05rem, 1.25vw, 1.25rem)",
                 }}
               >
                 "Decisions default to intuition.{" "}
@@ -123,8 +124,8 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
             </div>
           </div>
 
-          {/* RIGHT — avatar stage */}
-          <div className="relative" style={{ minHeight: 520 }}>
+          {/* RIGHT — avatar stage, tall and dominant */}
+          <div className="relative" style={{ minHeight: 580 }}>
 
             {/* Stat card — top right */}
             <div
@@ -151,7 +152,7 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
             {/* Floating "10x slower" chip */}
             <div
               className="absolute z-30 animate-fade-up"
-              style={{ animationDelay: "480ms", bottom: "22%", left: "6%" }}
+              style={{ animationDelay: "480ms", bottom: "26%", left: "2%" }}
             >
               <div
                 className="rounded-full px-4 py-2"
@@ -166,9 +167,9 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
               </div>
             </div>
 
-            {/* Avatar — full height, right-anchored */}
+            {/* Avatar — tall, right-anchored, bleeds to bottom */}
             <div
-              className="absolute bottom-0 right-2 z-20 animate-fade-up"
+              className="absolute bottom-0 right-0 z-20 animate-fade-up"
               style={{ animationDelay: "160ms" }}
             >
               <div className="animate-avatar-float">
@@ -178,10 +179,10 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
                   className="select-none"
                   style={{
                     width: "auto",
-                    height: 520,
+                    height: 580,
                     objectFit: "contain",
-                    maskImage: "linear-gradient(to top, transparent 0%, white 10%)",
-                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 10%)",
+                    maskImage: "linear-gradient(to top, transparent 0%, white 8%)",
+                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 8%)",
                   }}
                 />
               </div>
