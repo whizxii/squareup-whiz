@@ -7,54 +7,43 @@ import Reveal from "@/components/ui/Reveal";
 const TESTIMONIALS = [
   {
     quote:
-      "Our last agency gave us a 60 page deck after 5 weeks. Half of it was methodology slides. SquareUp gave us 8 pages. Every single page had something we could act on. My manager literally forwarded it to the CEO — that's never happened before.",
-    name: "Ashish",
-    role: "Category",
-    company: "Man Matters",
+      "At Titan and Myntra I've been through enough research reports to know what a 60-page deck full of methodology slides looks like. I gave SquareUp the same brief. They came back with 8 pages. Every single page had something I could act on. I literally forwarded it to a few colleagues — that never happens with research decks.",
+    name: "Saket",
+    role: "Ecommerce Head",
+    company: "Titan Company",
+    linkedin: "https://www.linkedin.com/in/saket-singh-chauhan-a3003956/",
     featured: true,
   },
   {
     quote:
-      "We had three people in leadership with three different opinions on the relaunch. Everyone had an 'insight.' SquareUp came back with evidence on those insights and suddenly there was nothing to argue about.",
-    name: "Siddharth",
-    role: "Growth",
-    company: "OYO",
+      "I had three different opinions on a relaunch direction and no way to settle it. Everyone had an 'insight.' I ran it through SquareUp — they came back with evidence on each one. Suddenly there was nothing to argue about.",
+    name: "Krishnavi",
+    role: "Founder",
+    company: "Sakhi",
+    linkedin: "https://www.linkedin.com/in/krishnavi-parekh-82b9231b2/",
   },
   {
     quote:
-      "Honestly I thought consumer research was something HUL and P&G do. Not us. We're a 20-person team. But we were about to spend 80 lakhs on a campaign for a new programme and had zero clue if the messaging would land. The pilot cost a fraction of that and told us to change the whole angle. It worked.",
+      "Honestly I thought consumer research was something Zomato and Meesho do. Not someone running a 120-person team. But I was about to spend 80 lakhs on a campaign and had zero evidence if the messaging would land. The pilot cost a fraction of that and told me to change the whole angle. It worked.",
     name: "Ankit",
     role: "Founder",
     company: "Mesa School of Business",
+    linkedin: "https://www.linkedin.com/in/ankitagar/",
   },
   {
     quote:
-      "I had to sign a PO for a new product. While my team was arguing 'but will people actually buy this.' SquareUp gave me the consumer data I needed. Three slides from their report went straight into my board deck. Got approved the same week.",
-    name: "Darshana",
-    role: "Growth",
-    company: "CRED",
+      "Every month I sit with hundreds of NPS responses trying to figure out what's actually going wrong. Two weekends gone, every month. I gave SquareUp the same problem — they talked to 30 people and found the one pattern I'd been staring at and couldn't see.",
+    name: "Arpan",
+    role: "Lead Product Growth",
+    company: "FInbox",
+    linkedin: "https://www.linkedin.com/in/arpan-adarsh-30/",
   },
   {
     quote:
-      "We were about to finalize an SKU that the whole team loved. Ran it through SquareUp studies just because these guys pushed so much. Turns out customers found the name confusing and the price felt wrong for the size. We would've found out after printing 10,000 units.",
+      "I was about to finalize an SKU that everyone around me loved. Ran it through SquareUp just because these guys pushed so much. Turns out customers found the name confusing and the price felt wrong for the size. I would've found out after printing 10,000 units.",
     name: "Shrey",
     role: "Founder",
     company: "FYN",
-  },
-  {
-    quote:
-      "I've worked at Myntra and Titan. I know what research looks like. It usually takes forever and half of it sits in a drive nobody opens. This was genuinely the first time I got a research output and immediately put it to use in the next quarter.",
-    name: "Saket",
-    role: "Brand Lead",
-    company: "Titan Skinn",
-    featured: true,
-  },
-  {
-    quote:
-      "Every month I'd sit with hundreds of NPS responses trying to figure out what's actually going wrong. Two weekends gone, every month. These guys talked to 30 people and found the one pattern I'd been staring at and couldn't see.",
-    name: "Naveen",
-    role: "Product",
-    company: "EA Games",
   },
 ];
 
@@ -106,9 +95,15 @@ function TestimonialCard({ t }: { t: (typeof TESTIMONIALS)[number] }) {
             <span className="text-sm font-bold text-lime">{t.name[0]}</span>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-maze-black truncate">
-              {t.name}
-            </p>
+            {t.linkedin ? (
+              <a href={t.linkedin} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-maze-black truncate hover:text-lime transition-colors">
+                {t.name}
+              </a>
+            ) : (
+              <p className="text-sm font-bold text-maze-black truncate">
+                {t.name}
+              </p>
+            )}
             <p className="text-[12px] text-maze-gray truncate">
               {t.role} <span className="text-lime/50">at</span> {t.company}
             </p>

@@ -134,7 +134,7 @@ export default function PilotHero() {
               href={CALENDLY_URL}
               className="w-full sm:w-auto sm:min-w-[280px] min-h-[56px] px-6 py-3 text-base font-display tracking-[-0.02em] text-white bg-maze-black rounded-xl hover:bg-black active:scale-[0.97] transition-all flex items-center justify-center"
             >
-              Book a 15-min call
+              Book a 20-min call
             </a>
           </div>
         </Reveal>
@@ -142,7 +142,7 @@ export default function PilotHero() {
         {/* Under-CTA micro line */}
         <Reveal width="100%" delay={0.36}>
           <p className="mt-4 text-[13px] text-maze-gray">
-            If we&rsquo;re not a fit, we&rsquo;ll tell you in 15 minutes.
+            If we&rsquo;re not a fit, we&rsquo;ll tell you in 20 minutes.
           </p>
         </Reveal>
 

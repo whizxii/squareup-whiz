@@ -30,10 +30,6 @@ const FAQS = [
     q: "Can I see the full transcripts?",
     a: "Yes. Every interview comes with a timestamped transcript and the original recording. You can audit any quote or recommendation back to the source.",
   },
-  {
-    q: "Do you have case studies?",
-    a: "We share relevant examples on the discovery call. Some are under NDA, but we can walk you through the methodology, the deliverable format, and real outcomes.",
-  },
 ];
 
 export default function PilotFAQ() {

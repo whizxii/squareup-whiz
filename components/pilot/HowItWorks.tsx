@@ -423,7 +423,7 @@ export default function HowItWorks({
               href="https://cal.com/squareup-ai/discovery-setup-call"
               className="min-h-[48px] px-7 py-2.5 text-[15px] font-display tracking-[-0.02em] text-white bg-maze-black rounded-xl hover:bg-black active:scale-[0.97] transition-all flex items-center justify-center"
             >
-              Book a 15-min call
+              Book a 20-min call
             </a>
           </div>
         </Reveal>

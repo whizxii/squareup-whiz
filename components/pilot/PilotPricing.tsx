@@ -112,7 +112,7 @@ export default function PilotPricing() {
                 href="https://cal.com/squareup-ai/discovery-setup-call"
                 className="min-h-[56px] w-full sm:w-auto sm:min-w-[280px] px-6 py-3 text-base font-display tracking-[-0.02em] text-white bg-maze-black rounded-xl hover:bg-black active:scale-[0.97] transition-all flex items-center justify-center"
               >
-                Get a quote in 15 minutes
+                Get a quote in 20 minutes
               </a>
             </div>
           </Reveal>

@@ -37,7 +37,7 @@ export default function PilotFinalCTA({
 
         <Reveal width="100%" delay={0.08}>
           <p className="mt-4 text-base sm:text-lg text-maze-gray">
-            Only 2 pilot slots left. Book a 15-min call.
+            Only 2 pilot slots left. Book a 20-min call.
           </p>
         </Reveal>
 
@@ -47,7 +47,7 @@ export default function PilotFinalCTA({
               href={CALENDLY_URL}
               className="w-full sm:w-auto sm:min-w-[280px] min-h-[56px] px-6 py-3 text-base font-display tracking-[-0.02em] text-white bg-maze-black rounded-xl hover:bg-black active:scale-[0.97] transition-all flex items-center justify-center"
             >
-              Book a 15-min call
+              Book a 20-min call
             </a>
             <button
               onClick={onShowBrief}
