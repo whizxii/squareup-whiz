@@ -1,0 +1,18 @@
+# Dependencies & build
+node_modules/
+.next/
+.npm-cache/
+tsconfig.tsbuildinfo
+
+# OS
+.DS_Store
+
+# Working asset directories (not needed for production)
+Agent videos/
+Maze image trail animation frames/
+Maze lime blur magic frames/
+Maze site hero + scroll frames/
+apple cinematic slider/
+maze website frames/
+muse globe frames/
+orange image trial effect/
