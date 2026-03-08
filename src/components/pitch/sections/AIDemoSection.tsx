@@ -1,20 +1,30 @@
 import { useEffect, useRef, useState } from "react";
 import type { SlideMode } from "@/lib/slides";
+import avatarAiAgent from "@/assets/avatar-ai-agent.png";
+import demoRecording from "@/assets/demo-recording.mp3";
 
 const MESSAGES = [
-  { role: "ai",   text: "Walk me through the last time your team had to make a big go/no-go call." },
-  { role: "user", text: "Q3 launch. 4 months of build. We committed early." },
-  { role: "ai",   text: "What did you wish you'd known before you committed?" },
-  { role: "user", text: "That our target segment doesn't shop the way we assumed. Found out after launch." },
-  { role: "ai",   text: "When you made that call — what data did you actually have?" },
-  { role: "user", text: "Internal metrics. Some gut feel. That's honestly it." },
-  { role: "ai",   text: "What would different data have changed?" },
+  { role: "ai", text: "When you looked at the new personal care range, what stopped you from purchasing?" },
+  { role: "user", text: "I liked the fragrance, but the pack size is huge for a first try." },
+  { role: "ai", text: "If a smaller, entry-level size was available, how would that change your decision?" },
+  { role: "user", text: "I would have definitely bought a 50ml bottle just to test it out." },
+  { role: "ai", text: "Did the pricing on the large bottle feel off, or was it purely the volume?" },
+  { role: "user", text: "It's the commitment. ₹1200 is too much for an unproven scent. ₹399 for a mini would fly." },
 ];
 
-const INSIGHTS = [
-  { after: 1, type: "sentiment", label: "Sentiment",  value: "Cautious — 71%",               color: "hsl(48,96%,42%)" },
-  { after: 3, type: "quote",     label: "Key Quote",  value: '"Segment doesn\'t shop the way we assumed"', sub: "Severity: High · 8.3/10", color: "hsl(var(--sq-orange))" },
-  { after: 5, type: "risk",      label: "Risk Flag",  value: "Assumption: Purchase behaviour", sub: "Status: Unvalidated ⚠",             color: "hsl(0,72%,51%)" },
+type InsightType = {
+  after: number;
+  type: string;
+  label: string;
+  value: string;
+  color: string;
+  sub?: string;
+};
+
+const INSIGHTS: InsightType[] = [
+  { after: 1, type: "theme", label: "Theme", value: "Price-Pack Mismatch", color: "hsl(var(--sq-orange))", sub: "Frequency: 74% of respondents" },
+  { after: 3, type: "severity", label: "Severity", value: "9.2 / 10 — Direct Purchase Block", color: "hsl(0,72%,51%)", sub: "Segment: First-time buyers, Urban, 22-28" },
+  { after: 5, type: "recommend", label: "Action", value: "Test ₹399 / 50ml entry SKU", color: "hsl(48,96%,42%)", sub: "Route to: Product, Growth" },
 ];
 
 function useTypewriter(text: string, speed = 36, active = false) {
@@ -43,11 +53,15 @@ function ChatMessage({ msg, index, activeMsg, onDone }: {
   const isAI = msg.role === "ai";
   return (
     <div className={`flex gap-2.5 ${isAI ? "" : "flex-row-reverse"}`}>
-      <div className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black"
-        style={{ background: isAI ? "hsl(var(--sq-orange))" : "hsl(var(--sq-subtle))", color: isAI ? "white" : "hsl(var(--sq-muted))" }}>
-        {isAI ? "AI" : "U"}
-      </div>
-      <div className="max-w-[82%] rounded-xl px-3 py-2 text-xs leading-relaxed"
+      {isAI ? (
+        <img src={avatarAiAgent} alt="SQ" className="w-6 h-6 rounded-full flex-shrink-0 object-cover" />
+      ) : (
+        <div className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black"
+          style={{ background: "hsl(var(--sq-subtle))", color: "hsl(var(--sq-muted))" }}>
+          U
+        </div>
+      )}
+      <div className="max-w-[82%] rounded-xl px-3 py-2 text-xs leading-relaxed font-medium"
         style={{
           background: isAI ? "hsl(var(--sq-off-white))" : "hsl(var(--sq-subtle))",
           color: isAI ? "hsl(var(--sq-text))" : "hsl(var(--sq-muted))"
@@ -68,6 +82,7 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
   const sectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (mode === "presenter") { setStarted(true); return; }
     const el = sectionRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(([entry]) => {
@@ -75,9 +90,11 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
     }, { threshold: 0.3 });
     obs.observe(el);
     return () => obs.disconnect();
-  }, [started]);
+  }, [started, mode]);
 
-  useEffect(() => { if (started) setActiveMsg(0); }, [started]);
+  useEffect(() => {
+    if (started) setActiveMsg(mode === "presenter" ? MESSAGES.length : 0);
+  }, [started, mode]);
 
   const handleMsgDone = (i: number) => {
     if (i < MESSAGES.length - 1) setTimeout(() => setActiveMsg(i + 1), 750);
@@ -89,24 +106,26 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
   return (
     <section
       id="aidemo"
-      className={`${isPresenter ? "h-full flex items-center px-16" : "py-24 px-6"}`}
+      className={`${isPresenter ? "min-h-screen flex items-center px-16" : "py-32 px-8 sm:px-16"}`}
       style={{ background: "hsl(var(--sq-off-white))" }}
     >
-      <div className="max-w-6xl mx-auto w-full" ref={sectionRef}>
+      <div className="max-w-5xl mx-auto w-full" ref={sectionRef}>
 
         {/* Header */}
-        <div className="mb-10 text-center">
+        <div className={`${isPresenter ? "mb-6" : "mb-12"} text-center`}>
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
-            AI in Action
+            The Magic Demo
           </p>
-          <h2 className={`font-black tracking-tight leading-[1.0] ${isPresenter ? "text-5xl" : "text-[2.5rem] sm:text-[3rem]"}`}
+          <h2 className={`font-black tracking-tight leading-[1.05] ${isPresenter ? "text-4xl" : "text-4xl sm:text-5xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}>
-            The AI that interviews like your{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>best researcher.</span>
+            Not a transcript. <br />
+            <span style={{ color: "hsl(var(--sq-orange))" }}>A live customer truth engine.</span>
           </h2>
-          <p className="mt-3 text-sm max-w-sm mx-auto" style={{ color: "hsl(var(--sq-muted))" }}>
-            Probes naturally. Extracts signal in real time.
-          </p>
+          {!isPresenter && (
+            <p className="mt-4 text-sm font-medium max-w-sm mx-auto" style={{ color: "hsl(var(--sq-muted))" }}>
+              As the AI probes, actionable intelligence is synthesized and assigned immediately.
+            </p>
+          )}
         </div>
 
         {/* Light-mode interview card */}
@@ -130,10 +149,10 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
 
           <div className={`grid ${isPresenter ? "grid-cols-2" : "grid-cols-1 lg:grid-cols-2"}`}>
             {/* LEFT — Chat */}
-            <div className="p-6 space-y-3 min-h-[340px]" style={{ borderRight: "1px solid hsl(var(--sq-subtle))" }}>
+            <div className={`${isPresenter ? "p-4 space-y-2" : "p-6 space-y-3 min-h-[340px]"}`} style={{ borderRight: "1px solid hsl(var(--sq-subtle))" }}>
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "hsl(var(--sq-orange))" }} />
-                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "hsl(var(--sq-muted))" }}>Live Interview</span>
+                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "hsl(var(--sq-muted))" }}>Live Call Interview</span>
               </div>
               {MESSAGES.map((msg, i) => (
                 i <= activeMsg ? (
@@ -143,9 +162,9 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
             </div>
 
             {/* RIGHT — Insights */}
-            <div className="p-6 space-y-3 min-h-[340px]">
+            <div className={`${isPresenter ? "p-4 space-y-2" : "p-6 space-y-3 min-h-[340px]"}`}>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#33C748" }} />
+                <div className="w-1.5 h-1.5 rounded-full sq-live-pulse" style={{ background: "#33C748" }} />
                 <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "hsl(var(--sq-muted))" }}>Live Extraction</span>
               </div>
 
@@ -165,7 +184,7 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
               ))}
 
               {allDone && (
-                <div className="rounded-xl p-4 animate-fade-up"
+                <div className="rounded-xl p-4 animate-fade-up sq-glow-pulse"
                   style={{ background: "hsl(var(--sq-orange) / 0.07)", border: "1px solid hsl(var(--sq-orange) / 0.25)" }}>
                   <p className="font-bold text-sm mb-3" style={{ color: "hsl(var(--sq-orange))" }}>
                     3 critical risks identified. Brief ready.
@@ -181,14 +200,23 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
           </div>
         </div>
 
-        {/* Bottom link */}
-        <div className="mt-6 flex items-center justify-center gap-4">
-          <a href="https://almost.joinsquareup.com" target="_blank" rel="noopener noreferrer"
-            className="font-bold text-sm px-5 py-2 rounded-full border transition-all hover:opacity-70"
-            style={{ borderColor: "hsl(var(--sq-orange) / 0.3)", color: "hsl(var(--sq-orange))" }}>
-            Try it yourself → almost.joinsquareup.com
-          </a>
-        </div>
+        {/* Audio player — hear the AI interview */}
+        {!isPresenter && (
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "hsl(var(--sq-muted))" }}>
+              Hear a real AI interview
+            </p>
+            <audio
+              controls
+              preload="metadata"
+              className="w-full max-w-md"
+              style={{ borderRadius: "9999px" }}
+              src={demoRecording}
+            >
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        )}
       </div>
     </section>
   );

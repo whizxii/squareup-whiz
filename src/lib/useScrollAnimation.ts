@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
-export function useScrollAnimation(threshold = 0.15) {
+export function useScrollAnimation(threshold = 0.15, forceReveal = false) {
   const ref = useRef<HTMLDivElement>(null);
-  const [revealed, setRevealed] = useState(false);
+  const [revealed, setRevealed] = useState(forceReveal);
 
   useEffect(() => {
+    if (forceReveal) { setRevealed(true); return; }
     const el = ref.current;
     if (!el) return;
     const obs = new IntersectionObserver(
@@ -13,17 +14,18 @@ export function useScrollAnimation(threshold = 0.15) {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [threshold]);
+  }, [threshold, forceReveal]);
 
   return { ref, revealed };
 }
 
-export function useCountUp(target: number, duration = 1800, prefix = "", suffix = "") {
+export function useCountUp(target: number, duration = 1800, prefix = "", suffix = "", forceStart = false) {
   const [count, setCount] = useState(0);
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(forceStart);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (forceStart) { setStarted(true); return; }
     const el = ref.current;
     if (!el) return;
     const obs = new IntersectionObserver(
@@ -32,10 +34,11 @@ export function useCountUp(target: number, duration = 1800, prefix = "", suffix 
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [forceStart]);
 
   useEffect(() => {
     if (!started) return;
+    if (forceStart) { setCount(target); return; }
     let startTime: number;
     const animate = (ts: number) => {
       if (!startTime) startTime = ts;
@@ -45,7 +48,7 @@ export function useCountUp(target: number, duration = 1800, prefix = "", suffix 
       if (progress < 1) requestAnimationFrame(animate);
     };
     requestAnimationFrame(animate);
-  }, [started, target, duration]);
+  }, [started, target, duration, forceStart]);
 
   return { ref, display: `${prefix}${count}${suffix}` };
 }

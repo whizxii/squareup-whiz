@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 
-export type SlideMode = "short" | "detailed" | "presenter";
-export type DeckLength = 5 | 8 | 10 | 12 | 15;
+export type SlideMode = "short" | "detailed" | "presenter" | "download";
+export type DeckLength = 8 | 12;
 
 export interface SlideDefinition {
   id: string;
@@ -11,21 +11,25 @@ export interface SlideDefinition {
 }
 
 export const ALL_SLIDES: SlideDefinition[] = [
-  { id: "hero",          title: "SquareUp",              lengths: [5, 8, 10, 12, 15], inShort: true  },
-  { id: "problem",       title: "The Problem",           lengths: [5, 8, 10, 12, 15], inShort: true  },
-  { id: "solution",      title: "The Solution",          lengths: [5, 8, 10, 12, 15], inShort: true  },
-  { id: "howitworks",   title: "How It Works",           lengths: [10, 12, 15],        inShort: true  },
-  { id: "aidemo",        title: "AI in Action",          lengths: [12, 15],            inShort: true  },
-  { id: "whofor",        title: "Who It's For",          lengths: [12, 15],            inShort: false },
-  { id: "traction",      title: "Traction",              lengths: [5, 8, 10, 12, 15], inShort: true  },
-  { id: "whynow",        title: "Why Now",               lengths: [8, 10, 12, 15],    inShort: false },
-  { id: "landscape",     title: "Competitive Landscape", lengths: [10, 12, 15],        inShort: true  },
-  { id: "market",        title: "Market Opportunity",    lengths: [8, 10, 12, 15],    inShort: false },
-  { id: "businessmodel", title: "Business Model",        lengths: [15],               inShort: true  },
-  { id: "team",          title: "Team",                  lengths: [8, 10, 12, 15],    inShort: true  },
-  { id: "ask",           title: "The Ask",               lengths: [5, 8, 10, 12, 15], inShort: true  },
-  { id: "cost",          title: "Cost of Blindness",     lengths: [15],               inShort: false },
-  { id: "toolsgap",      title: "Tools Gap",             lengths: [15],               inShort: false },
+  { id: "hero", title: "The Hook", lengths: [8, 12], inShort: true },
+  { id: "cost", title: "The Bleed", lengths: [8, 12], inShort: true },
+  { id: "problem", title: "The Structural Flaw", lengths: [8, 12], inShort: true },
+  { id: "decisionvolume", title: "The Frequency", lengths: [12], inShort: false },
+  { id: "landscape", title: "The False Idols", lengths: [12], inShort: false },
+  { id: "solution", title: "The Category Definition", lengths: [8, 12], inShort: true },
+  { id: "decisionflow", title: "How Customer Truth Becomes Action", lengths: [12], inShort: false },
+  { id: "whofor", title: "Who It's For", lengths: [12], inShort: false },
+  { id: "howitworks", title: "The Workflow", lengths: [12], inShort: false },
+  { id: "insightbrief", title: "The Decision Brief", lengths: [8, 12], inShort: true },
+  { id: "aidemo", title: "The Magic Demo", lengths: [8, 12], inShort: true },
+  { id: "whynow", title: "The Catalyst", lengths: [8, 12], inShort: true },
+  { id: "traction", title: "The Velocity", lengths: [8, 12], inShort: true },
+  { id: "market", title: "The Market", lengths: [8, 12], inShort: true },
+  { id: "businessmodel", title: "The Expansion", lengths: [12], inShort: false },
+  { id: "team", title: "The Destiny", lengths: [8, 12], inShort: true },
+  { id: "ask", title: "The Ask", lengths: [8, 12], inShort: true },
+  { id: "faq", title: "FAQ", lengths: [12], inShort: false },
+  { id: "cta", title: "Let's Talk", lengths: [8, 12], inShort: true },
 ];
 
 export function getSlidesForLength(length: DeckLength): SlideDefinition[] {
@@ -36,4 +40,4 @@ export function getShortSlides(): SlideDefinition[] {
   return ALL_SLIDES.filter((s) => s.inShort);
 }
 
-export const DECK_LENGTHS: DeckLength[] = [5, 8, 10, 12, 15];
+export const DECK_LENGTHS: DeckLength[] = [8, 12];

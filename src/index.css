@@ -5,15 +5,25 @@
 @layer base {
   :root {
     /* SquareUp Brand Tokens */
-    --sq-dark: 0 0% 5%;           /* #0D0D0D */
-    --sq-off-white: 45 14% 96%;   /* #F7F6F2 */
-    --sq-orange: 18 100% 60%;     /* #FF6B35 */
-    --sq-amber: 35 100% 65%;      /* #FFAA4D */
-    --sq-text: 0 0% 10%;          /* #1A1A1A */
-    --sq-muted: 0 0% 38%;         /* #616161 */
-    --sq-card: 0 0% 100%;         /* #FFFFFF */
-    --sq-subtle: 42 14% 91%;      /* #EEEDEA */
-    --sq-skin: 30 56% 77%;        /* avatar skin */
+    --sq-dark: 0 0% 5%;
+    /* #0D0D0D */
+    --sq-off-white: 45 14% 96%;
+    /* #F7F6F2 */
+    --sq-orange: 18 100% 60%;
+    /* #FF6B35 */
+    --sq-amber: 35 100% 65%;
+    /* #FFAA4D */
+    --sq-text: 0 0% 10%;
+    /* #1A1A1A */
+    --sq-muted: 0 0% 38%;
+    /* #616161 */
+    --sq-card: 0 0% 100%;
+    /* #FFFFFF */
+    --sq-subtle: 42 14% 91%;
+    /* #EEEDEA */
+    --sq-skin: 30 56% 77%;
+    /* avatar skin */
+    --sq-card-rgb: 255, 255, 255;
 
     /* shadcn/ui system */
     --background: 45 14% 96%;
@@ -45,16 +55,69 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  .dark {
+    /* SquareUp Brand Tokens — Dark Theme */
+    --sq-dark: 0 0% 5%;
+    /* Same dark anchor in both themes */
+    --sq-off-white: 0 0% 4%;
+    /* Deep space background */
+    --sq-orange: 18 100% 55%;
+    /* Slightly more vivid orange */
+    --sq-amber: 35 100% 60%;
+    --sq-text: 45 14% 96%;
+    /* Almost white text */
+    --sq-muted: 0 0% 60%;
+    /* Lighter muted text */
+    --sq-card: 0 0% 7%;
+    /* Very dark grey cards */
+    --sq-subtle: 0 0% 12%;
+    /* Subtle borders logic inverted */
+    --sq-skin: 30 56% 77%;
+    /* unchanged avatar skin */
+    --sq-card-rgb: 18, 18, 18;
+
+    /* shadcn/ui system */
+    --background: 0 0% 4%;
+    --foreground: 45 14% 96%;
+    --card: 0 0% 7%;
+    --card-foreground: 45 14% 96%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 45 14% 96%;
+    --primary: 18 100% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 45 14% 96%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 12%;
+    --accent-foreground: 45 14% 96%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 45 14% 96%;
+    --border: 0 0% 12%;
+    --input: 0 0% 12%;
+    --ring: 18 100% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
 }
 
 @layer base {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
   html {
     scroll-behavior: smooth;
   }
@@ -62,67 +125,171 @@
 
 /* SquareUp hero blob animations */
 @keyframes blob-drift-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(60px, -40px) scale(1.08); }
-  66% { transform: translate(-30px, 50px) scale(0.95); }
-}
-@keyframes blob-drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-50px, 30px) scale(0.92); }
-  66% { transform: translate(40px, -60px) scale(1.06); }
-}
-@keyframes bounce-chevron {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(8px); }
-}
-@keyframes ping-orange {
-  0% { transform: scale(1); opacity: 1; }
-  75%, 100% { transform: scale(2.2); opacity: 0; }
-}
-@keyframes counter-up {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(32px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-@keyframes timeline-fill {
-  from { width: 0%; }
-  to { width: 100%; }
-}
-@keyframes pulse-logo {
-  0%, 100% { opacity: 0.06; transform: scale(1); }
-  50% { opacity: 0.10; transform: scale(1.03); }
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(60px, -40px) scale(1.08);
+  }
+
+  66% {
+    transform: translate(-30px, 50px) scale(0.95);
+  }
 }
 
-.animate-blob-1 { animation: blob-drift-1 12s ease-in-out infinite; }
-.animate-blob-2 { animation: blob-drift-2 17s ease-in-out infinite; }
-.animate-bounce-chevron { animation: bounce-chevron 1.6s ease-in-out infinite; }
-.animate-ping-orange { animation: ping-orange 2s cubic-bezier(0,0,0.2,1) infinite; }
-.animate-fade-up { animation: fade-up 0.6s ease-out forwards; }
-.animate-slide-right { animation: slide-in-right 0.5s ease-out forwards; }
-.animate-timeline-fill { animation: timeline-fill 1.5s ease-out forwards; }
-.animate-pulse-logo { animation: pulse-logo 4s ease-in-out infinite; }
+@keyframes blob-drift-2 {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(-50px, 30px) scale(0.92);
+  }
+
+  66% {
+    transform: translate(40px, -60px) scale(1.06);
+  }
+}
+
+@keyframes bounce-chevron {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+@keyframes ping-orange {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes counter-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes timeline-fill {
+  from {
+    width: 0%;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes pulse-logo {
+
+  0%,
+  100% {
+    opacity: 0.06;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.10;
+    transform: scale(1.03);
+  }
+}
+
+.animate-blob-1 {
+  animation: blob-drift-1 12s ease-in-out infinite;
+}
+
+.animate-blob-2 {
+  animation: blob-drift-2 17s ease-in-out infinite;
+}
+
+.animate-bounce-chevron {
+  animation: bounce-chevron 1.6s ease-in-out infinite;
+}
+
+.animate-ping-orange {
+  animation: ping-orange 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s ease-out forwards;
+}
+
+.animate-slide-right {
+  animation: slide-in-right 0.5s ease-out forwards;
+}
+
+.animate-timeline-fill {
+  animation: timeline-fill 1.5s ease-out forwards;
+}
+
+.animate-pulse-logo {
+  animation: pulse-logo 4s ease-in-out infinite;
+}
 
 /* Presenter mode slide transitions */
 .slide-enter {
   opacity: 0;
   transform: scale(0.96);
 }
+
 .slide-enter-active {
   opacity: 1;
   transform: scale(1);
   transition: opacity 350ms ease-out, transform 350ms ease-out;
 }
+
 .slide-exit {
   opacity: 1;
   transform: scale(1);
 }
+
 .slide-exit-active {
   opacity: 0;
   transform: scale(1.04);
@@ -135,7 +302,210 @@
   transform: translateY(28px);
   transition: opacity 0.6s ease-out, transform 0.6s ease-out;
 }
+
 .sq-reveal.revealed {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* -------------------------------------
+ * SquareUp Typography Scale
+ * ------------------------------------- */
+
+/* Hero-level stats — the numbers that stop you scrolling */
+.sq-stat-hero {
+  font-size: clamp(5rem, 12vw, 9rem);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+
+/* Section-level stats — prominent but not hero */
+.sq-stat-section {
+  font-size: clamp(3rem, 7vw, 5rem);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+/* Section headlines */
+.sq-headline {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 900;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+}
+
+/* -------------------------------------
+ * SquareUp Visual Effects
+ * ------------------------------------- */
+
+/* Subtle orange text glow for key stats */
+.sq-glow-text {
+  text-shadow: 0 0 40px hsl(var(--sq-orange) / 0.25),
+               0 0 80px hsl(var(--sq-orange) / 0.1);
+}
+
+/* Glass card for dark sections */
+.sq-glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@supports not (backdrop-filter: blur(20px)) {
+  .sq-glass {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Animated gradient text */
+@keyframes gradient-text-shift {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.sq-gradient-text {
+  background: linear-gradient(90deg, hsl(var(--sq-orange)), hsl(var(--sq-amber)), hsl(var(--sq-orange)));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-text-shift 4s linear infinite;
+}
+
+/* CTA glow pulse */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px hsl(var(--sq-orange) / 0.3); }
+  50% { box-shadow: 0 0 40px hsl(var(--sq-orange) / 0.5), 0 0 80px hsl(var(--sq-orange) / 0.15); }
+}
+
+.sq-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Floating ambient orbs (CSS only, GPU-accelerated) */
+@keyframes orb-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(60px, -40px) scale(1.1); }
+  66% { transform: translate(-30px, 50px) scale(0.95); }
+}
+
+.sq-orb {
+  animation: orb-drift 15s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Avatar float animation */
+@keyframes avatar-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+.animate-avatar-float {
+  animation: avatar-float 4s ease-in-out infinite;
+}
+
+/* Green live indicator pulse */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px #22c55e; }
+  50% { opacity: 0.6; box-shadow: 0 0 12px #22c55e, 0 0 24px rgba(34, 197, 94, 0.3); }
+}
+
+.sq-live-pulse {
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+/* Dark section background utility */
+.sq-dark-section {
+  background: linear-gradient(135deg, #0a0a0f 0%, #0d1117 50%, #0a0a12 100%);
+}
+
+/* -------------------------------------
+ * PDF Export Print Styles
+ * ------------------------------------- */
+@media print {
+  @page {
+    size: 297mm 167mm landscape;
+    margin: 0;
+  }
+
+  /* Hide everything except root */
+  body > *:not(#root) {
+    display: none !important;
+  }
+
+  /* Hide the instruction overlay during print */
+  .print-instructions {
+    display: none !important;
+  }
+
+  .print-only {
+    width: 100%;
+    background: #0a0a0f !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-slide {
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    page-break-after: always;
+    page-break-inside: avoid;
+    break-after: page;
+    break-inside: avoid;
+    position: relative;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force section to fill exactly one page */
+  .print-slide > section {
+    width: 100% !important;
+    min-height: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Ensure inner content wrapper fills available width */
+  .print-slide > section > div {
+    width: 100% !important;
+  }
+
+  /* Neutralise backdrop-filter — unsupported in most print engines */
+  .print-slide .sq-glass {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+  }
+
+  /* Gradient-text trick fails in print; fall back to solid colour */
+  .print-slide .sq-gradient-text {
+    -webkit-text-fill-color: hsl(25, 95%, 53%) !important;
+    background: none !important;
+  }
+
+  /* Make sure images render */
+  .print-slide img {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Force all backgrounds & colors to print */
+  .print-slide,
+  .print-slide * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Kill animations in print */
+  .print-slide *,
+  .print-slide *::before,
+  .print-slide *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

@@ -1,106 +1,116 @@
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import type { SlideMode } from "@/lib/slides";
 
-const COMPETITORS = [
-  { name: "Qualtrics",      x: 22, y: 72, size: 16 },
-  { name: "Dovetail",       x: 30, y: 58, size: 14 },
-  { name: "Zendesk",        x: 14, y: 60, size: 14 },
-  { name: "SurveyMonkey",   x: 25, y: 82, size: 13 },
-  { name: "Typeform",       x: 38, y: 74, size: 13 },
-  { name: "UserTesting",    x: 45, y: 55, size: 14 },
+type Row = { tool: string; good: string; bad: string; players: string; sq?: boolean };
+
+const EXISTING_STACK: Row[] = [
+  { tool: "Analytics / BI", good: "Shows what happened", bad: "Cannot explain why customers behaved that way", players: "Google Analytics, Mixpanel, Amplitude, CleverTap" },
+  { tool: "Surveys", good: "Fast directional signal", bad: "Weak depth, weak follow-up, weak nuance", players: "SurveyMonkey, Typeform, Google Forms" },
+  { tool: "Support / CX Tools", good: "Surfaces complaints at scale", bad: "Reactive noise, not structured decision input", players: "Zendesk, Freshdesk, Intercom, Sprinklr" },
 ];
 
-const DIFF = [
-  { label: "Qualtrics / SurveyMonkey", verdict: "Collects opinions. Low depth. No follow-up.", ok: false },
-  { label: "Dovetail / Notion AI",      verdict: "Organizes recordings you already have. You still run the calls.", ok: false },
-  { label: "Research Agencies",         verdict: "6–8 weeks. ₹30–50L. Findings arrive after the decision.", ok: false },
-  { label: "SquareUp",                  verdict: "AI runs interviews. Generates signal on demand. Brief in 7 days.", ok: true },
+const DIRECT_ALTERNATIVES: Row[] = [
+  { tool: "VOC / Experience Platforms", good: "Enterprise-grade feedback programs", bad: "Survey-centric, slow to act on, requires large teams", players: "Qualtrics, Medallia, InMoment, Confirmit" },
+  { tool: "Qual Research Platforms", good: "Runs remote interviews & usability tests", bad: "No synthesis, no routing, no repository", players: "UserTesting, Discuss.io, dscout, Respondent" },
+  { tool: "Research Repositories", good: "Organizes existing research data", bad: "Does not generate fresh signal on demand", players: "Dovetail, Condens, EnjoyHQ, Great Question" },
+  { tool: "Research Agencies", good: "Deep custom qualitative work", bad: "Too slow and expensive for operating cadence", players: "Nielsen, Kantar, Ipsos, RedSeer" },
 ];
+
+const SQUAREUP_ROW: Row = {
+  tool: "SquareUp",
+  good: "AI-led interviews → synthesis → decision-ready briefs",
+  bad: "",
+  players: "",
+  sq: true,
+};
 
 export default function LandscapeSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation();
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
+
+  const thCls = `${isPresenter ? "py-2 px-3 text-[10px]" : "py-3 px-4 text-xs"} font-bold tracking-widest uppercase`;
+  const tdCls = `${isPresenter ? "py-2.5 px-3 text-xs" : "py-3.5 px-4 text-sm"}`;
+
+  const renderRow = (row: Row) => (
+    <tr
+      key={row.tool}
+      className={`border-b transition-colors ${row.sq ? "border-2" : ""}`}
+      style={{
+        borderColor: row.sq ? "hsl(var(--sq-orange) / 0.4)" : "hsl(var(--sq-subtle))",
+        background: row.sq ? "hsl(var(--sq-orange) / 0.05)" : "transparent",
+      }}
+    >
+      <td className={`${tdCls} font-bold`} style={{ color: row.sq ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>
+        {row.tool}
+      </td>
+      {row.sq ? (
+        <>
+          <td colSpan={3} className={`${tdCls} font-bold`} style={{ color: "hsl(var(--sq-text))" }}>
+            {row.good}
+          </td>
+        </>
+      ) : (
+        <>
+          <td className={`${tdCls} font-medium`} style={{ color: "hsl(var(--sq-text))" }}>{row.good}</td>
+          <td className={`${tdCls} font-medium`} style={{ color: "hsl(var(--sq-muted))" }}>{row.bad}</td>
+          <td className={`${tdCls} font-medium ${isPresenter ? "text-[10px]" : "text-xs"}`} style={{ color: "hsl(var(--sq-muted) / 0.7)" }}>{row.players}</td>
+        </>
+      )}
+    </tr>
+  );
 
   return (
     <section
       id="landscape"
-      className={`${isPresenter ? "h-full flex items-center px-16" : "py-24 px-6"}`}
+      className={`${isPresenter ? "min-h-screen flex items-center px-16" : "py-32 px-8 sm:px-16"}`}
       style={{ background: "hsl(var(--sq-card))" }}
     >
-      <div className="max-w-5xl mx-auto w-full" ref={ref}>
+      <div className="max-w-6xl mx-auto w-full" ref={ref}>
 
-        <div className={`mb-10 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
+        <div className={`${isPresenter ? "mb-8" : "mb-14"} transition-all duration-500 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
             Competitive Landscape
           </p>
-          <h2 className={`font-black tracking-tight leading-[1.0] ${isPresenter ? "text-5xl" : "text-[2.5rem] sm:text-[3rem]"}`}
+          <h2 className={`font-black tracking-tight leading-[1.05] ${isPresenter ? "text-5xl" : "text-4xl sm:text-5xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}>
-            Every tool organizes data you already have.{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>None generate new signal.</span>
+            The current stack collects fragments.<br />
+            <span style={{ color: "hsl(var(--sq-orange))" }}>It does not deliver real customer understanding.</span>
           </h2>
         </div>
 
-        <div className={`grid ${isPresenter ? "grid-cols-2" : "md:grid-cols-2"} gap-10 items-center transition-all duration-700 delay-200 ${revealed ? "opacity-100" : "opacity-0 translate-y-8"}`}>
+        <div className={`overflow-x-auto transition-all duration-700 delay-200 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+          <table className={`w-full text-left border-collapse ${isPresenter ? "" : "min-w-[900px]"}`}>
+            <thead>
+              <tr className="border-b-2" style={{ borderColor: "hsl(var(--sq-text))" }}>
+                <th className={thCls} style={{ color: "hsl(var(--sq-muted))" }}>Category</th>
+                <th className={thCls} style={{ color: "hsl(var(--sq-text))" }}>What it does well</th>
+                <th className={`${thCls} text-red-400`}>Where it falls short</th>
+                <th className={thCls} style={{ color: "hsl(var(--sq-muted))" }}>Key Players</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Group label: Existing Stack */}
+              <tr>
+                <td colSpan={4} className={`${isPresenter ? "pt-3 pb-1 px-3 text-[10px]" : "pt-5 pb-2 px-4 text-[11px]"} font-black uppercase tracking-widest`}
+                  style={{ color: "hsl(var(--sq-muted) / 0.5)" }}>
+                  Existing Stack — Used widely, but not built for customer understanding
+                </td>
+              </tr>
+              {EXISTING_STACK.map(renderRow)}
 
-          {/* Matrix */}
-          <div className="relative mx-auto w-full" style={{ maxWidth: 440, aspectRatio: "1" }}>
-            <svg viewBox="0 0 560 560" className="w-full h-full">
-              {/* Quadrants */}
-              <rect x="1" y="1" width="278" height="278" rx="10" fill="hsl(42,14%,97%)" />
-              <rect x="281" y="1" width="278" height="278" rx="10" fill="hsl(18,100%,97%)" />
-              <rect x="1" y="281" width="278" height="278" rx="10" fill="hsl(42,14%,97%)" />
-              <rect x="281" y="281" width="278" height="278" rx="10" fill="hsl(42,14%,97%)" />
-
-              {/* Axes */}
-              <line x1="280" y1="10" x2="280" y2="550" stroke="hsl(42,14%,82%)" strokeWidth="1.5" strokeDasharray="4 3" />
-              <line x1="10" y1="280" x2="550" y2="280" stroke="hsl(42,14%,82%)" strokeWidth="1.5" strokeDasharray="4 3" />
-
-              {/* Labels */}
-              <text x="280" y="12" textAnchor="middle" fontSize="10" fill="hsl(0,0%,50%)" fontWeight="700" fontFamily="sans-serif">▲ Drives Decisions</text>
-              <text x="280" y="556" textAnchor="middle" fontSize="10" fill="hsl(0,0%,50%)" fontWeight="700" fontFamily="sans-serif">Passive ▼</text>
-              <text x="8" y="284" textAnchor="middle" fontSize="10" fill="hsl(0,0%,50%)" fontWeight="700" fontFamily="sans-serif" transform="rotate(-90,8,280)">◀ Organizes</text>
-              <text x="552" y="284" textAnchor="middle" fontSize="10" fill="hsl(0,0%,50%)" fontWeight="700" fontFamily="sans-serif" transform="rotate(90,552,280)">Generates ▶</text>
-
-              {/* Competitors */}
-              {COMPETITORS.map((c) => {
-                const cx = (c.x / 100) * 560;
-                const cy = (c.y / 100) * 560;
-                return (
-                  <g key={c.name}>
-                    <circle cx={cx} cy={cy} r={c.size} fill="hsl(42,14%,75%)" opacity="0.7" />
-                    <text x={cx} y={cy + c.size + 11} textAnchor="middle" fontSize="8" fill="hsl(0,0%,50%)" fontWeight="700" fontFamily="sans-serif">{c.name}</text>
-                  </g>
-                );
-              })}
+              {/* Group label: Direct Alternatives */}
+              <tr>
+                <td colSpan={4} className={`${isPresenter ? "pt-5 pb-1 px-3 text-[10px]" : "pt-8 pb-2 px-4 text-[11px]"} font-black uppercase tracking-widest`}
+                  style={{ color: "hsl(var(--sq-muted) / 0.5)" }}>
+                  Direct Alternatives — Closest to what SquareUp does
+                </td>
+              </tr>
+              {DIRECT_ALTERNATIVES.map(renderRow)}
 
               {/* SquareUp */}
-              <circle cx="455" cy="78" r="36" fill="hsl(18,100%,60%)" opacity="0.1" />
-              <circle cx="455" cy="78" r="30" fill="hsl(18,100%,60%)" opacity="0.15" className="animate-ping-orange" style={{ transformOrigin: "455px 78px" }} />
-              <circle cx="455" cy="78" r="24" fill="hsl(18,100%,60%)" />
-              <text x="455" y="83" textAnchor="middle" fontSize="9" fill="white" fontWeight="900" fontFamily="sans-serif">SQ</text>
-              <text x="455" y="120" textAnchor="middle" fontSize="12" fill="hsl(18,100%,38%)" fontWeight="900" fontFamily="sans-serif">SquareUp</text>
-              <text x="455" y="134" textAnchor="middle" fontSize="8" fill="hsl(18,100%,50%)" fontWeight="600" fontFamily="sans-serif">Only player here</text>
-            </svg>
-          </div>
-
-          {/* Diff list */}
-          <div className="space-y-3">
-            {DIFF.map((item) => (
-              <div key={item.label} className="flex items-start gap-3 rounded-xl px-4 py-3"
-                style={{
-                  background: item.ok ? "hsl(var(--sq-orange) / 0.06)" : "hsl(var(--sq-off-white))",
-                  border: `1px solid ${item.ok ? "hsl(var(--sq-orange) / 0.25)" : "hsl(var(--sq-subtle))"}`,
-                }}>
-                <span className="font-black flex-shrink-0 mt-0.5 text-sm" style={{ color: item.ok ? "hsl(var(--sq-orange))" : "hsl(0,60%,55%)" }}>
-                  {item.ok ? "✓" : "✗"}
-                </span>
-                <div>
-                  <p className="font-bold text-sm" style={{ color: item.ok ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>{item.label}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "hsl(var(--sq-muted))" }}>{item.verdict}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              {renderRow(SQUAREUP_ROW)}
+            </tbody>
+          </table>
         </div>
       </div>
     </section>

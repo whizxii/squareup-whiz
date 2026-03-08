@@ -1,210 +1,123 @@
-import avatarProblem from "@/assets/avatar-problem-white.png";
 import type { SlideMode } from "@/lib/slides";
+import { AlertCircle, XCircle, FolderArchive, Users } from "lucide-react";
 
-const frictions = [
-  { icon: "📅", label: "Scheduling calls is slow." },
-  { icon: "🎙️", label: "Analyzing audio is manual." },
-  { icon: "💬", label: "Data trapped in slack channels, email threads or in memory." },
+const problemBuckets = [
+  { icon: XCircle, title: "Poor Quality", desc: "Garbage in, garbage out. Human bias distorts truth. Most 'insights' are just interpretations dressed as data." },
+  { icon: FolderArchive, title: "Insights Get Lost", desc: "Scattered across email, Slack, docs, and team memory. Nothing compounds. Every new study starts from scratch." },
+  { icon: Users, title: "Human Friction", desc: "100 calls placed → 20 pick up → 5 complete interviews → 1–2 meaningful outcomes. Terrible effort-to-insight ratio." },
 ];
-
 export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
 
   return (
     <section
       id="problem"
-      className="relative overflow-hidden"
-      style={{
-        background: "hsl(var(--sq-card))",
-        paddingTop: isPresenter ? "32px" : "clamp(32px, 4vw, 56px)",
-        paddingBottom: isPresenter ? "0px" : "clamp(24px, 3vw, 40px)",
-      }}
+      className={`relative overflow-hidden ${isPresenter ? "min-h-screen flex items-center px-16 py-8" : "py-32 px-8 sm:px-16"}`}
+      style={{ background: "hsl(var(--sq-card))" }}
     >
       {/* Subtle warm glow */}
       <div
         className="absolute bottom-0 right-0 w-[480px] h-[480px] pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse at bottom right, hsl(var(--sq-orange) / 0.07) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse at bottom right, hsl(var(--sq-orange) / 0.05) 0%, transparent 60%)",
         }}
       />
 
-      <div className="relative z-10 w-full mx-auto px-6 sm:px-10 lg:px-12" style={{ maxWidth: 1200 }}>
-
-        {/* EYEBROW */}
-        <p
-          className="animate-fade-up mb-2"
-          style={{
-            color: "hsl(var(--sq-orange))",
-            fontSize: "10px",
-            fontWeight: 700,
-            letterSpacing: "0.22em",
-            textTransform: "uppercase",
-            animationDelay: "0ms",
-          }}
-        >
-          The Problem
-        </p>
+      <div className="relative z-10 w-full mx-auto" style={{ maxWidth: 1100 }}>
 
         {/* HEADLINE */}
-        <h2
-          className="animate-fade-up"
-          style={{
-            color: "hsl(var(--sq-text))",
-            fontSize: isPresenter ? "3rem" : "clamp(2rem, 3.6vw, 3.8rem)",
-            fontWeight: 900,
-            lineHeight: 1.05,
-            letterSpacing: "-0.025em",
-            animationDelay: "50ms",
-            marginBottom: "clamp(16px, 2vw, 24px)",
-          }}
-        >
-          Every brand says they talk to customers.{" "}
-          <span
+        <div className={isPresenter ? "mb-8" : "mb-14"}>
+          <p
+            className="animate-fade-up mb-3 font-bold uppercase tracking-[0.2em]"
+            style={{ color: "hsl(var(--sq-orange))", fontSize: "11px", animationDelay: "0ms" }}
+          >
+            The Breakdown
+          </p>
+          <h2
+            className="animate-fade-up font-black tracking-tight leading-[1.05]"
             style={{
-              color: "hsl(var(--sq-orange))",
-              textDecoration: "underline",
-              textDecorationStyle: "wavy",
-              textDecorationColor: "hsl(var(--sq-orange) / 0.35)",
-              textUnderlineOffset: "5px",
-              textDecorationThickness: "2px",
+              color: "hsl(var(--sq-text))",
+              fontSize: isPresenter ? "2.4rem" : "clamp(1.8rem, 3vw, 2.8rem)",
+              animationDelay: "50ms",
             }}
           >
-            Almost none do it enough to matter.
-          </span>
-        </h2>
-
-        {/* Divider */}
-        <div
-          className="animate-fade-up mb-5"
-          style={{ height: 1, background: "hsl(var(--sq-subtle))", animationDelay: "90ms" }}
-        />
+            The issue is not lack of intent. <br />
+            <span style={{ color: "hsl(var(--sq-orange))", textDecoration: "underline", textDecorationStyle: "wavy", textDecorationColor: "hsl(var(--sq-orange) / 0.35)", textUnderlineOffset: "5px", textDecorationThickness: "2px" }}>
+              Customer understanding is structurally broken.
+            </span>
+          </h2>
+        </div>
 
         {/* MAIN GRID */}
-        <div className="flex flex-col lg:flex-row lg:items-stretch gap-6 lg:gap-0">
+        <div className={`grid ${isPresenter ? "grid-cols-12 gap-10" : "lg:grid-cols-12 gap-12 lg:gap-16"} items-start`}>
 
-          {/* LEFT COLUMN (7/12) */}
-          <div className="w-full lg:w-7/12 lg:pr-14 flex flex-col gap-4">
-
-            <p
-              className="animate-fade-up"
-              style={{
-                color: "hsl(var(--sq-muted))",
-                fontSize: "10px",
-                fontWeight: 700,
-                letterSpacing: "0.22em",
-                textTransform: "uppercase",
-                animationDelay: "120ms",
-              }}
-            >
-              The Friction
+          {/* LEFT COLUMN (7/12) - The Breakdown */}
+          <div className={`${isPresenter ? "col-span-7" : "lg:col-span-12 xl:col-span-7"} flex flex-col gap-${isPresenter ? "3" : "5"}`}>
+            <p className={`font-bold ${isPresenter ? "text-xs" : "text-sm"} tracking-widest uppercase mb-1`} style={{ color: "hsl(var(--sq-text))" }}>
+              Three ways it breaks
             </p>
 
-            {/* Friction rows */}
-            <div
-              className="animate-fade-up rounded-2xl overflow-hidden"
-              style={{ border: "1px solid hsl(var(--sq-subtle))", animationDelay: "150ms" }}
-            >
-              {frictions.map((item, i) => (
-                <div key={i}>
-                  <div className="flex items-center gap-4 px-5 py-4">
-                    <span
-                      className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-[16px]"
-                      style={{
-                        background: "hsl(var(--sq-orange) / 0.07)",
-                        border: "1px solid hsl(var(--sq-orange) / 0.14)",
-                      }}
-                    >
-                      {item.icon}
-                    </span>
-                    <p style={{ color: "hsl(var(--sq-text))", fontSize: "clamp(0.88rem, 1vw, 1rem)", fontWeight: 700, lineHeight: 1.35 }}>
-                      {item.label}
-                    </p>
+            <div className="animate-fade-up flex flex-col gap-3" style={{ animationDelay: "150ms" }}>
+              {problemBuckets.map((item, i) => (
+                <div key={i} className={`flex items-start gap-4 ${isPresenter ? "p-4" : "p-5"} rounded-xl border transition-colors hover:bg-[hsl(var(--sq-orange)/0.02)]`} style={{ borderColor: "hsl(var(--sq-subtle))" }}>
+                  <div className={`${isPresenter ? "w-10 h-10" : "w-12 h-12"} rounded-lg flex items-center justify-center bg-[hsl(var(--sq-card))] border border-[hsl(var(--sq-subtle))] shadow-sm flex-shrink-0`}>
+                    <item.icon size={isPresenter ? 18 : 22} style={{ color: "hsl(var(--sq-text))" }} />
                   </div>
-                  {i < frictions.length - 1 && (
-                    <div style={{ height: 1, background: "hsl(var(--sq-subtle))", marginLeft: 64 }} />
-                  )}
+                  <div>
+                    <h4 className={`font-bold ${isPresenter ? "text-base" : "text-lg"} mb-1`} style={{ color: "hsl(var(--sq-text))" }}>{item.title}</h4>
+                    <p className={`${isPresenter ? "text-xs" : "text-sm"} font-medium leading-relaxed`} style={{ color: "hsl(var(--sq-muted))" }}>{item.desc}</p>
+                  </div>
                 </div>
               ))}
             </div>
-
-            {/* Quote card */}
-            <div
-              className="animate-fade-up rounded-2xl px-5 py-4"
-              style={{
-                background: "hsl(var(--sq-orange) / 0.04)",
-                border: "1px solid hsl(var(--sq-orange) / 0.14)",
-                animationDelay: "300ms",
-              }}
-            >
-              <p style={{ color: "hsl(var(--sq-text))", fontSize: "clamp(0.88rem, 1vw, 1rem)", fontWeight: 800, lineHeight: 1.45 }}>
-                "Decisions default to intuition.{" "}
-                <span style={{ color: "hsl(var(--sq-orange))" }}>Intuition doesn't scale."</span>
-              </p>
-              <p className="mt-1.5" style={{ color: "hsl(var(--sq-muted))", fontSize: "10px", fontWeight: 600 }}>
-                — 50 leaders at Zepto, Swiggy, Meesho, Titan, Comet, Minimalist, Mosaic Wellness
-              </p>
-            </div>
           </div>
 
-          {/* RIGHT COLUMN (5/12) */}
-          <div className="w-full lg:w-5/12 flex flex-col items-end justify-between">
+          {/* RIGHT COLUMN (5/12) - The Proof */}
+          <div className={`${isPresenter ? "col-span-5" : "lg:col-span-12 xl:col-span-5"} flex flex-col gap-${isPresenter ? "4" : "6"}`}>
 
-            {/* Stat card — top-right */}
-            <div className="animate-fade-up self-end" style={{ animationDelay: "180ms" }}>
-              <div
-                className="rounded-2xl px-5 py-3"
-                style={{
-                  background: "hsl(var(--sq-card))",
-                  border: "1px solid hsl(var(--sq-subtle))",
-                  boxShadow: "0 4px 24px hsl(0 0% 0% / 0.06)",
-                }}
-              >
-                <p style={{ color: "hsl(var(--sq-muted))", fontSize: "9px", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 3 }}>
-                  Avg. research cycle
-                </p>
-                <p style={{ color: "hsl(var(--sq-orange))", fontSize: "1.75rem", fontWeight: 900, lineHeight: 1 }}>
-                  6–8 weeks
-                </p>
-                <p style={{ color: "hsl(var(--sq-muted))", fontSize: "11px", fontWeight: 600, marginTop: 3 }}>
-                  & ₹30–50L per agency
-                </p>
+            <div className={`animate-fade-up rounded-2xl ${isPresenter ? "p-6" : "p-8"}`} style={{ background: "#1A1A1A", animationDelay: "200ms" }}>
+              <div className={`flex items-center gap-3 ${isPresenter ? "mb-4" : "mb-6"}`}>
+                <AlertCircle className="text-red-400" size={isPresenter ? 20 : 24} />
+                <h3 className="font-bold text-white tracking-wide uppercase text-sm">The Fallout</h3>
+              </div>
+
+              <div className={`space-y-${isPresenter ? "4" : "6"}`}>
+                {/* Data point 1 */}
+                <div>
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className={`${isPresenter ? "text-4xl" : "text-5xl"} font-black text-red-500`}>{">"}80%</span>
+                  </div>
+                  <p className="text-[13px] font-medium text-white/60 leading-relaxed">
+                    of product launches fail within the fast-moving FMCG sector.
+                  </p>
+                  <p className="text-[10px] font-bold text-white/30 mt-1 tracking-widest uppercase">— Source: NielsenIQ</p>
+                </div>
+
+                <div className="w-full h-px bg-white/10" />
+
+                {/* Data point 2 */}
+                <div>
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className={`${isPresenter ? "text-4xl" : "text-5xl"} font-black text-red-500`}>75%</span>
+                  </div>
+                  <p className="text-[13px] font-medium text-white/60 leading-relaxed">
+                    of all CPG innovations fail, despite executives calling innovation their #1 growth lever.
+                  </p>
+                  <p className="text-[10px] font-bold text-white/30 mt-1 tracking-widest uppercase">— Source: McKinsey & Company</p>
+                </div>
               </div>
             </div>
 
-            {/* Avatar + chip — avatar stands on the chip */}
-            <div className="animate-fade-up flex flex-col items-center w-full" style={{ animationDelay: "120ms" }}>
-              {/* Avatar with transparent fade at bottom */}
-              <div className="animate-avatar-float" style={{ marginBottom: -48 }}>
-                <img
-                  src={avatarProblem}
-                  alt="Overwhelmed brand manager"
-                  className="select-none"
-                  style={{
-                    width: "auto",
-                    height: isPresenter ? 300 : 340,
-                    objectFit: "contain",
-                    objectPosition: "bottom",
-                    display: "block",
-                    maskImage: "linear-gradient(to top, transparent 0%, black 14%)",
-                    WebkitMaskImage: "linear-gradient(to top, transparent 0%, black 14%)",
-                    filter: "drop-shadow(0 16px 32px hsl(0 0% 0% / 0.08))",
-                  }}
-                />
-              </div>
-              {/* Chip pedestal */}
-              <div className="animate-fade-up" style={{ animationDelay: "400ms", position: "relative", zIndex: 10 }}>
-                <div
-                  className="rounded-full px-5 py-2"
-                  style={{
-                    background: "hsl(var(--sq-orange) / 0.09)",
-                    border: "1px solid hsl(var(--sq-orange) / 0.22)",
-                  }}
-                >
-                  <p style={{ color: "hsl(var(--sq-orange))", fontSize: "13px", fontWeight: 900, whiteSpace: "nowrap" }}>
-                    10× slower than it should be
-                  </p>
-                </div>
-              </div>
+            <div className="animate-fade-up p-5 rounded-2xl border" style={{ borderColor: "hsl(var(--sq-subtle))", animationDelay: "300ms", background: "hsl(var(--sq-card))" }}>
+              <p className="text-sm font-semibold leading-relaxed" style={{ color: "hsl(var(--sq-text))" }}>
+                Consumer brands make these decisions <span style={{ color: "hsl(var(--sq-orange))" }}>constantly</span>:
+              </p>
+              <ul className="mt-3 text-xs font-medium space-y-2" style={{ color: "hsl(var(--sq-muted))" }}>
+                <li>· Is the pack-price architecture right?</li>
+                <li>· Which cohort is this really for?</li>
+                <li>· Why did this campaign not convert?</li>
+                <li>· What should growth and product do next?</li>
+              </ul>
             </div>
 
           </div>

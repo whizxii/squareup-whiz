@@ -48,9 +48,8 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
   return (
     <section
       id="hero"
-      className={`relative overflow-hidden flex flex-col justify-center ${
-        isPresenter ? "h-full px-20 items-center" : "px-6 sm:px-12"
-      }`}
+      className={`relative overflow-hidden flex flex-col justify-center ${isPresenter ? "h-full px-20 items-center" : "px-6 sm:px-12"
+        }`}
       style={{ background: "hsl(var(--sq-card))", minHeight: "100vh" }}
     >
       {/* Warm ambient glow blobs */}
@@ -94,41 +93,33 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
             {/* Headline */}
             <div className="animate-fade-up" style={{ animationDelay: "80ms" }}>
               <h1
-                className={`font-black tracking-tight leading-[0.95] ${
-                  isPresenter ? "text-6xl" : "text-[2.8rem] sm:text-[3.8rem] lg:text-[4.8rem]"
-                }`}
+                className={`font-black tracking-tight leading-[0.95] ${isPresenter ? "text-5xl" : "text-[2.5rem] sm:text-[2.8rem] lg:text-[3.5rem]"
+                  }`}
                 style={{ color: "hsl(var(--sq-text))" }}
               >
-                Consumer brands<br />
-                bet crores on<br />
-                <span style={{
-                  color: "hsl(var(--sq-orange))",
-                  textDecoration: "underline",
-                  textDecorationStyle: "wavy",
-                  textDecorationColor: "hsl(var(--sq-orange) / 0.35)",
-                  textUnderlineOffset: "6px"
-                }}>gut feel.</span>
+                Everyone knows they should talk to customers.<br className="hidden lg:block" />
+                <span className="sq-gradient-text">Almost nobody does it well.</span>
               </h1>
             </div>
 
             {/* Sub */}
             <p
-              className={`font-medium leading-relaxed max-w-md animate-fade-up ${isPresenter ? "text-lg" : "text-base sm:text-lg"}`}
+              className={`font-medium leading-relaxed max-w-xl animate-fade-up ${isPresenter ? "text-lg" : "text-base sm:text-lg"}`}
               style={{ color: "hsl(var(--sq-muted))", animationDelay: "160ms" }}
             >
-              SquareUp runs AI-led customer interviews and turns them into a{" "}
-              <span className="font-bold" style={{ color: "hsl(var(--sq-text))" }}>
-                decision-ready brief in 7 days.
-              </span>
+              Crores ride on decisions backed by almost no customer truth.
+              SquareUp runs AI-led interviews and turns them into
+              <span className="font-bold" style={{ color: "hsl(var(--sq-text))" }}> decision-ready customer understanding in 2 days</span> —
+              every recommendation traceable to real evidence.
             </p>
 
             {/* Proof cards */}
             {!isPresenter && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-md sm:max-w-none">
-                <ProofCard stat="3" label="LOIs signed" delay={200} />
-                <ProofCard stat="50" label="leaders interviewed" delay={280} />
-                <ProofCard stat="<45d" label="idea to LOI" delay={360} />
-                <ProofCard stat="MVP" label="live now" delay={440} />
+                <ProofCard stat="3" label="Brands Signed LOIs" delay={200} />
+                <ProofCard stat="50+" label="Leaders Interviewed" delay={280} />
+                <ProofCard stat="Live" label="Product MVP" delay={360} />
+                <ProofCard stat="1st" label="Paid Pilot Set" delay={440} />
               </div>
             )}
 
@@ -137,7 +128,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
               <div className="flex flex-wrap gap-3 items-center animate-fade-up" style={{ animationDelay: "500ms" }}>
                 <a
                   href="mailto:hello@joinsquareup.com"
-                  className="font-bold px-7 py-3 rounded-full text-sm text-white transition-all hover:opacity-90 hover:scale-[1.02]"
+                  className="sq-glow-pulse font-bold px-7 py-3 rounded-full text-sm text-white transition-all hover:opacity-90 hover:scale-[1.02]"
                   style={{
                     background: "hsl(var(--sq-orange))",
                     boxShadow: "0 4px 24px hsl(var(--sq-orange) / 0.35)"
@@ -161,12 +152,18 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
           {/* RIGHT — Avatar stage */}
           <div
             className={`relative ${isPresenter ? "" : "block"}`}
-            style={{ minHeight: 640 }}
+            style={{ minHeight: isPresenter ? 480 : 640 }}
           >
             {/* Warm glow behind avatar */}
             <div className="absolute inset-0 pointer-events-none" style={{
               backgroundImage: "radial-gradient(ellipse 70% 60% at 55% 90%, hsl(var(--sq-orange) / 0.08) 0%, transparent 70%)",
             }} />
+
+            {/* Floating ambient orbs */}
+            <div className="absolute top-[20%] left-[10%] w-[200px] h-[200px] rounded-full sq-orb pointer-events-none"
+              style={{ background: "radial-gradient(circle, hsl(var(--sq-orange) / 0.06) 0%, transparent 70%)" }} />
+            <div className="absolute bottom-[30%] right-[15%] w-[150px] h-[150px] rounded-full sq-orb pointer-events-none"
+              style={{ background: "radial-gradient(circle, hsl(var(--sq-amber) / 0.05) 0%, transparent 70%)", animationDelay: "5s" }} />
 
             {/* Single primary avatar — female analyst, floating */}
             <div
@@ -179,7 +176,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
                   alt="Consumer insights analyst"
                   className="select-none"
                   style={{
-                    width: 360,
+                    width: isPresenter ? 280 : 360,
                     height: "auto",
                     objectFit: "contain",
                     maskImage: "linear-gradient(to top, transparent 0%, white 10%)",
@@ -188,28 +185,28 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
                 />
               </div>
             </div>
-          
 
-            {/* Floating insight cards */}
-            <div className="absolute top-10 right-2 z-30">
+
+            {/* Floating insight cards — repositioned to left in presenter so they don't cover avatar */}
+            <div className={`absolute ${isPresenter ? "top-6 left-0" : "top-10 right-2"} z-30`}>
               <FloatingInsightCard
                 icon="🇮🇳"
                 title="India — Proving Now"
-                sub="3 LOIs · ₹ market live"
+                sub="3 LOIs · MVP live"
                 delay={400}
               />
             </div>
 
-            <div className="absolute top-32 right-2 z-30">
+            <div className={`absolute ${isPresenter ? "top-[105px] left-0" : "top-32 right-2"} z-30`}>
               <FloatingInsightCard
-                icon="🌏"
-                title="SEA · MENA · EU"
-                sub="Expansion from Year 2"
+                icon="📊"
+                title="Decision-Ready"
+                sub="Growth, Product, CX"
                 delay={520}
               />
             </div>
 
-            <div className="absolute bottom-16 right-0 z-30">
+            <div className={`absolute ${isPresenter ? "bottom-24 left-0" : "bottom-16 right-0"} z-30`}>
               <div
                 className="flex items-center gap-2.5 rounded-2xl px-4 py-3 animate-fade-up"
                 style={{
@@ -221,14 +218,14 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
               >
                 <div className="w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ background: "hsl(var(--sq-orange))" }} />
                 <div>
-                  <p className="font-black text-xs" style={{ color: "hsl(var(--sq-text))" }}>Brief ready in 7 days</p>
-                  <p className="text-[10px] font-medium" style={{ color: "hsl(var(--sq-muted))" }}>3 risk flags · 12 insights</p>
+                  <p className="font-black text-xs" style={{ color: "hsl(var(--sq-text))" }}>Brief ready in 2 days</p>
+                  <p className="text-[10px] font-medium" style={{ color: "hsl(var(--sq-muted))" }}>Every claim traceable</p>
                 </div>
               </div>
             </div>
 
-            {/* Validated-with card — top left of avatar area */}
-            <div className="absolute top-14 left-0 z-30">
+            {/* Validated-with card */}
+            <div className={`absolute ${isPresenter ? "top-[200px] left-0" : "top-14 left-0"} z-30`}>
               <div
                 className="rounded-2xl px-4 py-3 animate-fade-up"
                 style={{
@@ -239,18 +236,18 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
                 }}
               >
                 <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: "hsl(var(--sq-muted))" }}>
-                  Validated with
+                  Audience Signal
                 </p>
                 <div className="flex gap-2.5">
-                  {["Zepto", "Swiggy", "Meesho"].map((b) => (
-                    <span key={b} className="font-black text-[10px]" style={{ color: "hsl(var(--sq-text) / 0.45)" }}>{b}</span>
-                  ))}
+                  <span className="font-black text-[10px]" style={{ color: "hsl(var(--sq-text) / 0.65)" }}>FMCG</span>
+                  <span className="font-black text-[10px]" style={{ color: "hsl(var(--sq-text) / 0.65)" }}>Beauty</span>
+                  <span className="font-black text-[10px]" style={{ color: "hsl(var(--sq-text) / 0.65)" }}>D2C</span>
                 </div>
               </div>
             </div>
 
             {/* $20B label */}
-            <div className="absolute top-[52%] left-8 z-30">
+            <div className={`absolute ${isPresenter ? "bottom-10 left-0" : "top-[52%] left-8"} z-30`}>
               <div
                 className="rounded-xl px-3 py-1.5 animate-fade-up"
                 style={{
@@ -259,7 +256,7 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
                   border: "1px solid hsl(var(--sq-orange) / 0.2)",
                 }}
               >
-                <p className="font-black text-xs" style={{ color: "hsl(var(--sq-orange))" }}>$20B+ opportunity</p>
+                <p className="font-black text-xs" style={{ color: "hsl(var(--sq-orange))" }}>$20B+ market (GVR)</p>
               </div>
             </div>
           </div>

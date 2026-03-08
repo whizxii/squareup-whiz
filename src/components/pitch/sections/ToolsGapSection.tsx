@@ -72,7 +72,7 @@ export default function ToolsGapSection({ mode = "detailed" }: { mode?: SlideMod
               <p className="font-black text-sm text-white">SquareUp</p>
             </div>
             <div className="flex items-center gap-2">
-              <p className="text-sm font-bold text-white/90">AI runs interviews. Signal on demand. Brief in 7 days.</p>
+              <p className="text-sm font-bold text-white/90">AI runs interviews. Signal on demand. Brief in 2 days.</p>
             </div>
           </div>
         </div>

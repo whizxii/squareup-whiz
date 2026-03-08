@@ -26,30 +26,46 @@ const GLOBAL_MARKETS = [
 
 export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation();
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
 
   return (
     <section
       id="market"
-      className={`${isPresenter ? "h-full flex items-center px-16" : "py-24 px-6"}`}
+      className={`${isPresenter ? "min-h-screen flex items-center px-16 py-10" : "py-32 px-8 sm:px-16"}`}
       style={{ background: "hsl(var(--sq-card))" }}
     >
       <div className="max-w-5xl mx-auto w-full" ref={ref}>
 
-        <div className={`mb-14 transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
+        <div className={`${isPresenter ? "mb-8" : "mb-14"} transition-all duration-500 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
           <p className="font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-orange))" }}>
             Market Size
           </p>
           <h2
-            className={`font-black tracking-tight leading-tight ${isPresenter ? "text-5xl" : "text-3xl sm:text-4xl"}`}
+            className={`font-black tracking-tight leading-tight ${isPresenter ? "text-4xl" : "text-3xl sm:text-4xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}
           >
-            India is the beachhead.<br />
+            Starting in India.<br />
             <span style={{ color: "hsl(var(--sq-orange))" }}>The problem is everywhere.</span>
           </h2>
-          <p className="mt-3 text-sm max-w-xl" style={{ color: "hsl(var(--sq-muted))" }}>
-            We sized India bottoms-up — not from an analyst report. ~4,000 mid-market consumer brands, ₹40L/yr average research spend. That's ₹16,000Cr in India alone. The same ICP exists in SEA, MENA, and every market where consumer brands outgrow gut feel.
+          <p className={`mt-3 text-sm max-w-xl`} style={{ color: "hsl(var(--sq-muted))" }}>
+            The global market research industry is $120B+ (ESOMAR). Customer analytics software alone is $16.98B → $48.63B by 2032 (Grand View Research). We're building the customer truth layer for the fastest-growing segment: consumer brands in emerging markets.
           </p>
+          {!isPresenter && (
+            <div className="mt-4 flex flex-wrap gap-3 max-w-2xl">
+              {[
+                { val: "$120B+", label: "Global research industry (ESOMAR)", desc: "Proves the pain is large" },
+                { val: "$17B→$49B", label: "Customer analytics software (GVR)", desc: "Proves software budget exists" },
+                { val: "India→SEA→MENA", label: "SquareUp wedge", desc: "Consumer brands, emerging markets" },
+              ].map((a) => (
+                <div key={a.label} className="flex-1 min-w-[160px] rounded-xl px-4 py-3"
+                  style={{ background: "hsl(var(--sq-orange) / 0.05)", border: "1px solid hsl(var(--sq-orange) / 0.15)" }}>
+                  <p className="font-black text-base" style={{ color: "hsl(var(--sq-orange))" }}>{a.val}</p>
+                  <p className="text-xs font-bold mt-0.5" style={{ color: "hsl(var(--sq-text))" }}>{a.label}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "hsl(var(--sq-muted))" }}>{a.desc}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Two-column: India beachhead + Global expansion */}
@@ -63,7 +79,7 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
             {TAM_BREAKDOWN.map((item) => (
               <div
                 key={item.label}
-                className="flex items-center justify-between rounded-xl px-5 py-4"
+                className={`flex items-center justify-between rounded-xl ${isPresenter ? "px-4 py-3" : "px-5 py-4"}`}
                 style={{
                   background: item.highlight ? "hsl(var(--sq-orange) / 0.08)" : "hsl(var(--sq-card))",
                   border: `1px solid ${item.highlight ? "hsl(var(--sq-orange) / 0.25)" : "hsl(var(--sq-subtle))"}`,
@@ -91,7 +107,7 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
               {GLOBAL_MARKETS.map((row) => (
                 <div
                   key={row.market}
-                  className="rounded-xl px-4 py-4"
+                  className={`rounded-xl ${isPresenter ? "px-3 py-3" : "px-4 py-4"}`}
                   style={{
                     background: row.active ? "hsl(var(--sq-orange) / 0.06)" : "hsl(var(--sq-card))",
                     border: `1px solid ${row.active ? "hsl(var(--sq-orange) / 0.3)" : "hsl(var(--sq-subtle))"}`,
@@ -126,53 +142,57 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
           </div>
         </div>
 
-        {/* ARR trajectory — India → Global */}
-        <div className={`mt-12 transition-all duration-500 delay-400 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
-          <p className="font-bold text-xs uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
-            SquareUp ARR trajectory — India → Global ($M)
-          </p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={BAR_DATA} barCategoryGap="30%">
-              <XAxis
-                dataKey="year"
-                tick={{ fill: "hsl(0,0%,50%)", fontSize: 11, fontWeight: 600 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis hide />
-              <Tooltip
-                formatter={(v, _name, props) => [`$${v}M ARR`, props.payload?.note ?? "SquareUp"]}
-                contentStyle={{
-                  background: "white",
-                  border: "1px solid hsl(0,0%,90%)",
-                  borderRadius: 10,
-                  fontSize: 12,
-                  fontWeight: 700
-                }}
-              />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                {BAR_DATA.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={index === BAR_DATA.length - 1
-                      ? "hsl(var(--sq-orange))"
-                      : "hsl(var(--sq-orange) / 0.35)"}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        {/* ARR trajectory — India → Global (hidden in presenter) */}
+        {!isPresenter && (
+          <div className={`mt-12 transition-all duration-500 delay-400 ${revealed ? "opacity-100" : "opacity-0 translate-y-6"}`}>
+            <p className="font-bold text-xs uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
+              SquareUp ARR trajectory — India → Global ($M)
+            </p>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={BAR_DATA} barCategoryGap="30%">
+                <XAxis
+                  dataKey="year"
+                  tick={{ fill: "hsl(0,0%,50%)", fontSize: 11, fontWeight: 600 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis hide />
+                <Tooltip
+                  formatter={(v, _name, props) => [`$${v}M ARR`, props.payload?.note ?? "SquareUp"]}
+                  contentStyle={{
+                    background: "white",
+                    border: "1px solid hsl(0,0%,90%)",
+                    borderRadius: 10,
+                    fontSize: 12,
+                    fontWeight: 700
+                  }}
+                />
+                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                  {BAR_DATA.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={index === BAR_DATA.length - 1
+                        ? "hsl(var(--sq-orange))"
+                        : "hsl(var(--sq-orange) / 0.35)"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         {/* Footer callout */}
-        <div className={`mt-10 text-center transition-all duration-500 delay-500 ${revealed ? "opacity-100" : "opacity-0"}`}>
+        <div className={`${isPresenter ? "mt-6" : "mt-10"} text-center transition-all duration-500 delay-500 ${revealed ? "opacity-100" : "opacity-0"}`}>
           <p className="font-black" style={{ fontSize: "clamp(1.2rem, 3vw, 1.75rem)", color: "hsl(var(--sq-text))" }}>
-            $20B+ global market.{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>We're starting with the hardest 10%.</span>
+            $120B global research industry.{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>We're starting with the fastest-growing 10%.</span>
           </p>
-          <p className="text-sm mt-2 max-w-xl mx-auto" style={{ color: "hsl(var(--sq-muted))" }}>
-            India is the proving ground. SEA and MENA are the prize. Global mid-market is the endgame.
-          </p>
+          {!isPresenter && (
+            <p className="text-sm mt-2 max-w-xl mx-auto" style={{ color: "hsl(var(--sq-muted))" }}>
+              India is the proving ground. SEA and MENA are the prize. Global mid-market is the endgame.
+            </p>
+          )}
         </div>
 
       </div>

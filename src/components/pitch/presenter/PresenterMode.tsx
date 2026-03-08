@@ -1,52 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
-import { getSlidesForLength, DECK_LENGTHS, type DeckLength, type SlideDefinition } from "@/lib/slides";
-import HeroSection from "../sections/HeroSection";
-import ProblemSection from "../sections/ProblemSection";
-import SolutionSection from "../sections/SolutionSection";
-import HowItWorksSection from "../sections/HowItWorksSection";
-import AIDemoSection from "../sections/AIDemoSection";
-import WhoIsItForSection from "../sections/WhoIsItForSection";
-import WhyNowSection from "../sections/WhyNowSection";
-import TractionSection from "../sections/TractionSection";
-import LandscapeSection from "../sections/LandscapeSection";
-import MarketSection from "../sections/MarketSection";
-import BusinessModelSection from "../sections/BusinessModelSection";
-import TeamSection from "../sections/TeamSection";
-import TheAskSection from "../sections/TheAskSection";
-import CostSection from "../sections/CostSection";
-import ToolsGapSection from "../sections/ToolsGapSection";
-import CTASection from "../sections/CTASection";
-
-const SLIDE_COMPONENTS: Record<string, React.ComponentType<{ mode?: "detailed" | "presenter" }>> = {
-  hero: HeroSection,
-  problem: ProblemSection,
-  solution: SolutionSection,
-  howitworks: HowItWorksSection,
-  aidemo: AIDemoSection,
-  whofor: WhoIsItForSection,
-  whynow: WhyNowSection,
-  traction: TractionSection,
-  landscape: LandscapeSection,
-  market: MarketSection,
-  businessmodel: BusinessModelSection,
-  team: TeamSection,
-  ask: TheAskSection,
-  cost: CostSection,
-  toolsgap: ToolsGapSection,
-  cta: CTASection,
-};
+import { type SlideDefinition } from "@/lib/slides";
+import { SLIDE_COMPONENTS } from "@/lib/slideComponents";
 
 interface PresenterModeProps {
   onExit: () => void;
-  deckLength: DeckLength;
-  onDeckLengthChange: (l: DeckLength) => void;
+  slides: SlideDefinition[];
 }
 
-export default function PresenterMode({ onExit, deckLength, onDeckLengthChange }: PresenterModeProps) {
+export default function PresenterMode({ onExit, slides }: PresenterModeProps) {
   const [current, setCurrent] = useState(0);
   const [transitioning, setTransitioning] = useState(false);
-  const slides = getSlidesForLength(deckLength);
 
   const goTo = useCallback((idx: number) => {
     if (transitioning || idx < 0 || idx >= slides.length) return;
@@ -54,7 +18,7 @@ export default function PresenterMode({ onExit, deckLength, onDeckLengthChange }
     setTimeout(() => { setCurrent(idx); setTransitioning(false); }, 350);
   }, [transitioning, slides.length]);
 
-  useEffect(() => { setCurrent(0); }, [deckLength]);
+  useEffect(() => { setCurrent(0); }, [slides]);
 
   useEffect(() => {
     const handle = (e: KeyboardEvent) => {
@@ -70,13 +34,12 @@ export default function PresenterMode({ onExit, deckLength, onDeckLengthChange }
   const SlideComp = slide ? SLIDE_COMPONENTS[slide.id] : null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-sq-dark flex flex-col">
-      {/* Slide area */}
+    <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: "#0a0a0f" }}>
+      {/* Slide area — overflow-y-auto so tall slides can scroll */}
       <div className="flex-1 relative overflow-hidden">
         <div
-          className={`absolute inset-0 transition-all duration-350 ease-out ${
-            transitioning ? "opacity-0 scale-[0.97]" : "opacity-100 scale-100"
-          }`}
+          className={`absolute inset-0 overflow-y-auto transition-all duration-350 ease-out ${transitioning ? "opacity-0 scale-[0.97]" : "opacity-100 scale-100"
+            }`}
           id={`presenter-slide-${current}`}
         >
           {SlideComp && <SlideComp mode="presenter" />}
@@ -103,26 +66,13 @@ export default function PresenterMode({ onExit, deckLength, onDeckLengthChange }
         </div>
 
         {/* Progress dots */}
-        <div className="hidden md:flex items-center gap-1.5">
+        <div className="hidden md:flex items-center gap-1.5 flex-1 justify-center max-w-[40%] overflow-x-auto">
           {slides.map((_, i) => (
             <button
               key={i}
               onClick={() => goTo(i)}
-              className={`rounded-full transition-all duration-200 ${i === current ? "w-5 h-2 bg-sq-orange" : "w-2 h-2 bg-white/25 hover:bg-white/50"}`}
+              className={`rounded-full transition-all duration-200 shrink-0 ${i === current ? "w-5 h-2 bg-sq-orange" : "w-2 h-2 bg-white/25 hover:bg-white/50"}`}
             />
-          ))}
-        </div>
-
-        {/* Length pills */}
-        <div className="flex items-center gap-1 bg-white/10 rounded-full px-2 py-1">
-          {DECK_LENGTHS.map((l) => (
-            <button
-              key={l}
-              onClick={() => onDeckLengthChange(l)}
-              className={`px-2 py-0.5 rounded-full text-xs font-bold transition-all ${deckLength === l ? "bg-sq-orange text-white" : "text-white/50 hover:text-white"}`}
-            >
-              {l}
-            </button>
           ))}
         </div>
 

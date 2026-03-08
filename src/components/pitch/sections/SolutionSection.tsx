@@ -1,101 +1,83 @@
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import type { SlideMode } from "@/lib/slides";
+import { Mic2, BrainCircuit, Database, Layers } from "lucide-react";
+import avatarHeroMain from "@/assets/avatar-hero-main.png";
+
+const PILLARS = [
+  { icon: Mic2, title: "1. Interview Layer", desc: "AI-led customer conversations at scale. Natural language, multilingual, consistent." },
+  { icon: BrainCircuit, title: "2. Synthesis Layer", desc: "Extracts themes, severity scores, quotes, contradictions, and risk flags instantly." },
+  { icon: Database, title: "3. Repository Layer", desc: "A searchable memory of customer truth, tied back natively to past launch decisions." },
+  { icon: Layers, title: "4. Routing Layer", desc: "Growth gets campaign inputs. Product gets launch risks. CX gets priority fixes." },
+];
 
 export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation();
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
 
   return (
     <section
       id="solution"
-      className={`relative overflow-hidden ${isPresenter ? "h-full flex items-center px-16" : "py-24 px-6"}`}
+      className={`relative overflow-hidden ${isPresenter ? "min-h-screen flex items-center px-16" : "py-32 px-8 sm:px-16"}`}
       style={{ background: "hsl(var(--sq-card))" }}
     >
-      <div className="max-w-5xl mx-auto relative z-10 w-full" ref={ref}>
+      {/* Character — hero-quality, at section level so it's behind content */}
+      <div className="absolute right-8 bottom-0 hidden lg:block pointer-events-none animate-avatar-float z-[1]" style={{ animationDelay: "1.5s" }}>
+        <img
+          src={avatarHeroMain}
+          alt=""
+          loading="lazy"
+          style={{
+            width: 220,
+            height: "auto",
+            objectFit: "contain",
+            maskImage: "linear-gradient(to top, transparent 0%, white 12%)",
+            WebkitMaskImage: "linear-gradient(to top, transparent 0%, white 12%)",
+          }}
+        />
+      </div>
 
-        {/* Two-col: left headline, right before/after */}
-        <div className={`grid ${isPresenter ? "grid-cols-2" : "lg:grid-cols-2"} gap-16 items-center`}>
+      <div className="max-w-6xl mx-auto relative z-10 w-full" ref={ref}>
 
-          {/* Left — headline + ROI chips */}
-          <div className={`transition-all duration-500 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
-            <p className="font-bold text-xs uppercase tracking-[0.2em] mb-5" style={{ color: "hsl(var(--sq-orange))" }}>
-              The Solution
-            </p>
-            <h2
-              className={`font-black tracking-tight leading-[1.0] mb-8 ${
-                isPresenter ? "text-5xl" : "text-[2.5rem] sm:text-[3rem] lg:text-[3.5rem]"
+        <div className={`${isPresenter ? "mb-8" : "mb-16"} text-center transition-all duration-700 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
+          <p className="font-bold text-xs uppercase tracking-[0.2em] mb-2" style={{ color: "hsl(var(--sq-orange))" }}>
+            The Category
+          </p>
+          <p className={`font-semibold ${isPresenter ? "text-sm" : "text-base"} mb-4`} style={{ color: "hsl(var(--sq-muted))" }}>
+            Customer understanding should not be an occasional project. It should be a compounding system.
+          </p>
+          <h2
+            className={`font-black tracking-tight leading-[1.05] mx-auto ${isPresenter ? "text-5xl max-w-4xl" : "sq-headline max-w-5xl"
               }`}
-              style={{ color: "hsl(var(--sq-text))" }}
-            >
-              Not a survey.<br />Not a transcript.<br />
-              <span style={{ color: "hsl(var(--sq-orange))" }}>A decision brief<br />in 7 days.</span>
-            </h2>
-
-            {/* 3 chips */}
-            <div className="flex flex-col gap-2.5">
-              {[
-                { stat: "10×", label: "cheaper than a research agency" },
-                { stat: "8×",  label: "faster than traditional research" },
-                { stat: "100%", label: "traceable — every decision, every quote" },
-              ].map((c) => (
-                <div key={c.stat} className="flex items-center gap-4 rounded-xl px-5 py-3"
-                  style={{ background: "hsl(var(--sq-off-white))", border: "1px solid hsl(var(--sq-subtle))" }}>
-                  <span className="font-black text-xl flex-shrink-0" style={{ color: "hsl(var(--sq-orange))" }}>{c.stat}</span>
-                  <span className="font-medium text-sm" style={{ color: "hsl(var(--sq-text))" }}>{c.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right — Before/After */}
-          <div className={`space-y-3 transition-all duration-700 delay-200 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-
-            {/* Without */}
-            <div className="rounded-2xl overflow-hidden" style={{ background: "#FEF2F2", border: "1px solid #FECACA" }}>
-              <div className="h-0.5 bg-red-400 w-full" />
-              <div className="p-6">
-                <p className="font-black text-xs uppercase tracking-widest mb-5 text-red-800">Without SquareUp</p>
-                <div className="space-y-3">
-                  {[
-                    ["6–8 weeks", "to get research you can trust"],
-                    ["₹30–50L", "for a research agency"],
-                    ["No trail", "decisions made on gut, no record why"],
-                  ].map(([stat, desc]) => (
-                    <div key={stat} className="flex items-baseline gap-3">
-                      <span className="font-black text-sm text-red-700 flex-shrink-0 w-20">{stat}</span>
-                      <span className="text-sm text-red-900/70">{desc}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* With */}
-            <div className="rounded-2xl overflow-hidden" style={{
-              background: "hsl(var(--sq-off-white))",
-              border: "1.5px solid hsl(var(--sq-orange) / 0.3)"
-            }}>
-              <div className="h-0.5 w-full" style={{ background: "hsl(var(--sq-orange))" }} />
-              <div className="p-6">
-                <p className="font-black text-xs uppercase tracking-widest mb-5" style={{ color: "hsl(var(--sq-orange))" }}>
-                  With SquareUp
-                </p>
-                <div className="space-y-3">
-                  {[
-                    ["7 days", "Insight Brief on your desk"],
-                    ["₹1–3L", "fraction of a traditional firm"],
-                    ["Full trail", "every decision tied to verbatim quotes"],
-                  ].map(([stat, desc]) => (
-                    <div key={stat} className="flex items-baseline gap-3">
-                      <span className="font-black text-sm flex-shrink-0 w-20" style={{ color: "hsl(var(--sq-orange))" }}>{stat}</span>
-                      <span className="text-sm" style={{ color: "hsl(var(--sq-text))" }}>{desc}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+            style={{ color: "hsl(var(--sq-text))" }}
+          >
+            The <span style={{ color: "hsl(var(--sq-orange))" }}>customer understanding department</span> most brands never build.
+          </h2>
+          {!isPresenter && (
+            <p className="mt-6 text-lg font-medium max-w-3xl mx-auto" style={{ color: "hsl(var(--sq-muted))" }}>
+              The gap is not lack of conversations — it's the lack of a customer intelligence system.
+              SquareUp generates fresh signal on demand, synthesizes it into decision-ready briefs, and routes truth to the right team — with a full audit trail.
+            </p>
+          )}
         </div>
+
+        <div className={`grid ${isPresenter ? "grid-cols-4" : "md:grid-cols-2 lg:grid-cols-4"} gap-6 transition-all duration-700 delay-200 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+          {PILLARS.map((p, i) => (
+            <div key={i} className={`rounded-2xl ${isPresenter ? "p-4" : "p-6"} border flex flex-col items-start hover:-translate-y-1 transition-transform duration-300`}
+              style={{
+                background: "hsl(var(--sq-off-white))",
+                borderColor: "hsl(var(--sq-subtle))",
+                boxShadow: "0 8px 30px rgba(0,0,0,0.03)"
+              }}
+            >
+              <div className={`${isPresenter ? "w-10 h-10 mb-3" : "w-14 h-14 mb-6"} rounded-xl flex items-center justify-center`} style={{ background: "linear-gradient(135deg, hsl(var(--sq-orange)), hsl(var(--sq-text)))" }}>
+                <p.icon className="text-white" size={isPresenter ? 18 : 24} />
+              </div>
+              <h3 className={`font-black ${isPresenter ? "text-base mb-2" : "text-xl mb-3"}`} style={{ color: "hsl(var(--sq-text))" }}>{p.title}</h3>
+              <p className={`${isPresenter ? "text-xs" : "text-sm"} font-medium leading-relaxed`} style={{ color: "hsl(var(--sq-muted))" }}>{p.desc}</p>
+            </div>
+          ))}
+        </div>
+
       </div>
     </section>
   );
