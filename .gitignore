@@ -1,0 +1,9 @@
+# Dependencies & build
+node_modules/
+.next/
+.npm-cache/
+tsconfig.tsbuildinfo
+out/
+
+# OS
+.DS_Store
