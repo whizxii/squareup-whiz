@@ -27,7 +27,7 @@ const GTM_PHASES = [
 
 export default function BusinessModelSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter" || mode === "download");
 
   return (
     <section

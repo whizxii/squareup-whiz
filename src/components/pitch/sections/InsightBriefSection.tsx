@@ -3,7 +3,7 @@ import type { SlideMode } from "@/lib/slides";
 
 export default function InsightBriefSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter" || mode === "download");
 
   return (
     <section

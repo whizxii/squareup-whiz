@@ -3,28 +3,46 @@ import type { SlideMode } from "@/lib/slides";
 import avatarAiAgent from "@/assets/avatar-ai-agent.png";
 import demoRecording from "@/assets/demo-recording.mp3";
 
-const MESSAGES = [
-  { role: "ai", text: "When you looked at the new personal care range, what stopped you from purchasing?" },
-  { role: "user", text: "I liked the fragrance, but the pack size is huge for a first try." },
-  { role: "ai", text: "If a smaller, entry-level size was available, how would that change your decision?" },
-  { role: "user", text: "I would have definitely bought a 50ml bottle just to test it out." },
-  { role: "ai", text: "Did the pricing on the large bottle feel off, or was it purely the volume?" },
-  { role: "user", text: "It's the commitment. ₹1200 is too much for an unproven scent. ₹399 for a mini would fly." },
-];
+type Message = { role: string; text: string };
+type InsightType = { after: number; type: string; label: string; value: string; color: string; sub?: string; };
 
-type InsightType = {
-  after: number;
-  type: string;
-  label: string;
-  value: string;
-  color: string;
-  sub?: string;
-};
-
-const INSIGHTS: InsightType[] = [
-  { after: 1, type: "theme", label: "Theme", value: "Price-Pack Mismatch", color: "hsl(var(--sq-orange))", sub: "Frequency: 74% of respondents" },
-  { after: 3, type: "severity", label: "Severity", value: "9.2 / 10 — Direct Purchase Block", color: "hsl(0,72%,51%)", sub: "Segment: First-time buyers, Urban, 22-28" },
-  { after: 5, type: "recommend", label: "Action", value: "Test ₹399 / 50ml entry SKU", color: "hsl(48,96%,42%)", sub: "Route to: Product, Growth" },
+const DEMOS = [
+  {
+    tab: "Beauty Brand",
+    tag: "FMCG · Price-Pack Study",
+    messages: [
+      { role: "ai", text: "When you looked at the new personal care range, what stopped you from purchasing?" },
+      { role: "user", text: "I liked the fragrance, but the pack size is huge for a first try." },
+      { role: "ai", text: "If a smaller, entry-level size was available, how would that change your decision?" },
+      { role: "user", text: "I would have definitely bought a 50ml bottle just to test it out." },
+      { role: "ai", text: "Did the pricing on the large bottle feel off, or was it purely the volume?" },
+      { role: "user", text: "It's the commitment. ₹1200 is too much for an unproven scent. ₹399 for a mini would fly." },
+    ] as Message[],
+    insights: [
+      { after: 1, type: "theme", label: "Theme", value: "Price-Pack Mismatch", color: "hsl(var(--sq-orange))", sub: "Frequency: 74% of respondents" },
+      { after: 3, type: "severity", label: "Severity", value: "9.2 / 10 — Direct Purchase Block", color: "hsl(0,72%,51%)", sub: "Segment: First-time buyers, Urban, 22-28" },
+      { after: 5, type: "recommend", label: "Action", value: "Test ₹399 / 50ml entry SKU", color: "hsl(48,96%,42%)", sub: "Route to: Product, Growth" },
+    ] as InsightType[],
+    cta: "3 critical risks identified. Brief ready.",
+  },
+  {
+    tab: "Tech Platform",
+    tag: "D2C · App Churn Diagnosis",
+    messages: [
+      { role: "ai", text: "You stopped using the app after 3 orders. Can you walk me through what changed?" },
+      { role: "user", text: "The first few orders were great, but delivery started getting delayed." },
+      { role: "ai", text: "When deliveries were delayed, did you reach out to support or just stop ordering?" },
+      { role: "user", text: "I complained once. Got a generic 'we're sorry' message. Didn't feel heard." },
+      { role: "ai", text: "If delivery improved and support felt more personal — would you come back?" },
+      { role: "user", text: "Honestly, I already switched to a competitor. They have faster delivery and better tracking." },
+    ] as Message[],
+    insights: [
+      { after: 1, type: "theme", label: "Theme", value: "Delivery Reliability Erosion", color: "hsl(var(--sq-orange))", sub: "Frequency: 68% of churned users" },
+      { after: 3, type: "severity", label: "Severity", value: "8.7 / 10 — Churn Trigger", color: "hsl(0,72%,51%)", sub: "Segment: Power users, 3+ orders/month" },
+      { after: 5, type: "recommend", label: "Action", value: "Fix SLA tracking + personalize win-back", color: "hsl(48,96%,42%)", sub: "Route to: CX, Product, Growth" },
+    ] as InsightType[],
+    cta: "Root cause identified. Win-back brief generated.",
+  },
 ];
 
 function useTypewriter(text: string, speed = 36, active = false) {
@@ -43,12 +61,12 @@ function useTypewriter(text: string, speed = 36, active = false) {
   return { displayed, done };
 }
 
-function ChatMessage({ msg, index, activeMsg, onDone }: {
-  msg: typeof MESSAGES[0]; index: number; activeMsg: number; onDone: () => void;
+function ChatMessage({ msg, index, activeMsg, onDone, speed = 36 }: {
+  msg: Message; index: number; activeMsg: number; onDone: () => void; speed?: number;
 }) {
   const isActive = index === activeMsg;
   const isPast = index < activeMsg;
-  const { displayed, done } = useTypewriter(msg.text, 36, isActive || isPast);
+  const { displayed, done } = useTypewriter(msg.text, speed, isActive || isPast);
   useEffect(() => { if (done && isActive) onDone(); }, [done, isActive]);
   const isAI = msg.role === "ai";
   return (
@@ -77,12 +95,19 @@ function ChatMessage({ msg, index, activeMsg, onDone }: {
 
 export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
+  const typeSpeed = isPresenter ? 18 : 36;
+  const msgDelay = isPresenter ? 350 : 750;
+  const [demoIdx, setDemoIdx] = useState(0);
   const [activeMsg, setActiveMsg] = useState(-1);
   const [started, setStarted] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
 
+  const demo = DEMOS[demoIdx];
+  const MESSAGES = demo.messages;
+  const INSIGHTS = demo.insights;
+
   useEffect(() => {
-    if (mode === "presenter") { setStarted(true); return; }
+    if (mode === "presenter" || mode === "download") { setStarted(true); return; }
     const el = sectionRef.current;
     if (!el) return;
     const obs = new IntersectionObserver(([entry]) => {
@@ -93,11 +118,19 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
   }, [started, mode]);
 
   useEffect(() => {
-    if (started) setActiveMsg(mode === "presenter" ? MESSAGES.length : 0);
-  }, [started, mode]);
+    if (!started) return;
+    if (mode === "download") { setActiveMsg(MESSAGES.length); return; }
+    setActiveMsg(0);
+  }, [started, mode, demoIdx, MESSAGES.length]);
 
   const handleMsgDone = (i: number) => {
-    if (i < MESSAGES.length - 1) setTimeout(() => setActiveMsg(i + 1), 750);
+    if (i < MESSAGES.length - 1) setTimeout(() => setActiveMsg(i + 1), msgDelay);
+  };
+
+  const switchDemo = (idx: number) => {
+    if (idx === demoIdx) return;
+    setActiveMsg(-1);
+    setDemoIdx(idx);
   };
 
   const visibleInsights = INSIGHTS.filter((ins) => activeMsg >= ins.after);
@@ -128,6 +161,24 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
           )}
         </div>
 
+        {/* Demo tabs */}
+        <div className={`flex items-center justify-center gap-2 ${isPresenter ? "mb-4" : "mb-6"}`}>
+          {DEMOS.map((d, i) => (
+            <button
+              key={d.tab}
+              onClick={() => switchDemo(i)}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${i === demoIdx ? "text-white" : "hover:opacity-80"}`}
+              style={{
+                background: i === demoIdx ? "hsl(var(--sq-orange))" : "hsl(var(--sq-subtle))",
+                color: i === demoIdx ? "white" : "hsl(var(--sq-muted))",
+              }}
+            >
+              {d.tab}
+              <span className="ml-1.5 font-medium opacity-60">{d.tag}</span>
+            </button>
+          ))}
+        </div>
+
         {/* Light-mode interview card */}
         <div className="rounded-3xl overflow-hidden border mx-auto"
           style={{
@@ -156,7 +207,7 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
               </div>
               {MESSAGES.map((msg, i) => (
                 i <= activeMsg ? (
-                  <ChatMessage key={i} msg={msg} index={i} activeMsg={activeMsg} onDone={() => handleMsgDone(i)} />
+                  <ChatMessage key={`${demoIdx}-${i}`} msg={msg} index={i} activeMsg={activeMsg} onDone={() => handleMsgDone(i)} speed={typeSpeed} />
                 ) : null
               ))}
             </div>
@@ -187,7 +238,7 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
                 <div className="rounded-xl p-4 animate-fade-up sq-glow-pulse"
                   style={{ background: "hsl(var(--sq-orange) / 0.07)", border: "1px solid hsl(var(--sq-orange) / 0.25)" }}>
                   <p className="font-bold text-sm mb-3" style={{ color: "hsl(var(--sq-orange))" }}>
-                    3 critical risks identified. Brief ready.
+                    {demo.cta}
                   </p>
                   <a href="https://almost.joinsquareup.com" target="_blank" rel="noopener noreferrer"
                     className="inline-block text-white font-bold text-xs px-4 py-2 rounded-full"
@@ -201,7 +252,7 @@ export default function AIDemoSection({ mode = "detailed" }: { mode?: SlideMode 
         </div>
 
         {/* Audio player — hear the AI interview */}
-        {!isPresenter && (
+        {!isPresenter && mode !== "download" && (
           <div className="mt-8 flex flex-col items-center gap-3">
             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "hsl(var(--sq-muted))" }}>
               Hear a real AI interview

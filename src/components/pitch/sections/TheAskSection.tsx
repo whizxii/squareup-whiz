@@ -13,7 +13,7 @@ function AskCounter({ forceStart = false }: { forceStart?: boolean }) {
 
 export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter" || mode === "download");
 
   return (
     <section
@@ -36,7 +36,7 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
             <p className="font-bold text-xs uppercase tracking-[0.2em] mb-5" style={{ color: "hsl(var(--sq-orange))" }}>
               The Ask
             </p>
-            <AskCounter forceStart={mode === "presenter"} />
+            <AskCounter forceStart={mode === "presenter" || mode === "download"} />
             <p className={`font-black ${isPresenter ? "text-lg" : "text-xl"} mb-2 mt-1 text-white`}>Seed Round 2026</p>
             <p className={`text-sm ${isPresenter ? "mb-6" : "mb-10"} text-white/50`}>
               Two founders. Full-time. Revenue in 90 days.

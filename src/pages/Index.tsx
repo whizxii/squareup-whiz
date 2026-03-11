@@ -3,7 +3,6 @@ import Nav from "@/components/pitch/Nav";
 import HeroSection from "@/components/pitch/sections/HeroSection";
 import CostSection from "@/components/pitch/sections/CostSection";
 import ProblemSection from "@/components/pitch/sections/ProblemSection";
-import DecisionVolumeSection from "@/components/pitch/sections/DecisionVolumeSection";
 import LandscapeSection from "@/components/pitch/sections/LandscapeSection";
 import SolutionSection from "@/components/pitch/sections/SolutionSection";
 import WhoIsItForSection from "@/components/pitch/sections/WhoIsItForSection";
@@ -18,7 +17,6 @@ import TheAskSection from "@/components/pitch/sections/TheAskSection";
 import FAQSection from "@/components/pitch/sections/FAQSection";
 import CTASection from "@/components/pitch/sections/CTASection";
 import InsightBriefSection from "@/components/pitch/sections/InsightBriefSection";
-import DecisionFlowSection from "@/components/pitch/sections/DecisionFlowSection";
 
 import PresenterMode from "@/components/pitch/presenter/PresenterMode";
 import PresenterBuilder from "@/components/pitch/presenter/PresenterBuilder";
@@ -49,10 +47,8 @@ const MASTER_SECTIONS = [
   <HeroSection key="hero" mode="detailed" />,
   <CostSection key="cost" mode="detailed" />,
   <ProblemSection key="problem" mode="detailed" />,
-  <DecisionVolumeSection key="decisionvolume" mode="detailed" />,
   <LandscapeSection key="landscape" mode="detailed" />,
   <SolutionSection key="solution" mode="detailed" />,
-  <DecisionFlowSection key="decisionflow" mode="detailed" />,
   <WhoIsItForSection key="whofor" mode="detailed" />,
   <HowItWorksSection key="howitworks" mode="detailed" />,
   <AIDemoSection key="aidemo" mode="detailed" />,

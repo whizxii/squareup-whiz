@@ -114,14 +114,12 @@ export default function HeroSection({ mode = "detailed" }: HeroSectionProps) {
             </p>
 
             {/* Proof cards */}
-            {!isPresenter && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-md sm:max-w-none">
-                <ProofCard stat="3" label="Brands Signed LOIs" delay={200} />
-                <ProofCard stat="50+" label="Leaders Interviewed" delay={280} />
-                <ProofCard stat="Live" label="Product MVP" delay={360} />
-                <ProofCard stat="1st" label="Paid Pilot Set" delay={440} />
-              </div>
-            )}
+            <div className={`grid grid-cols-2 ${isPresenter ? "grid-cols-4 gap-2" : "sm:grid-cols-4 gap-2.5"} max-w-md sm:max-w-none`}>
+              <ProofCard stat="3" label="Brands Signed LOIs" delay={200} />
+              <ProofCard stat="50+" label="Leaders Interviewed" delay={280} />
+              <ProofCard stat="Live" label="Product MVP" delay={360} />
+              <ProofCard stat="1st" label="Paid Pilot Set" delay={440} />
+            </div>
 
             {/* CTAs */}
             {!isPresenter && (

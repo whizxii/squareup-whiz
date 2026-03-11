@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from "react";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import type { SlideMode } from "@/lib/slides";
 import { Mic2, BrainCircuit, Database, Layers } from "lucide-react";
@@ -12,7 +13,23 @@ const PILLARS = [
 
 export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter" || mode === "download");
+  const [revealIndex, setRevealIndex] = useState(isPresenter ? 0 : PILLARS.length);
+
+  const advanceReveal = useCallback(() => {
+    setRevealIndex(prev => Math.min(prev + 1, PILLARS.length));
+  }, []);
+
+  useEffect(() => {
+    if (!isPresenter) { setRevealIndex(PILLARS.length); return; }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === " " || e.key === "ArrowDown") {
+        if (revealIndex < PILLARS.length) { e.preventDefault(); e.stopPropagation(); advanceReveal(); }
+      }
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [isPresenter, revealIndex, advanceReveal]);
 
   return (
     <section
@@ -62,7 +79,7 @@ export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMod
 
         <div className={`grid ${isPresenter ? "grid-cols-4" : "md:grid-cols-2 lg:grid-cols-4"} gap-6 transition-all duration-700 delay-200 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
           {PILLARS.map((p, i) => (
-            <div key={i} className={`rounded-2xl ${isPresenter ? "p-4" : "p-6"} border flex flex-col items-start hover:-translate-y-1 transition-transform duration-300`}
+            <div key={i} className={`rounded-2xl ${isPresenter ? "p-4" : "p-6"} border flex flex-col items-start transition-all duration-300 ${isPresenter && i >= revealIndex ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0 hover:-translate-y-1"}`}
               style={{
                 background: "hsl(var(--sq-off-white))",
                 borderColor: "hsl(var(--sq-subtle))",
@@ -76,6 +93,39 @@ export default function SolutionSection({ mode = "detailed" }: { mode?: SlideMod
               <p className={`${isPresenter ? "text-xs" : "text-sm"} font-medium leading-relaxed`} style={{ color: "hsl(var(--sq-muted))" }}>{p.desc}</p>
             </div>
           ))}
+        </div>
+
+        {/* Decision Flow — merged from DecisionFlowSection */}
+        <div className={`${isPresenter ? "mt-8" : "mt-14"} transition-all duration-700 delay-300 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
+          <div className={`grid ${isPresenter ? "grid-cols-[1fr_auto_1.4fr_auto_1fr]" : "md:grid-cols-[1fr_auto_1.4fr_auto_1fr]"} items-center ${isPresenter ? "gap-3" : "gap-4"}`}>
+            {/* Signals In */}
+            <div className={`rounded-xl ${isPresenter ? "p-3" : "p-4"} border`} style={{ borderColor: "hsl(var(--sq-subtle))", background: "hsl(var(--sq-off-white))" }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "hsl(var(--sq-muted))" }}>Signals In</p>
+              <div className="flex flex-wrap gap-1.5">
+                {["Conversations", "Tickets", "Surveys", "Field Notes"].map(s => (
+                  <span key={s} className="text-[10px] font-semibold px-2 py-1 rounded-md" style={{ background: "hsl(var(--sq-subtle))", color: "hsl(var(--sq-text))" }}>{s}</span>
+                ))}
+              </div>
+            </div>
+            <span className={`${isPresenter ? "text-lg" : "text-xl"} font-bold hidden md:block`} style={{ color: "hsl(var(--sq-orange))" }}>→</span>
+            {/* SquareUp */}
+            <div className={`rounded-xl ${isPresenter ? "p-3" : "p-4"} border-2`} style={{ borderColor: "hsl(var(--sq-orange) / 0.4)", background: "hsl(var(--sq-orange) / 0.04)" }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "hsl(var(--sq-orange))" }}>SquareUp</p>
+              <p className={`${isPresenter ? "text-[10px]" : "text-xs"} font-medium leading-relaxed`} style={{ color: "hsl(var(--sq-muted))" }}>
+                Interview → Synthesis → Repository → Routing
+              </p>
+            </div>
+            <span className={`${isPresenter ? "text-lg" : "text-xl"} font-bold hidden md:block`} style={{ color: "hsl(var(--sq-orange))" }}>→</span>
+            {/* Decisions Out */}
+            <div className={`rounded-xl ${isPresenter ? "p-3" : "p-4"} border`} style={{ borderColor: "hsl(var(--sq-subtle))", background: "hsl(var(--sq-off-white))" }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "hsl(var(--sq-muted))" }}>Decisions Out</p>
+              <div className="flex flex-wrap gap-1.5">
+                {["Product", "Growth", "CX", "Leadership"].map(s => (
+                  <span key={s} className="text-[10px] font-semibold px-2 py-1 rounded-md" style={{ background: "hsl(var(--sq-subtle))", color: "hsl(var(--sq-text))" }}>{s}</span>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>

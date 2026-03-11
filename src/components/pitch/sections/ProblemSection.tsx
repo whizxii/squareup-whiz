@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from "react";
 import type { SlideMode } from "@/lib/slides";
 import { AlertCircle, EyeOff, Brain, RotateCcw, GitBranch } from "lucide-react";
 
@@ -9,6 +10,22 @@ const problemBuckets = [
 ];
 export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
+  const [revealIndex, setRevealIndex] = useState(isPresenter ? 0 : problemBuckets.length);
+
+  const advanceReveal = useCallback(() => {
+    setRevealIndex(prev => Math.min(prev + 1, problemBuckets.length));
+  }, []);
+
+  useEffect(() => {
+    if (!isPresenter) { setRevealIndex(problemBuckets.length); return; }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === " " || e.key === "ArrowDown") {
+        if (revealIndex < problemBuckets.length) { e.preventDefault(); e.stopPropagation(); advanceReveal(); }
+      }
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [isPresenter, revealIndex, advanceReveal]);
 
   return (
     <section
@@ -60,7 +77,7 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
 
             <div className="animate-fade-up flex flex-col gap-3" style={{ animationDelay: "150ms" }}>
               {problemBuckets.map((item, i) => (
-                <div key={i} className={`flex items-start gap-4 ${isPresenter ? "p-4" : "p-5"} rounded-xl border transition-colors hover:bg-[hsl(var(--sq-orange)/0.02)]`} style={{ borderColor: "hsl(var(--sq-subtle))" }}>
+                <div key={i} className={`flex items-start gap-4 ${isPresenter ? "p-4" : "p-5"} rounded-xl border transition-all duration-300 ${isPresenter && i >= revealIndex ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"} hover:bg-[hsl(var(--sq-orange)/0.02)]`} style={{ borderColor: "hsl(var(--sq-subtle))" }}>
                   <div className={`${isPresenter ? "w-10 h-10" : "w-12 h-12"} rounded-lg flex items-center justify-center bg-[hsl(var(--sq-card))] border border-[hsl(var(--sq-subtle))] shadow-sm flex-shrink-0`}>
                     <item.icon size={isPresenter ? 18 : 22} style={{ color: "hsl(var(--sq-text))" }} />
                   </div>
@@ -119,6 +136,16 @@ export default function ProblemSection({ mode = "detailed" }: { mode?: SlideMode
                 <li>· Why did this campaign not convert?</li>
                 <li>· What should growth and product do next?</li>
               </ul>
+            </div>
+
+            {/* Frequency callout — merged from DecisionVolume */}
+            <div className="animate-fade-up rounded-2xl p-5 border-2 border-dashed" style={{ borderColor: "hsl(var(--sq-orange) / 0.3)", background: "hsl(var(--sq-orange) / 0.04)", animationDelay: "400ms" }}>
+              <p className={`font-black ${isPresenter ? "text-lg" : "text-xl"} leading-tight`} style={{ color: "hsl(var(--sq-text))" }}>
+                This isn't an annual research problem.
+              </p>
+              <p className={`${isPresenter ? "text-xs" : "text-sm"} font-medium mt-2 leading-relaxed`} style={{ color: "hsl(var(--sq-muted))" }}>
+                Brands face <span className="font-bold" style={{ color: "hsl(var(--sq-orange))" }}>10–30 high-stakes customer decisions per quarter</span> across product, pricing, growth, and CX. Most deserve fast validation. Very few get it.
+              </p>
             </div>
 
           </div>

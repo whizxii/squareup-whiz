@@ -32,7 +32,7 @@ const FAQS = [
 
 export default function FAQSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter" || mode === "download");
 
   return (
     <section id="faq" className={`${isPresenter ? "min-h-screen flex items-center px-16 py-8" : "py-32 px-8 sm:px-16"}`} style={{ background: "hsl(var(--sq-off-white))" }}>

@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from "react";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import type { SlideMode } from "@/lib/slides";
@@ -63,7 +64,23 @@ const GLOBAL_MARKETS = [
 
 export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter" || mode === "download");
+  const [funnelReveal, setFunnelReveal] = useState(isPresenter ? 0 : TAM_FUNNEL.length);
+
+  const advanceFunnel = useCallback(() => {
+    setFunnelReveal(prev => Math.min(prev + 1, TAM_FUNNEL.length));
+  }, []);
+
+  useEffect(() => {
+    if (!isPresenter) { setFunnelReveal(TAM_FUNNEL.length); return; }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === " " || e.key === "ArrowDown") {
+        if (funnelReveal < TAM_FUNNEL.length) { e.preventDefault(); e.stopPropagation(); advanceFunnel(); }
+      }
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [isPresenter, funnelReveal, advanceFunnel]);
 
   return (
     <section
@@ -113,26 +130,33 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
             <p className="font-bold text-xs uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
               🇮🇳 India TAM — How We Sized It
             </p>
-            {TAM_FUNNEL.map((item) => (
-              <div
-                key={item.label}
-                className={`flex items-center justify-between rounded-xl ${isPresenter ? "px-4 py-3" : "px-5 py-4"}`}
-                style={{
-                  background: item.highlight ? "hsl(var(--sq-orange) / 0.08)" : "hsl(var(--sq-card))",
-                  border: `1px solid ${item.highlight ? "hsl(var(--sq-orange) / 0.25)" : "hsl(var(--sq-subtle))"}`,
-                }}
-              >
-                <div className="min-w-0 mr-3">
-                  <p className="font-bold text-sm" style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>
-                    {item.label}
-                  </p>
-                  <p className="text-xs mt-0.5" style={{ color: "hsl(var(--sq-muted))" }}>{item.sub}</p>
+            {TAM_FUNNEL.map((item, i) => {
+              const widthPct = 100 - i * 8;
+              return (
+                <div
+                  key={item.label}
+                  className={`flex items-center justify-between rounded-xl ${isPresenter ? "px-4 py-3" : "px-5 py-4"} transition-all duration-500 ${isPresenter && i >= funnelReveal ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100 translate-y-0"}`}
+                  style={{
+                    width: `${widthPct}%`,
+                    marginLeft: "auto",
+                    marginRight: "auto",
+                    transitionDelay: !isPresenter ? `${i * 100}ms` : "0ms",
+                    background: item.highlight ? "hsl(var(--sq-orange) / 0.08)" : "hsl(var(--sq-card))",
+                    border: `1px solid ${item.highlight ? "hsl(var(--sq-orange) / 0.25)" : "hsl(var(--sq-subtle))"}`,
+                  }}
+                >
+                  <div className="min-w-0 mr-3">
+                    <p className="font-bold text-sm" style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>
+                      {item.label}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: "hsl(var(--sq-muted))" }}>{item.sub}</p>
+                  </div>
+                  <span className="font-black text-base ml-4 flex-shrink-0" style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>
+                    {item.value}
+                  </span>
                 </div>
-                <span className="font-black text-base ml-4 flex-shrink-0" style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>
-                  {item.value}
-                </span>
-              </div>
-            ))}
+              );
+            })}
             {!isPresenter && (
               <p className="text-[10px] pt-2 font-semibold" style={{ color: "hsl(var(--sq-muted) / 0.6)" }}>
                 Sources: MRSI Annual Industry Report FY2024 · ESOMAR Global Market Research 2024 · Avendus D2C Report

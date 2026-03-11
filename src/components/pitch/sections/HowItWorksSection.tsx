@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from "react";
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import type { SlideMode } from "@/lib/slides";
 
@@ -12,7 +13,23 @@ const STEPS = [
 
 export default function HowItWorksSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter" || mode === "download");
+  const [revealIndex, setRevealIndex] = useState(isPresenter ? 0 : STEPS.length);
+
+  const advanceReveal = useCallback(() => {
+    setRevealIndex(prev => Math.min(prev + 1, STEPS.length));
+  }, []);
+
+  useEffect(() => {
+    if (!isPresenter) { setRevealIndex(STEPS.length); return; }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === " " || e.key === "ArrowDown") {
+        if (revealIndex < STEPS.length) { e.preventDefault(); e.stopPropagation(); advanceReveal(); }
+      }
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [isPresenter, revealIndex, advanceReveal]);
 
   return (
     <section
@@ -39,7 +56,7 @@ export default function HowItWorksSection({ mode = "detailed" }: { mode?: SlideM
           {STEPS.map((step, i) => (
             <div
               key={step.num}
-              className={`relative rounded-2xl overflow-hidden flex flex-col transition-all duration-500 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+              className={`relative rounded-2xl overflow-hidden flex flex-col transition-all duration-500 ${isPresenter && i >= revealIndex ? "opacity-0 translate-y-4 pointer-events-none" : revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
                 }`}
               style={{
                 transitionDelay: `${i * 100}ms`,

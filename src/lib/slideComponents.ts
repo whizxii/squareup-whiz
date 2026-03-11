@@ -2,7 +2,6 @@ import type React from "react";
 import HeroSection from "@/components/pitch/sections/HeroSection";
 import CostSection from "@/components/pitch/sections/CostSection";
 import ProblemSection from "@/components/pitch/sections/ProblemSection";
-import DecisionVolumeSection from "@/components/pitch/sections/DecisionVolumeSection";
 import SolutionSection from "@/components/pitch/sections/SolutionSection";
 import WhoIsItForSection from "@/components/pitch/sections/WhoIsItForSection";
 import HowItWorksSection from "@/components/pitch/sections/HowItWorksSection";
@@ -18,14 +17,12 @@ import ToolsGapSection from "@/components/pitch/sections/ToolsGapSection";
 import CTASection from "@/components/pitch/sections/CTASection";
 import FAQSection from "@/components/pitch/sections/FAQSection";
 import InsightBriefSection from "@/components/pitch/sections/InsightBriefSection";
-import DecisionFlowSection from "@/components/pitch/sections/DecisionFlowSection";
 import type { SlideMode } from "@/lib/slides";
 
 export const SLIDE_COMPONENTS: Record<string, React.ComponentType<{ mode?: SlideMode }>> = {
   hero: HeroSection,
   cost: CostSection,
   problem: ProblemSection,
-  decisionvolume: DecisionVolumeSection,
   landscape: LandscapeSection,
   solution: SolutionSection,
   whofor: WhoIsItForSection,
@@ -41,5 +38,4 @@ export const SLIDE_COMPONENTS: Record<string, React.ComponentType<{ mode?: Slide
   cta: CTASection,
   faq: FAQSection,
   insightbrief: InsightBriefSection,
-  decisionflow: DecisionFlowSection,
 };

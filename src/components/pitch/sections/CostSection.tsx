@@ -5,7 +5,7 @@ import avatarProblem from "@/assets/avatar-problem-white.png";
 
 export default function CostSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
-  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
+  const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter" || mode === "download");
 
   return (
     <section

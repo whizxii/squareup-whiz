@@ -121,7 +121,7 @@ export default function PrintTemplate({ slides, onFinish }: PrintTemplateProps) 
                 if (!Comp) return null;
                 return (
                     <div key={i} className="print-slide">
-                        <Comp mode="presenter" />
+                        <Comp mode="download" />
                     </div>
                 );
             })}
