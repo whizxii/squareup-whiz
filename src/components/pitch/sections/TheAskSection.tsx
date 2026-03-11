@@ -46,7 +46,7 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
             <div className="space-y-2.5">
               {[
                 { pct: "50%", label: "Product", detail: "AI core, voice reliability, brief quality" },
-                { pct: "40%", label: "GTM", detail: "Convert 3 LOIs → paying → case studies" },
+                { pct: "40%", label: "GTM", detail: "Convert pilots → paying → case studies" },
                 { pct: "10%", label: "Ops", detail: "Tools, infra, legal. Stays lean." },
               ].map((f) => (
                 <div key={f.label} className={`sq-glass flex items-center gap-4 rounded-xl ${isPresenter ? "px-4 py-2" : "px-5 py-3"}`}>
@@ -67,10 +67,10 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
                 </p>
                 <div className="space-y-2">
                   {[
-                    "3 LOIs signed — first revenue starts in 90 days with or without this round",
-                    "$20B+ customer analytics market (Grand View Research) — no AI-native end-to-end player in India",
-                    "AI costs dropping 10x/year — the first team to build the data flywheel wins",
-                    "Small round by design — we stay lean until the motion is undeniably proven",
+                    "6 brands engaged — 2 in pilots, 4 in active tests. Revenue starts with or without this round.",
+                    "Conveo.ai just raised $5.3M (YC S24) for the global market. India is uncontested — but not for long.",
+                    "AI costs dropping 10x/year — first team to build the data flywheel wins. Every conversation compounds.",
+                    "Small round by design — we stay lean until the motion is undeniably proven.",
                   ].map((line) => (
                     <div key={line} className="flex items-start gap-2">
                       <span className="text-xs mt-1 flex-shrink-0" style={{ color: "hsl(var(--sq-orange))" }}>→</span>
@@ -90,7 +90,7 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
               </p>
               <div className={isPresenter ? "space-y-5" : "space-y-8"}>
                 {[
-                  { label: "First Revenue", desc: "3 LOI partners convert to paid. First ₹10L+ in revenue.", tag: "Month 3" },
+                  { label: "First Revenue", desc: "Pilot partners convert to paid. First ₹10L+ in revenue.", tag: "Month 3" },
                   { label: "Proof on Paper", desc: "5+ paying brands. Published case studies. Repeatable motion.", tag: "Month 9" },
                   { label: "Series A Ready", desc: "10+ brands, ₹2Cr+ ARR run-rate, clear unit economics.", tag: "Month 18" },
                 ].map((m, i) => (
@@ -118,9 +118,9 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
               <p className={`font-black ${isPresenter ? "text-xs" : "text-sm"} mb-2`} style={{ color: "hsl(var(--sq-orange))" }}>Why we win long-term</p>
               <div className="space-y-1">
                 {[
-                  "Proprietary dataset of customer conversations",
-                  "System-of-record lock-in across teams",
-                  "Early distribution via Mesa network",
+                  "Proprietary dataset of customer conversations — compounds with every interview",
+                  "System-of-record lock-in across product, growth, and CX teams",
+                  "Early distribution via Mesa network + pilot brand referrals",
                 ].map((m) => (
                   <div key={m} className="flex items-start gap-2">
                     <span className="flex-shrink-0 font-bold text-xs mt-0.5" style={{ color: "hsl(var(--sq-orange))" }}>→</span>

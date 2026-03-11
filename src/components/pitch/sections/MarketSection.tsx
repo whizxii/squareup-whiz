@@ -4,24 +4,61 @@ import type { SlideMode } from "@/lib/slides";
 
 const BAR_DATA = [
   { year: "Yr 1", value: 0.5, note: "India only" },
-  { year: "Yr 2", value: 1.5, note: "India + SEA pilot" },
-  { year: "Yr 3", value: 4, note: "India + SEA" },
-  { year: "Yr 4", value: 10, note: "India + SEA + MENA" },
+  { year: "Yr 2", value: 1.5, note: "India + MENA pilot" },
+  { year: "Yr 3", value: 4, note: "India + MENA" },
+  { year: "Yr 4", value: 10, note: "India + MENA + Global" },
   { year: "Yr 5", value: 25, note: "Multi-market" },
 ];
 
-const TAM_BREAKDOWN = [
-  { label: "~4,000 mid-market Indian consumer brands", value: "~₹16,000Cr", sub: "TAM — avg ₹40L/yr research spend each (bottoms-up)", highlight: false },
-  { label: "Brands actively buying qual research today", value: "~₹4,000Cr", sub: "SAM — ~25% currently outsource to agencies", highlight: false },
-  { label: "Metro brands, ₹100–500Cr revenue, agency-ready", value: "~₹800Cr", sub: "SOM — initial ICP: high urgency, fast to close", highlight: false },
-  { label: "5% SOM capture by Yr 3", value: "~₹40Cr ARR", sub: "~$5M — India proof, seed-fundable", highlight: true },
+const TAM_FUNNEL = [
+  {
+    label: "Consumer company research in India",
+    value: "~$600M",
+    sub: "65% of India's $930M custom research spend (MRSI FY2024) — FMCG, platforms, D2C, retail, QSR, BPC",
+    highlight: false,
+    layer: "Existing Spend",
+  },
+  {
+    label: "Market expansion — AI unlocks new demand",
+    value: "+$100M+",
+    sub: "10,000+ companies that can't afford ₹30-50L agency studies can now do ₹1-3L AI research",
+    highlight: false,
+    layer: "New Market",
+  },
+  {
+    label: "India TAM",
+    value: "~$700M",
+    sub: "TAM — existing disruption + market creation",
+    highlight: true,
+    layer: "Total",
+  },
+  {
+    label: "Actively outsourcing, metro, funded/profitable",
+    value: "~$200M",
+    sub: "SAM — companies seeking solutions today",
+    highlight: false,
+    layer: "SAM",
+  },
+  {
+    label: "High urgency, ₹100Cr-5,000Cr revenue, closeable in <90d",
+    value: "~$50M",
+    sub: "SOM — initial ICP",
+    highlight: false,
+    layer: "SOM",
+  },
+  {
+    label: "Yr 3 target — seed proof point",
+    value: "~$1-2M ARR",
+    sub: "2-3% SOM capture — proof of repeatable motion",
+    highlight: true,
+    layer: "Target",
+  },
 ];
 
 const GLOBAL_MARKETS = [
-  { flag: "🇮🇳", market: "India (beachhead)", brands: "~4,000", spend: "~₹16,000Cr", status: "Proving now", active: true },
-  { flag: "🌏", market: "SEA — Indonesia, Vietnam, Thailand", brands: "~6,000", spend: "~$1.2B", status: "Yr 2–3", active: false },
-  { flag: "🌍", market: "MENA — UAE, Saudi, Egypt", brands: "~3,500", spend: "~$800M", status: "Yr 3–4", active: false },
-  { flag: "🌐", market: "Global mid-market (ex-China)", brands: "~50,000+", spend: "~$18B+", status: "Series B", active: false },
+  { flag: "🇮🇳", market: "India (beachhead)", brands: "All consumer-facing", spend: "~$700M", status: "Proving now", active: true },
+  { flag: "🌍", market: "MENA — UAE, Saudi, Egypt", brands: "~3,500+", spend: "~$800M", status: "Yr 2–3", active: false },
+  { flag: "🌐", market: "Global mid-market (ex-China)", brands: "50,000+", spend: "~$18B+", status: "Series A+", active: false },
 ];
 
 export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode }) {
@@ -44,18 +81,18 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
             className={`font-black tracking-tight leading-tight ${isPresenter ? "text-4xl" : "text-3xl sm:text-4xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}
           >
-            Starting in India.<br />
-            <span style={{ color: "hsl(var(--sq-orange))" }}>The problem is everywhere.</span>
+            Not just replacing agencies.<br />
+            <span style={{ color: "hsl(var(--sq-orange))" }}>Creating a market that didn't exist.</span>
           </h2>
           <p className={`mt-3 text-sm max-w-xl`} style={{ color: "hsl(var(--sq-muted))" }}>
-            The global market research industry is $120B+ (ESOMAR). Customer analytics software alone is $16.98B → $48.63B by 2032 (Grand View Research). We're building the customer truth layer for the fastest-growing segment: consumer brands in emerging markets.
+            India is the world's 3rd largest research & insights market at $3.2B (MRSI FY2024). Today, only the top 100-200 companies can afford structured qualitative research. AI makes it accessible to tens of thousands more.
           </p>
           {!isPresenter && (
             <div className="mt-4 flex flex-wrap gap-3 max-w-2xl">
               {[
-                { val: "$120B+", label: "Global research industry (ESOMAR)", desc: "Proves the pain is large" },
-                { val: "$17B→$49B", label: "Customer analytics software (GVR)", desc: "Proves software budget exists" },
-                { val: "India→SEA→MENA", label: "SquareUp wedge", desc: "Consumer brands, emerging markets" },
+                { val: "$3.2B", label: "India research industry (MRSI FY2024)", desc: "3rd largest globally, 12.6% YoY growth" },
+                { val: "$930M", label: "Custom research segment (29%)", desc: "Tailored qual & quant for business decisions" },
+                { val: "$140B", label: "Global research industry (ESOMAR)", desc: "SquareUp's long-term market" },
               ].map((a) => (
                 <div key={a.label} className="flex-1 min-w-[160px] rounded-xl px-4 py-3"
                   style={{ background: "hsl(var(--sq-orange) / 0.05)", border: "1px solid hsl(var(--sq-orange) / 0.15)" }}>
@@ -68,15 +105,15 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
           )}
         </div>
 
-        {/* Two-column: India beachhead + Global expansion */}
+        {/* Two-column: India TAM + Global expansion */}
         <div className={`grid grid-cols-1 ${isPresenter ? "grid-cols-2" : "md:grid-cols-2"} gap-10 items-start transition-all duration-600 delay-200 ${revealed ? "opacity-100" : "opacity-0 translate-y-8"}`}>
 
-          {/* Left — India TAM breakdown */}
+          {/* Left — India TAM funnel */}
           <div className="space-y-2">
             <p className="font-bold text-xs uppercase tracking-wider mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
-              🇮🇳 India Beachhead (TAM → SOM)
+              🇮🇳 India TAM — How We Sized It
             </p>
-            {TAM_BREAKDOWN.map((item) => (
+            {TAM_FUNNEL.map((item) => (
               <div
                 key={item.label}
                 className={`flex items-center justify-between rounded-xl ${isPresenter ? "px-4 py-3" : "px-5 py-4"}`}
@@ -85,7 +122,7 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
                   border: `1px solid ${item.highlight ? "hsl(var(--sq-orange) / 0.25)" : "hsl(var(--sq-subtle))"}`,
                 }}
               >
-                <div>
+                <div className="min-w-0 mr-3">
                   <p className="font-bold text-sm" style={{ color: item.highlight ? "hsl(var(--sq-orange))" : "hsl(var(--sq-text))" }}>
                     {item.label}
                   </p>
@@ -96,6 +133,11 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
                 </span>
               </div>
             ))}
+            {!isPresenter && (
+              <p className="text-[10px] pt-2 font-semibold" style={{ color: "hsl(var(--sq-muted) / 0.6)" }}>
+                Sources: MRSI Annual Industry Report FY2024 · ESOMAR Global Market Research 2024 · Avendus D2C Report
+              </p>
+            )}
           </div>
 
           {/* Right — Global expansion table */}
@@ -119,7 +161,7 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
                       <div className="min-w-0">
                         <p className="font-bold text-sm truncate" style={{ color: "hsl(var(--sq-text))" }}>{row.market}</p>
                         <p className="text-xs mt-0.5" style={{ color: "hsl(var(--sq-muted))" }}>
-                          {row.brands} brands · {row.spend}
+                          {row.brands} · {row.spend}
                         </p>
                       </div>
                     </div>
@@ -135,9 +177,15 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
                   </div>
                 </div>
               ))}
-              <p className="text-xs pt-2 font-semibold" style={{ color: "hsl(var(--sq-muted))" }}>
-                Total addressable market: <span style={{ color: "hsl(var(--sq-orange))" }}>$20B+</span> globally
-              </p>
+
+              {/* Conveo validation callout */}
+              <div className="rounded-xl px-4 py-3 mt-2"
+                style={{ background: "hsl(var(--sq-orange) / 0.04)", border: "1px dashed hsl(var(--sq-orange) / 0.25)" }}>
+                <p className="text-xs font-bold" style={{ color: "hsl(var(--sq-orange))" }}>Category validation</p>
+                <p className="text-xs mt-1" style={{ color: "hsl(var(--sq-muted))" }}>
+                  Conveo.ai (YC S24) raised $5.3M targeting the same $140B global market. They serve Unilever & P&G. SquareUp goes after that same market starting from India.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -185,12 +233,12 @@ export default function MarketSection({ mode = "detailed" }: { mode?: SlideMode 
         {/* Footer callout */}
         <div className={`${isPresenter ? "mt-6" : "mt-10"} text-center transition-all duration-500 delay-500 ${revealed ? "opacity-100" : "opacity-0"}`}>
           <p className="font-black" style={{ fontSize: "clamp(1.2rem, 3vw, 1.75rem)", color: "hsl(var(--sq-text))" }}>
-            $120B global research industry.{" "}
-            <span style={{ color: "hsl(var(--sq-orange))" }}>We're starting with the fastest-growing 10%.</span>
+            $140B global research industry.{" "}
+            <span style={{ color: "hsl(var(--sq-orange))" }}>India is proving ground. Global is the prize.</span>
           </p>
           {!isPresenter && (
             <p className="text-sm mt-2 max-w-xl mx-auto" style={{ color: "hsl(var(--sq-muted))" }}>
-              India is the proving ground. SEA and MENA are the prize. Global mid-market is the endgame.
+              Like Canva democratized design, SquareUp makes structured customer intelligence accessible to every consumer brand — not just the top 200.
             </p>
           )}
         </div>

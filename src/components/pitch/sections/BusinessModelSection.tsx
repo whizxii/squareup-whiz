@@ -1,6 +1,30 @@
 import { useScrollAnimation } from "@/lib/useScrollAnimation";
 import type { SlideMode } from "@/lib/slides";
 
+const GTM_PHASES = [
+  {
+    phase: "Phase 1",
+    title: "Founder-Led Sales",
+    tag: "Now → Month 3",
+    desc: "Kunj's D2C network + Mesa School network. Convert pilot partners (Skinn, Big Basket) to paid. Close 3-5 paying brands.",
+    icon: "→",
+  },
+  {
+    phase: "Phase 2",
+    title: "Case Study Flywheel",
+    tag: "Month 3–9",
+    desc: "Published results from pilot brands. Referrals from design partners. Outbound to similar-profile consumer brands. Target: 10+ paying brands.",
+    icon: "↗",
+  },
+  {
+    phase: "Phase 3",
+    title: "Channel + Content",
+    tag: "Month 9–18",
+    desc: "Thought leadership & founder content. Agency partnership channel. Inbound from published case studies. Target: 20+ brands → Series A.",
+    icon: "⟶",
+  },
+];
+
 export default function BusinessModelSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
   const { ref, revealed } = useScrollAnimation(0.15, mode === "presenter");
@@ -18,7 +42,7 @@ export default function BusinessModelSection({ mode = "detailed" }: { mode?: Sli
           {/* Left — headline */}
           <div className={`transition-all duration-500 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
             <p className="font-bold text-xs uppercase tracking-[0.2em] mb-5" style={{ color: "hsl(var(--sq-orange))" }}>
-              The Revenue Model
+              Revenue Model & GTM
             </p>
             <h2 className={`font-black tracking-tight leading-[1.05] mb-6 ${isPresenter ? "text-4xl" : "text-4xl sm:text-[3rem]"}`}
               style={{ color: "hsl(var(--sq-text))" }}>
@@ -102,34 +126,67 @@ export default function BusinessModelSection({ mode = "detailed" }: { mode?: Sli
                 ))}
               </div>
             </div>
+
+            {/* Land & expand 1-liner */}
+            <div className="rounded-xl px-4 py-3"
+              style={{ background: "hsl(var(--sq-orange) / 0.06)", border: "1px solid hsl(var(--sq-orange) / 0.2)" }}>
+              <p className="text-xs font-bold" style={{ color: "hsl(var(--sq-orange))" }}>Land & expand</p>
+              <p className="text-xs mt-0.5" style={{ color: "hsl(var(--sq-muted))" }}>
+                Start with one ₹1-3L study → prove value on one decision → expand to ₹75K-1.5L/month subscription
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Expansion Timeline */}
+        {/* Expansion Timeline + GTM (hidden in presenter) */}
         {!isPresenter && (
-          <div className={`mt-12 transition-all duration-500 delay-300 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
-            <p className="font-bold text-xs uppercase tracking-widest mb-5" style={{ color: "hsl(var(--sq-muted))" }}>
-              Path to Platform
-            </p>
-            <div className="grid md:grid-cols-3 gap-4">
-              {[
-                { phase: "Phase 1", title: "Decision Studies", desc: "Per-study revenue. Prove value on one decision at a time.", tag: "Now" },
-                { phase: "Phase 2", title: "Always-On Signal", desc: "Monthly subscription. Lock in as the ongoing customer truth layer.", tag: "Month 6+" },
-                { phase: "Phase 3", title: "Customer Truth System of Record", desc: "Platform revenue. Proprietary data moat. Improving decision-quality models built on real brand workflows.", tag: "Month 12+" },
-              ].map((p) => (
-                <div key={p.phase} className="rounded-xl px-5 py-4"
-                  style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))" }}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "hsl(var(--sq-orange))" }}>{p.phase}</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: "hsl(var(--sq-orange) / 0.1)", color: "hsl(var(--sq-orange))" }}>{p.tag}</span>
+          <>
+            {/* Path to Platform */}
+            <div className={`mt-12 transition-all duration-500 delay-300 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
+              <p className="font-bold text-xs uppercase tracking-widest mb-5" style={{ color: "hsl(var(--sq-muted))" }}>
+                Path to Platform
+              </p>
+              <div className="grid md:grid-cols-3 gap-4">
+                {[
+                  { phase: "Phase 1", title: "Decision Studies", desc: "Per-study revenue. Prove value on one decision at a time.", tag: "Now" },
+                  { phase: "Phase 2", title: "Always-On Signal", desc: "Monthly subscription. Lock in as the ongoing customer truth layer.", tag: "Month 6+" },
+                  { phase: "Phase 3", title: "Customer Truth System of Record", desc: "Platform revenue. Proprietary data moat. Improving decision-quality models built on real brand workflows.", tag: "Month 12+" },
+                ].map((p) => (
+                  <div key={p.phase} className="rounded-xl px-5 py-4"
+                    style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))" }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "hsl(var(--sq-orange))" }}>{p.phase}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: "hsl(var(--sq-orange) / 0.1)", color: "hsl(var(--sq-orange))" }}>{p.tag}</span>
+                    </div>
+                    <p className="font-black text-sm mb-1" style={{ color: "hsl(var(--sq-text))" }}>{p.title}</p>
+                    <p className="text-xs" style={{ color: "hsl(var(--sq-muted))" }}>{p.desc}</p>
                   </div>
-                  <p className="font-black text-sm mb-1" style={{ color: "hsl(var(--sq-text))" }}>{p.title}</p>
-                  <p className="text-xs" style={{ color: "hsl(var(--sq-muted))" }}>{p.desc}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+
+            {/* GTM Strategy */}
+            <div className={`mt-10 transition-all duration-500 delay-400 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}>
+              <p className="font-bold text-xs uppercase tracking-widest mb-5" style={{ color: "hsl(var(--sq-orange))" }}>
+                Go-To-Market Strategy
+              </p>
+              <div className="grid md:grid-cols-3 gap-4">
+                {GTM_PHASES.map((g) => (
+                  <div key={g.phase} className="rounded-xl px-5 py-5"
+                    style={{ background: "hsl(var(--sq-card))", border: "1px solid hsl(var(--sq-subtle))" }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "hsl(var(--sq-orange))" }}>{g.phase}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: "hsl(var(--sq-orange) / 0.1)", color: "hsl(var(--sq-orange))" }}>{g.tag}</span>
+                    </div>
+                    <p className="font-black text-sm mb-2" style={{ color: "hsl(var(--sq-text))" }}>{g.title}</p>
+                    <p className="text-xs leading-relaxed" style={{ color: "hsl(var(--sq-muted))" }}>{g.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
         )}
       </div>
     </section>

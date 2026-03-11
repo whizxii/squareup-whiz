@@ -2,7 +2,7 @@ import { useScrollAnimation, useCountUp } from "@/lib/useScrollAnimation";
 import mesaLogo from "@/assets/mesa-logo.png";
 import type { SlideMode } from "@/lib/slides";
 
-const LOGOS = ["Zepto", "Meesho", "Swiggy", "Titan", "Rebel Foods", "Swish"];
+const LOGOS = ["Skinn", "Big Basket", "Bloc", "V BOG", "MPC", "Super Sheldon", "Zepto", "Meesho", "Swiggy", "Titan", "Rebel Foods"];
 
 function Counter({ target, prefix = "", suffix = "", label, sublabel, mode }: {
   target: number; prefix?: string; suffix?: string; label: string; sublabel?: string; mode?: SlideMode;
@@ -39,21 +39,21 @@ export default function TractionSection({ mode = "detailed" }: { mode?: SlideMod
           </p>
           <h2 className={`font-black tracking-tight leading-[1.05] ${isPresenter ? "text-5xl" : "text-4xl sm:text-[3rem]"}`}
             style={{ color: "hsl(var(--sq-text))" }}>
-            Idea to LOI in under 90 days.<br />
-            <span style={{ color: "hsl(var(--sq-orange))" }}>In India.</span>
+            Founded 3 months ago.<br />
+            <span style={{ color: "hsl(var(--sq-orange))" }}>6 brands already engaged.</span>
           </h2>
         </div>
 
-        {/* 2-col: stats + LOI highlight */}
+        {/* 2-col: stats + engagement highlight */}
         <div className={`grid ${isPresenter ? "grid-cols-2" : "lg:grid-cols-2"} gap-6 ${isPresenter ? "mb-4" : "mb-8"}`}>
 
           {/* Counter grid */}
           <div className={`grid grid-cols-2 gap-4 transition-all duration-500 delay-150 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
             {[
-              { target: 90, prefix: "<", label: "days", sublabel: "idea → signed LOI" },
+              { target: 6, label: "brands engaged", sublabel: "pilots + active tests" },
               { target: 50, suffix: "+", label: "leaders interviewed", sublabel: "Zepto, Swiggy, Meesho…" },
               { target: 15, label: "days to MVP", sublabel: "shipped v1" },
-              { target: 1, label: "paid pilot started", sublabel: "design partners" },
+              { target: 2, label: "pilots running", sublabel: "Skinn · Big Basket" },
             ].map((c, i) => (
               <div key={i} className={`rounded-2xl ${isPresenter ? "p-3" : "p-5"} flex flex-col items-center justify-center`}
                 style={{ background: "hsl(var(--sq-off-white))", border: "1px solid hsl(var(--sq-subtle))" }}>
@@ -62,17 +62,27 @@ export default function TractionSection({ mode = "detailed" }: { mode?: SlideMod
             ))}
           </div>
 
-          {/* LOI banner */}
+          {/* Engagement banner */}
           <div className={`sq-glow-pulse rounded-3xl flex flex-col justify-center ${isPresenter ? "px-6 py-5" : "px-8 py-8"} transition-all duration-500 delay-300 ${revealed ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
             style={{ background: "hsl(var(--sq-orange))", boxShadow: "0 16px 48px hsl(var(--sq-orange) / 0.2)" }}>
-            <div className="font-black text-white" style={{ fontSize: isPresenter ? "3rem" : "clamp(3rem, 8vw, 5rem)", lineHeight: 1 }}>3</div>
-            <div className={`font-black text-white ${isPresenter ? "text-base" : "text-xl"} mt-1 mb-2`}>Letters of Intent. Signed.</div>
-            <p className={`text-white/70 ${isPresenter ? "text-xs" : "text-sm"} font-medium`}>Design partners committed to paid pilots — not just interest, signed commitment.</p>
+            <div className="font-black text-white" style={{ fontSize: isPresenter ? "3rem" : "clamp(3rem, 8vw, 5rem)", lineHeight: 1 }}>6</div>
+            <div className={`font-black text-white ${isPresenter ? "text-base" : "text-xl"} mt-1 mb-3`}>Brands Engaged</div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-white/90 bg-white/20 px-2.5 py-1 rounded-full">2 Pilots</span>
+                <span className="text-xs font-bold text-white/60">Skinn (Titan) · Big Basket</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-white/90 bg-white/20 px-2.5 py-1 rounded-full">4 Testing</span>
+                <span className="text-xs font-bold text-white/60">Bloc · V BOG · MPC · Super Sheldon</span>
+              </div>
+            </div>
             <div className="mt-4 flex flex-col gap-1.5">
               {[
                 "Dec '25 — Founded, began discovery",
                 "Jan '26 — MVP shipped in 15 days",
-                "Feb '26 — 3 LOIs signed, first pilot scoped",
+                "Feb '26 — 3 LOIs signed",
+                "Mar '26 — 2 pilots running, 4 more testing",
               ].map((m) => (
                 <span key={m} className="text-xs font-bold text-white/50 tracking-wide">{m}</span>
               ))}
@@ -97,7 +107,7 @@ export default function TractionSection({ mode = "detailed" }: { mode?: SlideMod
             </div>
           )}
           <p className="text-center font-bold text-xs uppercase tracking-[0.2em] mb-4" style={{ color: "hsl(var(--sq-muted))" }}>
-            Discovery conversations with leaders at
+            Engaged brands & discovery conversations
           </p>
           <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
             {LOGOS.map((logo) => (

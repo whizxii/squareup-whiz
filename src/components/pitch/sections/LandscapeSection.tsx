@@ -18,11 +18,38 @@ const DIRECT_ALTERNATIVES: Row[] = [
 
 const SQUAREUP_ROW: Row = {
   tool: "SquareUp",
-  good: "AI-led interviews → synthesis → decision-ready briefs",
+  good: "AI-led interviews → synthesis → decision-ready briefs → team routing",
   bad: "",
   players: "",
   sq: true,
 };
+
+const WHY_WE_WIN = [
+  {
+    vs: "Research Agencies",
+    players: "Kantar, Nielsen, RedSeer",
+    advantage: "₹1-3L in 2 days vs ₹30-50L in 8 weeks",
+    detail: "Same interview depth. 10x faster. 10x cheaper. No project managers needed.",
+  },
+  {
+    vs: "Survey Tools",
+    players: "Typeform, SurveyMonkey",
+    advantage: "AI probes deeper with adaptive follow-ups",
+    detail: "70%+ of actionable insights come from follow-up questions. Surveys can't do this.",
+  },
+  {
+    vs: "VOC Platforms",
+    players: "Qualtrics, Medallia",
+    advantage: "Built for mid-market, deploys in hours",
+    detail: "Enterprise pricing and complexity vs. self-serve simplicity. No 6-month implementation.",
+  },
+  {
+    vs: "Research Repos",
+    players: "Dovetail, Condens",
+    advantage: "Generates fresh signal on demand",
+    detail: "They organize old data. We create new customer intelligence and deliver decision-ready briefs.",
+  },
+];
 
 export default function LandscapeSection({ mode = "detailed" }: { mode?: SlideMode }) {
   const isPresenter = mode === "presenter";
@@ -74,7 +101,7 @@ export default function LandscapeSection({ mode = "detailed" }: { mode?: SlideMo
           <h2 className={`font-black tracking-tight leading-[1.05] ${isPresenter ? "text-5xl" : "text-4xl sm:text-5xl"}`}
             style={{ color: "hsl(var(--sq-text))" }}>
             The current stack collects fragments.<br />
-            <span style={{ color: "hsl(var(--sq-orange))" }}>It does not deliver real customer understanding.</span>
+            <span style={{ color: "hsl(var(--sq-orange))" }}>SquareUp delivers decisions.</span>
           </h2>
         </div>
 
@@ -111,6 +138,49 @@ export default function LandscapeSection({ mode = "detailed" }: { mode?: SlideMo
               {renderRow(SQUAREUP_ROW)}
             </tbody>
           </table>
+        </div>
+
+        {/* Why SquareUp Wins — head-to-head */}
+        <div className={`${isPresenter ? "mt-8" : "mt-14"} transition-all duration-700 delay-400 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+          <p className="font-bold text-xs uppercase tracking-[0.2em] mb-5" style={{ color: "hsl(var(--sq-orange))" }}>
+            Why SquareUp Wins
+          </p>
+          <div className={`grid ${isPresenter ? "grid-cols-4" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"} gap-4`}>
+            {WHY_WE_WIN.map((item) => (
+              <div key={item.vs} className={`rounded-2xl ${isPresenter ? "p-4" : "p-5"}`}
+                style={{ background: "hsl(var(--sq-off-white))", border: "1px solid hsl(var(--sq-subtle))" }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: "hsl(var(--sq-muted) / 0.6)" }}>
+                  vs {item.players}
+                </p>
+                <p className={`font-black ${isPresenter ? "text-xs" : "text-sm"} mb-1`} style={{ color: "hsl(var(--sq-orange))" }}>
+                  {item.advantage}
+                </p>
+                <p className="text-xs" style={{ color: "hsl(var(--sq-muted))" }}>
+                  {item.detail}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Conveo callout + summary */}
+          {!isPresenter && (
+            <div className="mt-6 flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 rounded-xl px-5 py-4"
+                style={{ background: "hsl(var(--sq-orange) / 0.04)", border: "1px dashed hsl(var(--sq-orange) / 0.25)" }}>
+                <p className="text-xs font-bold" style={{ color: "hsl(var(--sq-orange))" }}>Category validation</p>
+                <p className="text-xs mt-1" style={{ color: "hsl(var(--sq-muted))" }}>
+                  Conveo (YC S24, $5.3M) validates the category globally — they target Unilever & P&G. SquareUp owns India's consumer brands.
+                </p>
+              </div>
+              <div className="flex-1 rounded-xl px-5 py-4"
+                style={{ background: "hsl(var(--sq-orange) / 0.08)", border: "1px solid hsl(var(--sq-orange) / 0.25)" }}>
+                <p className="text-xs font-bold" style={{ color: "hsl(var(--sq-orange))" }}>The only end-to-end platform</p>
+                <p className="text-xs mt-1" style={{ color: "hsl(var(--sq-text))" }}>
+                  AI interviews → real-time synthesis → decision briefs → team routing. No one else does all four.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
