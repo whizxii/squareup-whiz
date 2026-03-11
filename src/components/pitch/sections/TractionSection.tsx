@@ -9,11 +9,9 @@ const BRAND_BADGES = [
   { name: "V BOG", bg: "#2D2D2D", color: "#E8C547" },
   { name: "MPC", bg: "#1B3A5C", color: "#fff" },
   { name: "Super Sheldon", bg: "#FF4444", color: "#fff" },
-  { name: "Zepto", bg: "#6C2BD9", color: "#fff" },
-  { name: "Meesho", bg: "#E91E63", color: "#fff" },
-  { name: "Swiggy", bg: "#FC8019", color: "#fff" },
-  { name: "Titan", bg: "#1A1A2E", color: "#C8A96E" },
-  { name: "Rebel Foods", bg: "#E53935", color: "#fff" },
+  { name: "SuperYou", bg: "#6C2BD9", color: "#fff" },
+  { name: "Andamen", bg: "#1A3C5A", color: "#fff" },
+  { name: "Swish", bg: "#0D9488", color: "#fff" },
 ];
 
 function Counter({ target, prefix = "", suffix = "", label, sublabel, mode }: {
@@ -63,7 +61,7 @@ export default function TractionSection({ mode = "detailed" }: { mode?: SlideMod
           <div className={`grid grid-cols-2 gap-4 transition-all duration-500 delay-150 ${revealed ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
             {[
               { target: 6, label: "brands engaged", sublabel: "pilots + active tests" },
-              { target: 50, suffix: "+", label: "leaders interviewed", sublabel: "Zepto, Swiggy, Meesho…" },
+              { target: 50, suffix: "+", label: "leaders interviewed", sublabel: "across D2C, FMCG, tech" },
               { target: 15, label: "days to MVP", sublabel: "shipped v1" },
               { target: 2, label: "pilots running", sublabel: "Skinn · Big Basket" },
             ].map((c, i) => (

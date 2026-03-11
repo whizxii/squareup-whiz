@@ -92,7 +92,7 @@ export default function TheAskSection({ mode = "detailed" }: { mode?: SlideMode 
                 {[
                   { label: "First Revenue", desc: "Pilot partners convert to paid. First ₹10L+ in revenue.", tag: "Month 3" },
                   { label: "Proof on Paper", desc: "5+ paying brands. Published case studies. Repeatable motion.", tag: "Month 9" },
-                  { label: "Series A Ready", desc: "10+ brands, ₹2Cr+ ARR run-rate, clear unit economics.", tag: "Month 18" },
+                  { label: "Series A Ready", desc: "15+ brands, ₹4Cr+ ARR run-rate, clear unit economics.", tag: "Month 18" },
                 ].map((m, i) => (
                   <div key={m.label} className={`flex items-start ${isPresenter ? "gap-3" : "gap-5"}`}>
                     <div className={`flex-shrink-0 ${isPresenter ? "w-7 h-7" : "w-8 h-8"} rounded-full flex items-center justify-center font-black text-white text-xs`}

@@ -6,7 +6,7 @@ import type { SlideMode } from "@/lib/slides";
 const BAR_DATA = [
   { year: "Yr 1", value: 0.5, note: "India only" },
   { year: "Yr 2", value: 1.5, note: "India + MENA pilot" },
-  { year: "Yr 3", value: 4, note: "India + MENA" },
+  { year: "Yr 3", value: 5, note: "India + MENA" },
   { year: "Yr 4", value: 10, note: "India + MENA + Global" },
   { year: "Yr 5", value: 25, note: "Multi-market" },
 ];
@@ -41,16 +41,16 @@ const TAM_FUNNEL = [
     layer: "SAM",
   },
   {
-    label: "High urgency, ₹100Cr-5,000Cr revenue, closeable in <90d",
-    value: "~$50M",
-    sub: "SOM — initial ICP",
+    label: "High urgency, ₹50Cr-5,000Cr revenue, closeable in <90d",
+    value: "~$100M",
+    sub: "SOM — initial ICP across FMCG, D2C, platforms",
     highlight: false,
     layer: "SOM",
   },
   {
     label: "Yr 3 target — seed proof point",
-    value: "~$1-2M ARR",
-    sub: "2-3% SOM capture — proof of repeatable motion",
+    value: "~$4-5M ARR",
+    sub: "4-5% SOM capture — proof of repeatable motion",
     highlight: true,
     layer: "Target",
   },

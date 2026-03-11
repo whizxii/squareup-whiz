@@ -35,7 +35,7 @@ export const ALL_SLIDES: SlideDefinition[] = [
   { id: "traction", title: "The Velocity", lengths: [8, 12], inShort: true,
     speakerNotes: "Founded 3 months ago. 6 brands engaged. MVP in 15 days. 2 pilots running (Skinn by Titan, Big Basket). 50+ leaders interviewed. This team ships." },
   { id: "market", title: "The Market", lengths: [8, 12], inShort: true,
-    speakerNotes: "Click through funnel. India TAM: ~$700M. SAM: ~$200M. SOM: ~$50M. Yr 3 target: $1-2M ARR. India is proving ground — $140B global market is the prize. Like Canva for design, SquareUp for customer intelligence." },
+    speakerNotes: "Click through funnel. India TAM: ~$700M. SAM: ~$200M. SOM: ~$100M. Yr 3 target: $4-5M ARR. India is proving ground — $140B global market is the prize. Like Canva for design, SquareUp for customer intelligence." },
   { id: "businessmodel", title: "The Expansion", lengths: [12], inShort: false,
     speakerNotes: "₹1-3L per study, 3-4 studies/brand/quarter. Land with one team, expand across Growth/Product/CX. Phase 1: founder-led sales. Phase 2: case study flywheel. Phase 3: channel + content." },
   { id: "team", title: "The Destiny", lengths: [8, 12], inShort: true,
