@@ -1,0 +1,18 @@
+# Dependencies & build
+node_modules/
+.next/
+.npm-cache/
+tsconfig.tsbuildinfo
+out/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Database
+*.db
+
+# OS
+.DS_Store
