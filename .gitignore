@@ -5,5 +5,14 @@ node_modules/
 tsconfig.tsbuildinfo
 out/
 
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Database
+*.db
+
 # OS
 .DS_Store
