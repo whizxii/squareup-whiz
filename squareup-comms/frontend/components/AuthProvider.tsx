@@ -71,7 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.error("Auth verification failed:", err);
-        useAuthStore.setState({ profile: null, needsOnboarding: false });
+        document.cookie = "__session=; path=/; max-age=0; SameSite=Lax";
+        useAuthStore.setState({
+          user: null,
+          token: null,
+          profile: null,
+          needsOnboarding: false,
+        });
       } finally {
         useAuthStore.getState().setLoading(false);
       }
