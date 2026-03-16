@@ -17,10 +17,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Authenticated users visiting login → office
-  if (hasSession && pathname === "/login") {
-    return NextResponse.redirect(new URL("/office", request.url));
-  }
+  // Authenticated users visiting login: let client-side handle redirect
+  // based on onboarding status (middleware has no knowledge of it)
 
   return NextResponse.next();
 }

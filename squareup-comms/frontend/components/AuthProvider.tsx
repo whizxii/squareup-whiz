@@ -41,10 +41,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Block redirects while we verify with the backend
+      useAuthStore.setState({ loading: true });
+
       try {
         const idToken = await firebaseUser.getIdToken();
-        useAuthStore.getState().setUser(firebaseUser);
-        useAuthStore.getState().setToken(idToken);
+        // Atomic update — prevents intermediate renders where user is set but loading is false
+        useAuthStore.setState({ user: firebaseUser, token: idToken });
 
         // Set session cookie so Next.js middleware can detect auth state
         document.cookie = "__session=1; path=/; max-age=86400; SameSite=Lax";
