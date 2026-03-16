@@ -52,6 +52,7 @@ from app.api.crm_smart_lists import router as crm_smart_lists_router
 from app.api.crm_analytics import router as crm_analytics_router
 from app.api.crm_bulk import router as crm_bulk_router
 from app.api.crm_dedup import router as crm_dedup_router
+from app.api.users import router as users_router
 
 # Initialize structured logging before anything else
 setup_logging()
@@ -88,10 +89,11 @@ async def lifespan(app: FastAPI):
 
     # Register follow-up auto-creation handlers
     followup_svc = FollowUpService(
-        session=None,  # Handlers receive session via event payloads
+        session=None,
         events=app.state.event_bus,
         background=app.state.background,
         cache=app.state.cache,
+        session_factory=async_session,
     )
     followup_svc.register_handlers()
     logger.info("Follow-up auto-creation handlers registered.")
@@ -175,6 +177,7 @@ app.include_router(crm_smart_lists_router)
 app.include_router(crm_analytics_router)
 app.include_router(crm_bulk_router)
 app.include_router(crm_dedup_router)
+app.include_router(users_router)
 
 
 @app.get("/health")

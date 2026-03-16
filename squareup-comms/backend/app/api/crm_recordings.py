@@ -124,7 +124,7 @@ async def upload_recording(
     duration_seconds: int = Form(0),
     calendar_event_id: Optional[str] = Form(None),
     svc: RecordingService = Depends(get_recording_service),
-    user: dict = Depends(get_current_user),
+    user_id: str = Depends(get_current_user),
 ):
     """Upload a recording file and create a recording record.
 
@@ -139,7 +139,7 @@ async def upload_recording(
             title=title,
             duration_seconds=duration_seconds,
             calendar_event_id=calendar_event_id,
-            created_by=user.get("uid", "system"),
+            created_by=user_id,
         )
     except ValueError as exc:
         raise ApiError(status_code=400, detail=str(exc))
@@ -153,7 +153,7 @@ async def upload_recording(
 async def get_recording(
     recording_id: str,
     svc: RecordingService = Depends(get_recording_service),
-    _user: dict = Depends(get_current_user),
+    _user_id: str = Depends(get_current_user),
 ):
     recording = await svc.get_recording(recording_id)
     if recording is None:
@@ -168,7 +168,7 @@ async def get_recording(
 async def trigger_transcription(
     recording_id: str,
     svc: RecordingService = Depends(get_recording_service),
-    _user: dict = Depends(get_current_user),
+    _user_id: str = Depends(get_current_user),
 ):
     recording = await svc.trigger_transcription(recording_id)
     if recording is None:
@@ -183,7 +183,7 @@ async def trigger_transcription(
 async def get_transcript(
     recording_id: str,
     svc: RecordingService = Depends(get_recording_service),
-    _user: dict = Depends(get_current_user),
+    _user_id: str = Depends(get_current_user),
 ):
     recording = await svc.get_recording(recording_id)
     if recording is None:
@@ -204,7 +204,7 @@ async def get_transcript(
 async def get_action_items(
     recording_id: str,
     svc: RecordingService = Depends(get_recording_service),
-    _user: dict = Depends(get_current_user),
+    _user_id: str = Depends(get_current_user),
 ):
     recording = await svc.get_recording(recording_id)
     if recording is None:
@@ -223,7 +223,7 @@ async def toggle_action_item(
     recording_id: str,
     item_index: int,
     svc: RecordingService = Depends(get_recording_service),
-    _user: dict = Depends(get_current_user),
+    _user_id: str = Depends(get_current_user),
 ):
     recording = await svc.toggle_action_item(recording_id, item_index)
     if recording is None:
@@ -240,7 +240,7 @@ async def get_contact_recordings(
     cursor: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=100),
     svc: RecordingService = Depends(get_recording_service),
-    _user: dict = Depends(get_current_user),
+    _user_id: str = Depends(get_current_user),
 ):
     result = await svc.get_recordings_for_contact(
         contact_id=contact_id,
@@ -264,7 +264,7 @@ async def get_contact_recordings(
 async def get_recording_summary(
     recording_id: str,
     svc: RecordingService = Depends(get_recording_service),
-    _user: dict = Depends(get_current_user),
+    _user_id: str = Depends(get_current_user),
 ):
     recording = await svc.get_recording(recording_id)
     if recording is None:

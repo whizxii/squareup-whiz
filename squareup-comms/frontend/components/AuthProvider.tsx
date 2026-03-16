@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -73,6 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           useAuthStore.setState({ needsOnboarding: true, profile: null });
         } else {
           useAuthStore.setState({ needsOnboarding: false, profile: data.profile });
+          // Hydrate settings store from backend profile
+          useSettingsStore.getState().hydrateFromProfile();
         }
       } catch (err) {
         console.error("Auth verification failed:", err);

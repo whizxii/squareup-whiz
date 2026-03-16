@@ -112,7 +112,7 @@ class AnalyticsService(BaseService):
         # Avg days to close (won deals)
         avg_cycle_q = select(
             func.avg(
-                func.julianday(CRMDeal.actual_close_date) - func.julianday(CRMDeal.created_at)
+                extract('epoch', CRMDeal.actual_close_date - CRMDeal.created_at) / 86400.0
             )
         ).where(CRMDeal.status == "won", CRMDeal.actual_close_date.isnot(None))
         avg_days_raw = (await self.session.execute(avg_cycle_q)).scalar_one()
@@ -158,8 +158,7 @@ class AnalyticsService(BaseService):
                 func.count(CRMDeal.id).label("count"),
                 func.coalesce(func.sum(CRMDeal.value), 0).label("value"),
                 func.avg(
-                    func.julianday(func.datetime("now"))
-                    - func.julianday(CRMDeal.stage_entered_at)
+                    extract('epoch', func.now() - CRMDeal.stage_entered_at) / 86400.0
                 ).label("avg_days_in_stage"),
             )
             .where(CRMDeal.status == "open")
@@ -370,7 +369,7 @@ class AnalyticsService(BaseService):
                 func.count(CRMDeal.id).label("count"),
                 func.coalesce(func.sum(CRMDeal.value), 0).label("value"),
                 func.avg(
-                    func.julianday(CRMDeal.actual_close_date) - func.julianday(CRMDeal.created_at)
+                    extract('epoch', CRMDeal.actual_close_date - CRMDeal.created_at) / 86400.0
                 ).label("avg_cycle"),
             )
             .where(
@@ -443,12 +442,10 @@ class AnalyticsService(BaseService):
                 CRMDeal.stage,
                 func.count(CRMDeal.id).label("count"),
                 func.avg(
-                    func.julianday(func.datetime("now"))
-                    - func.julianday(CRMDeal.stage_entered_at)
+                    extract('epoch', func.now() - CRMDeal.stage_entered_at) / 86400.0
                 ).label("avg_days"),
                 func.max(
-                    func.julianday(func.datetime("now"))
-                    - func.julianday(CRMDeal.stage_entered_at)
+                    extract('epoch', func.now() - CRMDeal.stage_entered_at) / 86400.0
                 ).label("max_days"),
             )
             .where(CRMDeal.status == "open")
@@ -518,8 +515,7 @@ class AnalyticsService(BaseService):
             await self.session.execute(
                 select(
                     func.avg(
-                        func.julianday(CRMDeal.actual_close_date)
-                        - func.julianday(CRMDeal.created_at)
+                        extract('epoch', CRMDeal.actual_close_date - CRMDeal.created_at) / 86400.0
                     )
                 ).where(
                     CRMDeal.status == "won",

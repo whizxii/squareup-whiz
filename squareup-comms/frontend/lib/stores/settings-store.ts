@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useAuthStore } from "@/lib/stores/auth-store";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export type UserStatus = "online" | "away" | "busy" | "dnd";
 export type FontSize = "Small" | "Medium" | "Large";
@@ -32,13 +35,38 @@ interface SettingsState {
   setNotifAgentUpdates: (v: boolean) => void;
   setNotifChannelMessages: (v: boolean) => void;
   setSoundEnabled: (v: boolean) => void;
+  /** Hydrate profile fields from backend auth profile. */
+  hydrateFromProfile: () => void;
+}
+
+/** Debounced sync to PUT /api/auth/me — avoids flooding on rapid changes. */
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+function syncToBackend(fields: Record<string, unknown>) {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    try {
+      const token = useAuthStore.getState().token;
+      if (!token) return;
+      await fetch(`${API_URL}/api/auth/me`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(fields),
+      });
+    } catch {
+      // Silent — localStorage already has the value; sync will retry on next change
+    }
+  }, 1000);
 }
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       // Profile defaults
-      displayName: "Kunj",
+      displayName: "",
       status: "online",
       statusMessage: "",
       statusEmoji: "",
@@ -54,10 +82,22 @@ export const useSettingsStore = create<SettingsState>()(
       soundEnabled: true,
 
       // Actions (immutable — always return new state)
-      setDisplayName: (displayName) => set({ displayName }),
-      setStatus: (status) => set({ status }),
-      setStatusMessage: (statusMessage) => set({ statusMessage }),
-      setStatusEmoji: (statusEmoji) => set({ statusEmoji }),
+      setDisplayName: (displayName) => {
+        set({ displayName });
+        syncToBackend({ display_name: displayName });
+      },
+      setStatus: (status) => {
+        set({ status });
+        syncToBackend({ status });
+      },
+      setStatusMessage: (statusMessage) => {
+        set({ statusMessage });
+        syncToBackend({ status_message: statusMessage });
+      },
+      setStatusEmoji: (statusEmoji) => {
+        set({ statusEmoji });
+        syncToBackend({ status_emoji: statusEmoji });
+      },
       setFontSize: (fontSize) => set({ fontSize }),
       setNotifMentions: (notifMentions) => set({ notifMentions }),
       setNotifDMs: (notifDMs) => set({ notifDMs }),
@@ -65,6 +105,17 @@ export const useSettingsStore = create<SettingsState>()(
       setNotifChannelMessages: (notifChannelMessages) =>
         set({ notifChannelMessages }),
       setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
+
+      hydrateFromProfile: () => {
+        const profile = useAuthStore.getState().profile;
+        if (!profile) return;
+        set({
+          displayName: profile.display_name || "",
+          status: (profile.status as UserStatus) || "online",
+          statusMessage: profile.status_message || "",
+          statusEmoji: profile.status_emoji || "",
+        });
+      },
     }),
     {
       name: "squareup-settings",

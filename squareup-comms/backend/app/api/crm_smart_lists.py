@@ -103,11 +103,14 @@ class ContactResponse(BaseModel):
 
     @classmethod
     def from_model(cls, c: Any) -> "ContactResponse":
+        parts = (c.name or "").split(" ", 1)
+        first_name = parts[0] if parts else None
+        last_name = parts[1] if len(parts) > 1 else None
         return cls(
             id=c.id,
             name=c.name,
-            first_name=c.first_name,
-            last_name=c.last_name,
+            first_name=first_name,
+            last_name=last_name,
             email=c.email,
             phone=c.phone,
             company=c.company,

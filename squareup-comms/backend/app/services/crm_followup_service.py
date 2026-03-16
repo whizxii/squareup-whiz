@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Callable
 
 from sqlalchemy import select
-
 from app.core.logging_config import get_logger
 from app.models.crm import CRMContact
 from app.models.crm_calendar import CRMCalendarEvent
@@ -28,7 +27,17 @@ TERMINAL_STAGES = {"closed_won", "closed_lost", "won", "lost"}
 
 
 class FollowUpService(BaseService):
-    """Automated follow-up creation and management."""
+    """Automated follow-up creation and management.
+
+    Supports two modes:
+    - **Request-scoped**: pass a real ``session`` (used by API endpoints via DI).
+    - **Event-handler mode**: pass ``session=None`` + ``session_factory`` so
+      handlers can create their own sessions per event.
+    """
+
+    def __init__(self, *args: Any, session_factory: Callable | None = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._session_factory = session_factory
 
     @property
     def calendar_repo(self) -> CalendarEventRepository:
@@ -162,12 +171,27 @@ class FollowUpService(BaseService):
             logger.debug("Skipping follow-up for terminal stage: %s", new_stage)
             return
 
-        await self.create_follow_up(
-            contact_id=contact_id,
-            deal_id=deal_id,
-            title=f"Follow up on deal stage change to {new_stage}",
-            trigger="deal_stage_change",
-        )
+        # Event handlers may run without a request-scoped session.
+        # Create a temporary session from the factory when needed.
+        if self.session is None and self._session_factory:
+            async with self._session_factory() as session:
+                self.session = session
+                try:
+                    await self.create_follow_up(
+                        contact_id=contact_id,
+                        deal_id=deal_id,
+                        title=f"Follow up on deal stage change to {new_stage}",
+                        trigger="deal_stage_change",
+                    )
+                finally:
+                    self.session = None
+        else:
+            await self.create_follow_up(
+                contact_id=contact_id,
+                deal_id=deal_id,
+                title=f"Follow up on deal stage change to {new_stage}",
+                trigger="deal_stage_change",
+            )
 
     async def _on_meeting_completed(self, payload: dict[str, Any]) -> None:
         """Create a follow-up after a meeting is completed."""
@@ -178,13 +202,27 @@ class FollowUpService(BaseService):
         if not contact_id:
             return
 
-        await self.create_follow_up(
-            contact_id=contact_id,
-            deal_id=deal_id,
-            title="Follow up after meeting",
-            trigger="meeting_completed",
-            description=f"Follow-up for completed event {event_id}",
-        )
+        if self.session is None and self._session_factory:
+            async with self._session_factory() as session:
+                self.session = session
+                try:
+                    await self.create_follow_up(
+                        contact_id=contact_id,
+                        deal_id=deal_id,
+                        title="Follow up after meeting",
+                        trigger="meeting_completed",
+                        description=f"Follow-up for completed event {event_id}",
+                    )
+                finally:
+                    self.session = None
+        else:
+            await self.create_follow_up(
+                contact_id=contact_id,
+                deal_id=deal_id,
+                title="Follow up after meeting",
+                trigger="meeting_completed",
+                description=f"Follow-up for completed event {event_id}",
+            )
 
     # ─── Snooze / Dismiss ─────────────────────────────────────────
 

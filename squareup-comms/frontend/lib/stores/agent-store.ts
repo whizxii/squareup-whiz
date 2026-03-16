@@ -104,7 +104,7 @@ interface AgentState {
 
   fetchAgents: () => Promise<void>;
   setAgents: (agents: Agent[]) => void;
-  addAgent: (agent: Agent) => void;
+  addAgent: (agent: Agent) => Promise<void>;
   updateAgent: (id: string, updates: Partial<Agent>) => void;
   removeAgent: (id: string) => void;
   setSelectedAgent: (id: string | null) => void;
@@ -184,7 +184,44 @@ export const useAgentStore = create<AgentState>((set) => ({
   },
 
   setAgents: (agents) => set({ agents }),
-  addAgent: (agent) => set((s) => ({ agents: [...s.agents, agent] })),
+  addAgent: async (agent) => {
+    // Persist to backend first, then update local state
+    try {
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = token
+        ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+        : { "X-User-Id": getCurrentUserId(), "Content-Type": "application/json" };
+
+      const res = await fetch(`${API_URL}/api/agents/`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          name: agent.name,
+          description: agent.description,
+          system_prompt: agent.system_prompt,
+          model: agent.model,
+          tools: agent.tools,
+          mcp_servers: agent.mcp_servers,
+          trigger_mode: agent.trigger_mode,
+          personality: agent.personality,
+          office_x: agent.office_x,
+          office_y: agent.office_y,
+          office_station_icon: agent.office_station_icon,
+        }),
+      });
+
+      if (res.ok) {
+        const saved: AgentResponse = await res.json();
+        set((s) => ({ agents: [...s.agents, mapAgentResponse(saved)] }));
+      } else {
+        // Fallback: add locally so UI isn't broken
+        set((s) => ({ agents: [...s.agents, agent] }));
+      }
+    } catch {
+      // Offline fallback — add locally
+      set((s) => ({ agents: [...s.agents, agent] }));
+    }
+  },
   updateAgent: (id, updates) =>
     set((s) => ({
       agents: s.agents.map((a) => (a.id === id ? { ...a, ...updates } : a)),
