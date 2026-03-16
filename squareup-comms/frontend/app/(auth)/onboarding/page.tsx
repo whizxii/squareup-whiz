@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/auth-store";
-import { fetchWithRetry } from "@/lib/fetch-with-retry";
+import { fetchWithRetry, warmUpBackend } from "@/lib/fetch-with-retry";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -42,6 +42,11 @@ export default function OnboardingPage() {
       router.replace("/office");
     }
   }, [authLoading, user, needsOnboarding, router]);
+
+  // Wake up Render backend while user fills the form
+  useEffect(() => {
+    warmUpBackend();
+  }, []);
 
   const [fullName, setFullName] = useState(user?.displayName ?? "");
   const [nickname, setNickname] = useState("");

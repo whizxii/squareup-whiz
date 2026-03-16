@@ -3,13 +3,13 @@
  *
  * When Render's service is sleeping, the first request may get a 503
  * from the proxy WITHOUT CORS headers, causing browsers to throw
- * a generic TypeError("Failed to fetch"). Retrying after a short
- * delay gives the service time to wake up.
+ * a generic TypeError("Failed to fetch"). Retrying after longer delays
+ * gives the service time to wake up (cold starts can take 30-60s).
  */
 export async function fetchWithRetry(
   input: RequestInfo | URL,
   init?: RequestInit,
-  { retries = 2, baseDelay = 2000 } = {}
+  { retries = 4, baseDelay = 3000 } = {}
 ): Promise<Response> {
   let lastError: unknown;
 
@@ -32,6 +32,21 @@ export async function fetchWithRetry(
   }
 
   throw lastError;
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+/**
+ * Wake up the Render backend by hitting the health endpoint.
+ * Call this early (e.g. on page load) so the service is warm
+ * by the time the user submits a form.
+ */
+export async function warmUpBackend(): Promise<void> {
+  try {
+    await fetch(`${API_URL}/health`, { method: "GET" });
+  } catch {
+    // Ignore — just a best-effort wake-up ping
+  }
 }
 
 function delay(ms: number): Promise<void> {

@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithGoogle } from "@/lib/firebase";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { warmUpBackend } from "@/lib/fetch-with-retry";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -14,6 +15,11 @@ export default function LoginPage() {
   const user = useAuthStore((s) => s.user);
   const authLoading = useAuthStore((s) => s.loading);
   const needsOnboarding = useAuthStore((s) => s.needsOnboarding);
+
+  // Wake up Render backend as soon as the login page loads
+  useEffect(() => {
+    warmUpBackend();
+  }, []);
 
   // Redirect based on auth state — AuthProvider determines the destination
   useEffect(() => {
