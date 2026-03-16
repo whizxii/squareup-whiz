@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   User,
@@ -15,9 +16,11 @@ import {
   Volume2,
   VolumeX,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useIntegrationStore } from "@/lib/stores/integration-store";
 
 /* ------------------------------------------------------------------ */
 /*  Toggle Switch                                                      */
@@ -142,15 +145,68 @@ function FieldRow({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Integration Card                                                   */
+/*  Google Calendar Integration Card                                   */
 /* ------------------------------------------------------------------ */
-const integrations = [
-  {
-    name: "Google Workspace",
-    description: "Gmail, Calendar, Drive sync",
-    icon: "G",
-    color: "bg-red-500/10 text-red-500",
-  },
+function GoogleCalendarCard() {
+  const connected = useIntegrationStore((s) => s.calendarConnected);
+  const email = useIntegrationStore((s) => s.calendarEmail);
+  const loading = useIntegrationStore((s) => s.calendarLoading);
+  const checkStatus = useIntegrationStore((s) => s.checkCalendarStatus);
+  const connect = useIntegrationStore((s) => s.connectCalendar);
+  const disconnect = useIntegrationStore((s) => s.disconnectCalendar);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    checkStatus();
+  }, [checkStatus]);
+
+  // Re-check status when redirected back from OAuth
+  useEffect(() => {
+    if (searchParams.get("calendar") === "connected") {
+      checkStatus();
+    }
+  }, [searchParams, checkStatus]);
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-background/50 hover:bg-accent/30 transition-colors">
+      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 bg-red-500/10 text-red-500">
+        G
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground">Google Calendar</p>
+        <p className="text-xs text-muted-foreground truncate">
+          {connected ? email ?? "Connected" : "Sync your calendar events"}
+        </p>
+      </div>
+      <div className="shrink-0">
+        {loading ? (
+          <div className="px-3 py-1.5">
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : connected ? (
+          <button
+            onClick={disconnect}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+          >
+            Disconnect
+          </button>
+        ) : (
+          <button
+            onClick={connect}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+          >
+            Connect
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Static Integration Card (Coming Soon)                              */
+/* ------------------------------------------------------------------ */
+const comingSoonIntegrations = [
   {
     name: "GitHub",
     description: "Issues, PRs, and repo activity",
@@ -485,7 +541,8 @@ export default function SettingsPage() {
               Connect your favourite tools to SquareUp Comms.
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
-              {integrations.map((integration) => (
+              <GoogleCalendarCard />
+              {comingSoonIntegrations.map((integration) => (
                 <IntegrationCard key={integration.name} {...integration} />
               ))}
             </div>

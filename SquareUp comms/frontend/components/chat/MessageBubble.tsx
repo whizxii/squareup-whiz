@@ -4,13 +4,20 @@ import { Message, useChatStore } from "@/lib/stores/chat-store";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/format";
-import { Bot, MessageSquareReply } from "lucide-react";
+import { Bot, MessageSquareReply, Pin as PinIcon, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
+import DOMPurify from "dompurify";
+import { useSwipeAction } from "@/hooks/use-swipe-action";
 
 import { MessageActions } from "./MessageActions";
 import { MessageEditForm } from "./MessageEditForm";
 import { MessageReactions } from "./MessageReactions";
+import { AgentResponseCard } from "./agents/AgentResponseCard";
+import { MessageStatus, type DeliveryStatus } from "./status/MessageStatus";
+import { LinkPreview, extractUrls } from "./embeds/LinkPreview";
+import { addBookmark, removeBookmark, isBookmarked } from "./BookmarkedMessages";
+import { ForwardDialog } from "./ForwardDialog";
 
 interface MessageBubbleProps {
   message: Message;
@@ -26,28 +33,80 @@ export function MessageBubble({
   currentUserId,
 }: MessageBubbleProps) {
   const [showActions, setShowActions] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content || "");
+  const [editContentHtml, setEditContentHtml] = useState(message.content_html || "");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showForwardDialog, setShowForwardDialog] = useState(false);
+  const [bookmarked, setBookmarked] = useState(() => isBookmarked(message.id));
+  const [swipeProgress, setSwipeProgress] = useState(0);
 
   const setActiveThread = useChatStore((s) => s.setActiveThread);
+
+  // Swipe-to-reply gesture (WhatsApp/Telegram pattern)
+  const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeAction({
+    threshold: 80,
+    direction: "right",
+    onSwipe: () => {
+      setSwipeProgress(0);
+      setActiveThread(message.id);
+    },
+    onProgress: setSwipeProgress,
+    onCancel: () => setSwipeProgress(0),
+  });
   const updateMessage = useChatStore((s) => s.updateMessage);
   const removeMessage = useChatStore((s) => s.removeMessage);
+  const activeChannel = useChatStore((s) =>
+    s.channels.find((c) => c.id === s.activeChannelId)
+  );
 
   const isAgent = message.sender_type === "agent";
+  const isPending = message.pending;
+  const isFailed = message.failed;
 
-  const timeAgo = formatDistanceToNow(new Date(message.created_at), {
-    addSuffix: true,
-  });
+  // Derive delivery status for own messages
+  const deliveryStatus: DeliveryStatus = useMemo(() => {
+    if (isFailed) return "pending";
+    if (isPending) return "pending";
+    return "sent";
+  }, [isPending, isFailed]);
+
+  // Extract URLs for link previews
+  const messageUrls = useMemo(
+    () => extractUrls(message.content || ""),
+    [message.content]
+  );
+
+  const timeAgo = useMemo(
+    () =>
+      formatDistanceToNow(new Date(message.created_at), { addSuffix: true }),
+    [message.created_at]
+  );
+
+  // Sanitize HTML content for rendering
+  const sanitizedHtml = useMemo(() => {
+    if (!message.content_html) return null;
+    return DOMPurify.sanitize(message.content_html, {
+      ALLOWED_TAGS: [
+        "p", "br", "strong", "em", "u", "s", "del",
+        "code", "pre", "blockquote",
+        "ul", "ol", "li",
+        "a", "span",
+      ],
+      ALLOWED_ATTR: ["href", "target", "rel", "class", "data-mention-type", "data-type", "data-id"],
+    });
+  }, [message.content_html]);
 
   const handleEdit = useCallback(async () => {
     if (!editContent.trim() || actionLoading) return;
     setActionLoading(true);
     try {
-      await api.editMessage(message.id, editContent.trim());
+      await api.editMessage(message.id, editContent.trim(), editContentHtml || undefined);
       updateMessage(message.channel_id, message.id, {
         content: editContent.trim(),
+        content_html: editContentHtml || undefined,
         edited: true,
         updated_at: new Date().toISOString(),
       });
@@ -57,7 +116,7 @@ export function MessageBubble({
     } finally {
       setActionLoading(false);
     }
-  }, [editContent, actionLoading, message.id, message.channel_id, updateMessage]);
+  }, [editContent, editContentHtml, actionLoading, message.id, message.channel_id, updateMessage]);
 
   const handleDelete = useCallback(async () => {
     if (actionLoading) return;
@@ -82,16 +141,16 @@ export function MessageBubble({
       // Optimistic update
       const updatedReactions = existing
         ? (message.reactions || []).filter(
-            (r) => !(r.emoji === emoji && r.user_id === currentUserId)
-          )
+          (r) => !(r.emoji === emoji && r.user_id === currentUserId)
+        )
         : [
-            ...(message.reactions || []),
-            {
-              emoji,
-              user_id: currentUserId,
-              created_at: new Date().toISOString(),
-            },
-          ];
+          ...(message.reactions || []),
+          {
+            emoji,
+            user_id: currentUserId,
+            created_at: new Date().toISOString(),
+          },
+        ];
 
       updateMessage(message.channel_id, message.id, {
         reactions: updatedReactions,
@@ -114,15 +173,84 @@ export function MessageBubble({
     [message, currentUserId, updateMessage]
   );
 
+  const handlePin = useCallback(() => {
+    updateMessage(message.channel_id, message.id, {
+      pinned: !message.pinned,
+    });
+    // TODO: Call api.pinMessage when backend endpoint is ready
+  }, [message.channel_id, message.id, message.pinned, updateMessage]);
+
+  const handleBookmark = useCallback(() => {
+    if (bookmarked) {
+      removeBookmark(message.id);
+      setBookmarked(false);
+    } else {
+      addBookmark({
+        id: message.id,
+        channelId: message.channel_id,
+        channelName: activeChannel?.name || "channel",
+        senderId: message.sender_id,
+        senderName: message.sender_name || message.sender_id,
+        content: message.content || "",
+        createdAt: message.created_at,
+        bookmarkedAt: new Date().toISOString(),
+      });
+      setBookmarked(true);
+    }
+  }, [bookmarked, message, activeChannel?.name]);
+
+  const handleForward = useCallback(
+    (targetChannelId: string) => {
+      // TODO: Call api.forwardMessage when backend endpoint is ready
+      console.log(`Forward message ${message.id} to channel ${targetChannelId}`);
+      setShowForwardDialog(false);
+    },
+    [message.id]
+  );
+
+  // Accessible label for screen readers: "Sender said: content, time ago"
+  const ariaLabel = useMemo(() => {
+    const sender = message.sender_name || message.sender_id;
+    const content = message.content || "attachment";
+    const status = isFailed ? ", failed to send" : isPending ? ", sending" : "";
+    const edited = message.edited ? ", edited" : "";
+    const pinned = message.pinned ? ", pinned" : "";
+    return `${sender} said: ${content}, ${timeAgo}${edited}${pinned}${status}`;
+  }, [message.sender_name, message.sender_id, message.content, message.edited, message.pinned, timeAgo, isPending, isFailed]);
+
   return (
-    <div
+    <article
       className={cn(
         "group relative flex gap-3 px-4 py-1.5 hover:bg-accent/30 transition-colors duration-100",
-        isAgent && "bg-sq-agent/[0.03]"
+        isAgent && "bg-sq-agent/[0.03]",
+        isPending && "opacity-60",
+        isFailed && "bg-destructive/[0.03]",
+        swipeProgress > 0 && "will-change-transform"
       )}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
+      style={swipeProgress > 0 ? { transform: `translateX(${swipeProgress * 60}px)` } : undefined}
+      onMouseEnter={() => {
+        hoverTimerRef.current = setTimeout(() => setShowActions(true), 50);
+      }}
+      onMouseLeave={() => {
+        clearTimeout(hoverTimerRef.current);
+        setShowActions(false);
+      }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      aria-label={ariaLabel}
     >
+      {/* Swipe-to-reply indicator */}
+      {swipeProgress > 0 && (
+        <div
+          className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary transition-opacity"
+          style={{ opacity: Math.min(swipeProgress * 1.5, 1) }}
+          aria-hidden="true"
+        >
+          <MessageSquareReply className="w-4 h-4" />
+        </div>
+      )}
+
       {/* Avatar */}
       {showAvatar ? (
         <div
@@ -163,6 +291,18 @@ export function MessageBubble({
             {message.edited && (
               <span className="text-[10px] text-muted-foreground">(edited)</span>
             )}
+            {message.pinned && (
+              <PinIcon className="w-3 h-3 text-primary/60" />
+            )}
+            {isOwn && (
+              <MessageStatus status={deliveryStatus} className="ml-0.5" />
+            )}
+            {isFailed && (
+              <span className="flex items-center gap-1 text-[10px] text-destructive">
+                <AlertCircle className="w-3 h-3" />
+                Failed
+              </span>
+            )}
           </div>
         )}
 
@@ -170,18 +310,36 @@ export function MessageBubble({
         {isEditing ? (
           <MessageEditForm
             content={editContent}
+            contentHtml={editContentHtml}
             onChange={setEditContent}
+            onChangeHtml={setEditContentHtml}
             onSave={handleEdit}
             onCancel={() => {
               setIsEditing(false);
               setEditContent(message.content || "");
+              setEditContentHtml(message.content_html || "");
             }}
             loading={actionLoading}
+          />
+        ) : sanitizedHtml ? (
+          <div
+            className="text-sm text-foreground/90 leading-relaxed prose prose-sm max-w-none
+              prose-p:my-0.5 prose-pre:my-1.5 prose-pre:rounded-lg prose-pre:bg-muted/80
+              prose-code:rounded prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[13px] prose-code:font-mono
+              prose-blockquote:border-l-2 prose-blockquote:border-primary/30 prose-blockquote:pl-3 prose-blockquote:italic prose-blockquote:text-muted-foreground
+              prose-a:text-primary prose-a:underline prose-a:underline-offset-2
+              prose-ul:my-0.5 prose-ol:my-0.5 prose-li:my-0"
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
           />
         ) : (
           <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
             {message.content}
           </p>
+        )}
+
+        {/* Agent tool calls card */}
+        {isAgent && message.tool_calls && message.tool_calls.length > 0 && (
+          <AgentResponseCard toolCalls={message.tool_calls} />
         )}
 
         {/* Attachments */}
@@ -204,6 +362,15 @@ export function MessageBubble({
           </div>
         )}
 
+        {/* Link previews */}
+        {messageUrls.length > 0 && (
+          <div className="space-y-1">
+            {messageUrls.map((url) => (
+              <LinkPreview key={url} url={url} />
+            ))}
+          </div>
+        )}
+
         {/* Reactions */}
         <MessageReactions
           reactions={message.reactions || []}
@@ -213,7 +380,7 @@ export function MessageBubble({
 
         {/* Delete confirmation */}
         {showDeleteConfirm && (
-          <div className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-destructive/5 border border-destructive/20">
+          <div className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-destructive/5 border border-destructive/20" role="alert">
             <span className="text-xs text-destructive">Delete this message?</span>
             <button
               onClick={handleDelete}
@@ -235,7 +402,8 @@ export function MessageBubble({
         {message.reply_count > 0 && (
           <button
             onClick={() => setActiveThread(message.id)}
-            className="flex items-center gap-1.5 mt-1.5 text-xs text-primary hover:underline"
+            className="sq-tap flex items-center gap-1.5 mt-1.5 text-xs text-primary hover:underline transition-all"
+            aria-label={`${message.reply_count} ${message.reply_count === 1 ? "reply" : "replies"}, open thread`}
           >
             <MessageSquareReply className="w-3.5 h-3.5" />
             {message.reply_count}{" "}
@@ -245,18 +413,32 @@ export function MessageBubble({
       </div>
 
       {/* Hover actions */}
-      {showActions && !isEditing && (
+      {showActions && !isEditing && !isPending && (
         <MessageActions
           isOwn={isOwn}
+          isPinned={message.pinned}
+          isBookmarked={bookmarked}
           onReact={handleReaction}
           onReply={() => setActiveThread(message.id)}
           onEdit={() => {
             setIsEditing(true);
             setEditContent(message.content || "");
+            setEditContentHtml(message.content_html || "");
           }}
           onDelete={() => setShowDeleteConfirm(true)}
+          onPin={handlePin}
+          onBookmark={handleBookmark}
+          onForward={() => setShowForwardDialog(true)}
         />
       )}
-    </div>
+
+      {/* Forward dialog */}
+      <ForwardDialog
+        open={showForwardDialog}
+        messageContent={message.content || ""}
+        onClose={() => setShowForwardDialog(false)}
+        onForward={handleForward}
+      />
+    </article>
   );
 }

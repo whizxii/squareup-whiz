@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { api } from "@/lib/api";
@@ -8,12 +8,21 @@ import { ChannelList } from "@/components/chat/ChannelList";
 import { MessageList } from "@/components/chat/MessageList";
 import { MessageComposer } from "@/components/chat/MessageComposer";
 import { CreateChannelDialog } from "@/components/chat/CreateChannelDialog";
-import { Hash, Menu, X, WifiOff } from "lucide-react";
-
-// Hardcoded user ID until auth is wired up
-const CURRENT_USER_ID = "dev-user-001";
+import { Hash, Menu, X, WifiOff, Search, Pin, Bookmark } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { AgentPresenceIndicator } from "@/components/chat/agents/AgentPresenceIndicator";
+import { ThreadPanel } from "@/components/chat/thread/ThreadPanel";
+import { CommandPalette } from "@/components/chat/command/CommandPalette";
+import { SearchPanel } from "@/components/chat/search/SearchPanel";
+import { PinnedMessages } from "@/components/chat/PinnedMessages";
+import { BookmarkedMessages } from "@/components/chat/BookmarkedMessages";
+import { MessageEffects, type EffectType } from "@/components/chat/effects/MessageEffects";
+import { useKeyboardShortcuts, type ShortcutAction } from "@/hooks/use-keyboard-shortcuts";
+import { KeyboardShortcutsDialog } from "@/components/chat/KeyboardShortcutsDialog";
+import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 
 export default function ChatPage() {
+  const currentUserId = useCurrentUserId();
   const channels = useChatStore((s) => s.channels);
   const activeChannelId = useChatStore((s) => s.activeChannelId);
   const setChannels = useChatStore((s) => s.setChannels);
@@ -24,18 +33,112 @@ export default function ChatPage() {
   const removeMessage = useChatStore((s) => s.removeMessage);
   const setTyping = useChatStore((s) => s.setTyping);
   const clearTyping = useChatStore((s) => s.clearTyping);
+  const activeThreadId = useChatStore((s) => s.activeThreadId);
+  const setActiveThread = useChatStore((s) => s.setActiveThread);
 
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [pinnedOpen, setPinnedOpen] = useState(false);
+  const [bookmarksOpen, setBookmarksOpen] = useState(false);
+  const [activeEffect, setActiveEffect] = useState<EffectType | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
 
   const activeChannel = channels.find((c) => c.id === activeChannelId);
 
+  // ─── Keyboard shortcuts (Linear-quality) ───────────────────────────
+  const shortcuts = useMemo<ShortcutAction[]>(
+    () => [
+      {
+        key: "k",
+        meta: true,
+        description: "Open command palette",
+        category: "General",
+        action: () => setCommandPaletteOpen((v) => !v),
+      },
+      {
+        key: "/",
+        meta: true,
+        description: "Show keyboard shortcuts",
+        category: "General",
+        action: () => setShortcutsOpen((v) => !v),
+      },
+      {
+        key: "Escape",
+        description: "Close panel / dialog",
+        category: "General",
+        action: () => {
+          if (shortcutsOpen) { setShortcutsOpen(false); return; }
+          if (commandPaletteOpen) { setCommandPaletteOpen(false); return; }
+          if (searchOpen) { setSearchOpen(false); return; }
+          if (pinnedOpen) { setPinnedOpen(false); return; }
+          if (bookmarksOpen) { setBookmarksOpen(false); return; }
+          if (activeThreadId) { setActiveThread(null); return; }
+          if (mobileSidebarOpen) { setMobileSidebarOpen(false); return; }
+        },
+      },
+      {
+        key: "m",
+        meta: true,
+        shift: true,
+        description: "Toggle sidebar",
+        category: "Navigation",
+        action: () => setMobileSidebarOpen((v) => !v),
+      },
+      {
+        key: "f",
+        meta: true,
+        shift: true,
+        description: "Search messages",
+        category: "Navigation",
+        action: () => setSearchOpen((v) => !v),
+      },
+      {
+        key: "t",
+        meta: true,
+        shift: true,
+        description: "Toggle thread panel",
+        category: "Navigation",
+        action: () => {
+          if (activeThreadId) {
+            setActiveThread(null);
+          }
+        },
+      },
+      {
+        key: "g c",
+        description: "Go to chat",
+        category: "Navigation",
+        action: () => {
+          // Focus the first channel if none selected
+          const state = useChatStore.getState();
+          if (state.channels.length > 0 && !state.activeChannelId) {
+            state.setActiveChannel(state.channels[0].id);
+          }
+        },
+      },
+    ],
+    [
+      shortcutsOpen,
+      commandPaletteOpen,
+      searchOpen,
+      pinnedOpen,
+      bookmarksOpen,
+      activeThreadId,
+      mobileSidebarOpen,
+      setActiveThread,
+    ]
+  );
+
+  useKeyboardShortcuts(shortcuts);
+
   // ─── WebSocket connection ──────────────────────────────────────────
   // The hook builds the URL from NEXT_PUBLIC_WS_URL and appends ?token=<value>.
   // We pass the user ID as the token so the backend can identify us.
-  const { status: wsStatus, send: wsSend, on: wsOn } = useWebSocket(CURRENT_USER_ID);
+  const { status: wsStatus, send: wsSend, on: wsOn } = useWebSocket(currentUserId);
 
   // Expose wsStatus for the disconnection banner
   const isWsConnected = wsStatus === "connected";
@@ -50,7 +153,7 @@ export default function ChatPage() {
 
       // Don't duplicate messages we sent ourselves (already added optimistically via REST)
       const senderId = msg.sender_id as string;
-      if (senderId === CURRENT_USER_ID) return;
+      if (senderId === currentUserId) return;
 
       addMessage(channelId, {
         id: (msg.id ?? msg.message_id) as string,
@@ -79,7 +182,7 @@ export default function ChatPage() {
       if (!channelId || !userId) return;
 
       // Ignore our own typing echoes
-      if (userId === CURRENT_USER_ID) return;
+      if (userId === currentUserId) return;
 
       if (data.is_typing) {
         setTyping(channelId, {
@@ -176,7 +279,7 @@ export default function ChatPage() {
         wsSend({
           type: "chat.typing",
           channel_id: activeChannelId,
-          user_id: CURRENT_USER_ID,
+          user_id: currentUserId,
           is_typing: true,
         });
       }
@@ -191,7 +294,7 @@ export default function ChatPage() {
           wsSend({
             type: "chat.typing",
             channel_id: activeChannelId,
-            user_id: CURRENT_USER_ID,
+            user_id: currentUserId,
             is_typing: false,
           });
         }, 2000);
@@ -201,7 +304,7 @@ export default function ChatPage() {
         wsSend({
           type: "chat.typing",
           channel_id: activeChannelId,
-          user_id: CURRENT_USER_ID,
+          user_id: currentUserId,
           is_typing: false,
         });
       }
@@ -217,13 +320,39 @@ export default function ChatPage() {
         wsSend({
           type: "chat.typing",
           channel_id: activeChannelId,
-          user_id: CURRENT_USER_ID,
+          user_id: currentUserId,
           is_typing: false,
         });
         isTypingRef.current = false;
       }
     };
   }, [activeChannelId, wsSend]);
+
+  // ─── Message effect trigger ──────────────────────────────────────
+  // Subscribe to message changes and play effects for new messages
+  const prevMessageCountRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    const unsubscribe = useChatStore.subscribe((state) => {
+      const channelId = state.activeChannelId;
+      if (!channelId) return;
+
+      const messages = state.messages[channelId] || [];
+      const prevCount = prevMessageCountRef.current[channelId] ?? 0;
+
+      if (messages.length > prevCount && prevCount > 0) {
+        const newest = messages[messages.length - 1];
+        if (newest?.effect_type) {
+          setActiveEffect(newest.effect_type);
+        }
+      }
+
+      prevMessageCountRef.current = {
+        ...prevMessageCountRef.current,
+        [channelId]: messages.length,
+      };
+    });
+    return unsubscribe;
+  }, []);
 
   // ─── Stale typing indicator cleanup ────────────────────────────────
   // Clear remote typing indicators that are older than 5 seconds
@@ -294,7 +423,7 @@ export default function ChatPage() {
           reactions: [],
           attachments: [],
           mentions: [],
-          sender_name: m.sender_id === CURRENT_USER_ID ? "You" : m.sender_id,
+          sender_name: m.sender_id === currentUserId ? "You" : m.sender_id,
         }));
         setMessages(activeChannelId, messages);
       } catch {
@@ -391,6 +520,35 @@ export default function ChatPage() {
               {loading ? "Loading..." : "Select a channel"}
             </span>
           )}
+          {/* Agent presence: show active agents in this channel */}
+          <div className="ml-auto flex items-center gap-2">
+            <AgentPresenceIndicator activeOnly className="gap-1.5" />
+            {activeChannel && (
+              <>
+                <button
+                  onClick={() => setPinnedOpen((v) => !v)}
+                  className="p-1.5 rounded-md hover:bg-accent transition-colors"
+                  aria-label="Pinned messages"
+                >
+                  <Pin className="w-4 h-4 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => setBookmarksOpen((v) => !v)}
+                  className="p-1.5 rounded-md hover:bg-accent transition-colors"
+                  aria-label="Bookmarked messages"
+                >
+                  <Bookmark className="w-4 h-4 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  className="p-1.5 rounded-md hover:bg-accent transition-colors"
+                  aria-label="Search messages"
+                >
+                  <Search className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Messages */}
@@ -400,10 +558,59 @@ export default function ChatPage() {
         <MessageComposer onTypingChange={handleTypingChange} />
       </div>
 
+      {/* Thread panel */}
+      <AnimatePresence>
+        {activeThreadId && (
+          <ThreadPanel
+            parentMessageId={activeThreadId}
+            onClose={() => setActiveThread(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Search panel */}
+      <AnimatePresence>
+        {searchOpen && (
+          <SearchPanel onClose={() => setSearchOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Pinned messages panel */}
+      <AnimatePresence>
+        {pinnedOpen && (
+          <PinnedMessages onClose={() => setPinnedOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Bookmarked messages panel */}
+      <AnimatePresence>
+        {bookmarksOpen && (
+          <BookmarkedMessages onClose={() => setBookmarksOpen(false)} />
+        )}
+      </AnimatePresence>
+
       {/* Create channel dialog */}
       <CreateChannelDialog
         open={showCreateChannel}
         onClose={() => setShowCreateChannel(false)}
+      />
+
+      {/* Command palette (Cmd+K) */}
+      <CommandPalette
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+      />
+
+      {/* Keyboard shortcuts dialog (Cmd+/) */}
+      <KeyboardShortcutsDialog
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
+
+      {/* Message effects overlay */}
+      <MessageEffects
+        effect={activeEffect}
+        onComplete={() => setActiveEffect(null)}
       />
     </div>
   );

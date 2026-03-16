@@ -1,6 +1,7 @@
 from app.websocket.manager import hub_manager
 from app.core.db import async_session
 from app.models.chat import Message, ChannelMember
+from app.models.users import UserProfile
 from sqlmodel import select
 import uuid
 import logging
@@ -131,8 +132,8 @@ async def handle_chat_read(user_id: str, data: dict):
             ChannelMember.channel_id == channel_id,
             ChannelMember.user_id == user_id,
         )
-        result = await session.exec(stmt)
-        member = result.first()
+        result = await session.execute(stmt)
+        member = result.scalars().first()
         if member:
             member.last_read_message_id = message_id
             member.last_read_at = datetime.now(timezone.utc)
@@ -141,9 +142,18 @@ async def handle_chat_read(user_id: str, data: dict):
 
 
 async def handle_office_move(user_id: str, data: dict):
-    """Handle avatar movement."""
+    """Handle avatar movement — persist position and broadcast."""
     x = data.get("x", 0)
     y = data.get("y", 0)
+
+    async with async_session() as session:
+        profile = await session.get(UserProfile, user_id)
+        if profile is not None:
+            profile.office_x = x
+            profile.office_y = y
+            session.add(profile)
+            await session.commit()
+
     await hub_manager.broadcast_all(
         {"type": "office.user_moved", "user_id": user_id, "x": x, "y": y},
         exclude=user_id,
@@ -151,9 +161,18 @@ async def handle_office_move(user_id: str, data: dict):
 
 
 async def handle_office_status(user_id: str, data: dict):
-    """Handle status update."""
+    """Handle status update — persist status and broadcast."""
     status = data.get("status", "online")
     status_message = data.get("status_message")
+
+    async with async_session() as session:
+        profile = await session.get(UserProfile, user_id)
+        if profile is not None:
+            profile.status = status
+            profile.status_message = status_message
+            session.add(profile)
+            await session.commit()
+
     await hub_manager.broadcast_all(
         {
             "type": "office.user_status",

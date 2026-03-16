@@ -26,13 +26,17 @@ export interface Message {
   reply_count: number;
   mentions?: Mention[];
   agent_execution_id?: string;
+  tool_calls?: import("./agent-store").ToolCall[];
   edited: boolean;
   pinned: boolean;
   created_at: string;
   updated_at?: string;
   reactions?: Reaction[];
-  // Frontend-only: display name for sender
+  effect_type?: "confetti" | "balloons" | "fireworks" | "sparkles";
+  // Frontend-only fields
   sender_name?: string;
+  pending?: boolean;
+  failed?: boolean;
 }
 
 export interface Attachment {
@@ -86,17 +90,22 @@ interface ChatState {
   activeThreadId: string | null;
   setActiveThread: (messageId: string | null) => void;
 
+  // Unread tracking
+  lastReadMessageId: Record<string, string>; // channelId -> messageId
+  setLastRead: (channelId: string, messageId: string) => void;
+
   // UI
   contextPanelOpen: boolean;
   setContextPanelOpen: (open: boolean) => void;
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>((set) => ({
   channels: [],
   activeChannelId: null,
   messages: {},
   typingUsers: {},
   activeThreadId: null,
+  lastReadMessageId: {},
   contextPanelOpen: false,
 
   setChannels: (channels) => set({ channels }),
@@ -167,5 +176,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     })),
 
   setActiveThread: (messageId) => set({ activeThreadId: messageId }),
+  setLastRead: (channelId, messageId) =>
+    set((s) => ({
+      lastReadMessageId: { ...s.lastReadMessageId, [channelId]: messageId },
+    })),
   setContextPanelOpen: (open) => set({ contextPanelOpen: open }),
 }));

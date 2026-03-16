@@ -3,9 +3,9 @@
 import {
   useAgentStore,
   AgentChatMessage,
-  getSimulatedResponse,
 } from "@/lib/stores/agent-store";
 import { cn } from "@/lib/utils";
+import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { formatTime } from "@/lib/format";
 import {
   Bot,
@@ -89,53 +89,39 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
 
     updateAgent(agent.id, { status: "thinking", current_task: text });
 
-    // Try real API first, fall back to simulated response
+    // Call the real backend API
     try {
       const res = await fetch(`${API_URL}/api/agents/${agent.id}/invoke`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-User-Id": "dev-user-001",
+          "X-User-Id": getCurrentUserId(),
         },
         body: JSON.stringify({ message: text }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        updateChatMessage(agent.id, agentMsgId, {
-          content: data.response_text || "Done!",
-          toolCalls: data.tools_called || [],
-          status: "done",
-        });
-        updateAgent(agent.id, { status: "idle", current_task: undefined });
-        setSending(false);
-        return;
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(errBody.detail || `API Error: ${res.status}`);
       }
-    } catch {
-      // API not available — use simulated response
+
+      const data = await res.json();
+      updateChatMessage(agent.id, agentMsgId, {
+        content: data.response_text || "Done!",
+        toolCalls: data.tools_called || [],
+        status: "done",
+      });
+      updateAgent(agent.id, { status: "idle", current_task: undefined });
+      setSending(false);
+    } catch (err) {
+      updateChatMessage(agent.id, agentMsgId, {
+        content: "Failed to reach the agent. Make sure the backend is running.",
+        status: "error",
+      });
+      updateAgent(agent.id, { status: "idle", current_task: undefined });
+      setSending(false);
+      return;
     }
-
-    // Simulated response with realistic delay
-    updateAgent(agent.id, { status: "working" });
-
-    // Simulate tool execution steps with a delay
-    await new Promise((r) => setTimeout(r, 800 + Math.random() * 700));
-
-    const simulated = getSimulatedResponse(agent.id, text);
-
-    updateChatMessage(agent.id, agentMsgId, {
-      content: simulated.content,
-      toolCalls: simulated.toolCalls,
-      status: "done",
-    });
-
-    updateAgent(agent.id, {
-      status: "idle",
-      current_task: undefined,
-      total_executions: agent.total_executions + 1,
-    });
-
-    setSending(false);
   };
 
   const handleClearChat = () => {

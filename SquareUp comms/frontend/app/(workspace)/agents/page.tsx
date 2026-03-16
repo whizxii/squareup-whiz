@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useAgentStore, Agent, AgentStatus } from "@/lib/stores/agent-store";
+import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { AgentCard } from "@/components/agents/AgentCard";
 import { AgentChat } from "@/components/agents/AgentChat";
 import {
@@ -378,7 +379,7 @@ function CreateAgentDialog({
       total_executions: 0,
       total_cost_usd: 0,
       success_rate: 100,
-      created_by: "dev-user-001",
+      created_by: getCurrentUserId(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

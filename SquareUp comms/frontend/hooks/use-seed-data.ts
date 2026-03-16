@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SEED_KEY = "squareup-comms-seeded";
@@ -17,7 +18,7 @@ export function useSeedData() {
       try {
         const headers = {
           "Content-Type": "application/json",
-          "X-User-Id": "dev-user-001",
+          "X-User-Id": getCurrentUserId(),
         };
 
         // Check if channels exist

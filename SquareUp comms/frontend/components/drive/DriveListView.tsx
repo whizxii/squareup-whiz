@@ -47,8 +47,8 @@ export function DriveListView({
                 key={file.id}
                 onClick={() => onSelect(isSelected ? null : file.id)}
                 className={cn(
-                  "border-b border-border cursor-pointer transition-colors",
-                  isSelected ? "bg-primary/5" : "hover:bg-accent/30"
+                  "border-b border-border cursor-pointer transition-all duration-150 sq-tap sq-focus-ring group",
+                  isSelected ? "bg-primary/5 border-primary/20" : "hover:bg-accent/30 hover:border-primary/20"
                 )}
                 role="row"
                 aria-selected={isSelected}

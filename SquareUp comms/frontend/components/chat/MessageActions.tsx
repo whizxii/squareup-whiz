@@ -1,11 +1,15 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import {
   SmilePlus,
   MessageSquareReply,
   Pencil,
   Trash2,
+  Pin,
+  Bookmark,
+  Forward,
 } from "lucide-react";
 
 const QUICK_REACTIONS = [
@@ -19,18 +23,28 @@ const QUICK_REACTIONS = [
 
 interface MessageActionsProps {
   isOwn: boolean;
+  isPinned?: boolean;
+  isBookmarked?: boolean;
   onReact: (emoji: string) => void;
   onReply: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onPin?: () => void;
+  onBookmark?: () => void;
+  onForward?: () => void;
 }
 
 export function MessageActions({
   isOwn,
+  isPinned,
+  isBookmarked,
   onReact,
   onReply,
   onEdit,
   onDelete,
+  onPin,
+  onBookmark,
+  onForward,
 }: MessageActionsProps) {
   const [showQuickReact, setShowQuickReact] = useState(false);
   const quickReactRef = useRef<HTMLDivElement>(null);
@@ -88,6 +102,27 @@ export function MessageActions({
         tooltip="Reply in thread"
         onClick={onReply}
       />
+      {onPin && (
+        <ActionButton
+          icon={<Pin className={cn("w-3.5 h-3.5", isPinned && "text-primary")} />}
+          tooltip={isPinned ? "Unpin" : "Pin"}
+          onClick={onPin}
+        />
+      )}
+      {onBookmark && (
+        <ActionButton
+          icon={<Bookmark className={cn("w-3.5 h-3.5", isBookmarked && "fill-primary text-primary")} />}
+          tooltip={isBookmarked ? "Remove bookmark" : "Bookmark"}
+          onClick={onBookmark}
+        />
+      )}
+      {onForward && (
+        <ActionButton
+          icon={<Forward className="w-3.5 h-3.5" />}
+          tooltip="Forward"
+          onClick={onForward}
+        />
+      )}
       {isOwn && (
         <>
           <ActionButton

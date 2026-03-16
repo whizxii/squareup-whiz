@@ -1,11 +1,17 @@
 "use client";
 
 import { useChatStore, Message, TypingUser } from "@/lib/stores/chat-store";
+import { useAgentStore } from "@/lib/stores/agent-store";
 import { MessageBubble } from "./MessageBubble";
-import { useEffect, useRef } from "react";
-import { MessageSquare, Sparkles } from "lucide-react";
-
-const CURRENT_USER_ID = "dev-user-001"; // TODO: from auth context
+import { AgentThinkingIndicator } from "./agents/AgentThinkingIndicator";
+import { ConversationSummary } from "./ConversationSummary";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { MessageSquare, Sparkles, ArrowDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { usePrefersReducedMotion } from "@/hooks/use-keyboard-shortcuts";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 
 // Stable references to avoid infinite re-render loops with React 19 + Zustand
 const EMPTY_MESSAGES: Message[] = [];
@@ -14,6 +20,48 @@ const EMPTY_TYPING: TypingUser[] = [];
 interface MessageListProps {
   loading?: boolean;
 }
+
+/** Format a date into a human-readable day label */
+function formatDateLabel(date: Date): string {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffMs = today.getTime() - msgDay.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) {
+    return date.toLocaleDateString("en-US", { weekday: "long" });
+  }
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: now.getFullYear() !== date.getFullYear() ? "numeric" : undefined,
+  });
+}
+
+/** Check if two dates are on different calendar days */
+function isDifferentDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() !== b.getFullYear() ||
+    a.getMonth() !== b.getMonth() ||
+    a.getDate() !== b.getDate()
+  );
+}
+
+/** Row types for the flattened virtual list */
+type VirtualRow =
+  | { type: "date-separator"; label: string; key: string }
+  | { type: "unread-divider"; key: string }
+  | { type: "message"; message: Message; showAvatar: boolean; isRecent: boolean; key: string };
+
+/** Estimated heights for initial layout before measurement */
+const ROW_HEIGHT_ESTIMATES: Record<VirtualRow["type"], number> = {
+  "date-separator": 44,
+  "unread-divider": 32,
+  message: 52,
+};
 
 export function MessageList({ loading = false }: MessageListProps) {
   const activeChannelId = useChatStore((s) => s.activeChannelId);
@@ -24,14 +72,117 @@ export function MessageList({ loading = false }: MessageListProps) {
     (s) =>
       (activeChannelId ? s.typingUsers[activeChannelId] : null) ?? EMPTY_TYPING
   );
+  const lastReadMessageId = useChatStore(
+    (s) => (activeChannelId ? s.lastReadMessageId[activeChannelId] : null) ?? null
+  );
+
+  // Agents currently thinking/working (for thinking indicator bubbles)
+  // Select stable reference, then filter in useMemo to avoid React 19 infinite loop
+  const allAgents = useAgentStore((s) => s.agents);
+  const thinkingAgents = useMemo(
+    () => allAgents.filter((a) => a.status === "thinking" || a.status === "working"),
+    [allAgents]
+  );
+
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [isScrolledUp, setIsScrolledUp] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const isNearBottomRef = useRef(true);
 
-  // Auto-scroll to bottom on new messages
+  // Build the unread marker index (first message after lastReadMessageId)
+  const unreadMarkerIndex = useMemo(() => {
+    if (!lastReadMessageId) return -1;
+    const readIdx = messages.findIndex((m) => m.id === lastReadMessageId);
+    if (readIdx === -1 || readIdx >= messages.length - 1) return -1;
+    return readIdx + 1;
+  }, [messages, lastReadMessageId]);
+
+  // Flatten messages + separators into a single row list for virtualization
+  const rows = useMemo((): VirtualRow[] => {
+    const result: VirtualRow[] = [];
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const prev = i > 0 ? messages[i - 1] : null;
+      const msgDate = new Date(msg.created_at);
+      const prevDate = prev ? new Date(prev.created_at) : null;
+
+      const showDateSeparator = !prevDate || isDifferentDay(prevDate, msgDate);
+
+      if (showDateSeparator) {
+        result.push({
+          type: "date-separator",
+          label: formatDateLabel(msgDate),
+          key: `date-${msg.id}`,
+        });
+      }
+
+      if (i === unreadMarkerIndex) {
+        result.push({ type: "unread-divider", key: `unread-${msg.id}` });
+      }
+
+      const showAvatar =
+        !prev ||
+        prev.sender_id !== msg.sender_id ||
+        msgDate.getTime() - new Date(prev.created_at).getTime() > 5 * 60 * 1000 ||
+        showDateSeparator;
+
+      result.push({
+        type: "message",
+        message: msg,
+        showAvatar,
+        isRecent: i >= messages.length - 3,
+        key: msg.id,
+      });
+    }
+    return result;
+  }, [messages, unreadMarkerIndex]);
+
+  // Virtual list for efficient rendering of 10k+ messages
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: (index) => ROW_HEIGHT_ESTIMATES[rows[index].type],
+    overscan: 10,
+  });
+
+  // Track scroll position to show/hide jump-to-bottom
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const nearBottom = distanceFromBottom < 100;
+    isNearBottomRef.current = nearBottom;
+    setIsScrolledUp(!nearBottom);
+    if (nearBottom) {
+      setUnreadCount(0);
+    }
+  }, []);
+
+  // Auto-scroll to bottom on new messages (only if already near bottom)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+    if (isNearBottomRef.current) {
+      virtualizer.scrollToIndex(rows.length - 1, { align: "end", behavior: "smooth" });
+    } else {
+      setUnreadCount((prev) => prev + 1);
+    }
+  }, [messages.length, rows.length, virtualizer]);
+
+  // Scroll to bottom on channel switch
+  useEffect(() => {
+    if (rows.length > 0) {
+      virtualizer.scrollToIndex(rows.length - 1, { align: "end", behavior: "auto" });
+    }
+    setIsScrolledUp(false);
+    setUnreadCount(0);
+  }, [activeChannelId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const jumpToBottom = useCallback(() => {
+    virtualizer.scrollToIndex(rows.length - 1, { align: "end", behavior: "smooth" });
+    setIsScrolledUp(false);
+    setUnreadCount(0);
+  }, [virtualizer, rows.length]);
 
   if (!activeChannelId) {
     return (
@@ -56,11 +207,28 @@ export function MessageList({ loading = false }: MessageListProps) {
   }
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin">
-      <div className="py-4">
+    <div className="relative flex-1">
+      <AnimatePresence mode="wait">
+      <motion.div
+        key={activeChannelId}
+        ref={scrollRef}
+        className="h-full overflow-y-auto scrollbar-thin"
+        onScroll={handleScroll}
+        role="log"
+        aria-label="Message history"
+        aria-live="polite"
+        aria-relevant="additions"
+        initial={prefersReducedMotion ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={prefersReducedMotion ? undefined : { opacity: 0 }}
+        transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.15, ease: "easeInOut" }}
+      >
+        {/* AI conversation summary */}
+        <ConversationSummary />
+
         {/* Skeleton loading */}
         {loading ? (
-          <div className="space-y-4 px-4">
+          <div className="space-y-4 px-4 py-4">
             {Array.from({ length: 5 }).map((_, i) => (
               <MessageSkeleton key={i} short={i % 3 === 2} />
             ))}
@@ -84,49 +252,173 @@ export function MessageList({ loading = false }: MessageListProps) {
             </div>
           </div>
         ) : (
-          /* Messages */
-          messages.map((msg, i) => {
-            const prev = i > 0 ? messages[i - 1] : null;
-            const showAvatar =
-              !prev ||
-              prev.sender_id !== msg.sender_id ||
-              new Date(msg.created_at).getTime() -
-                new Date(prev.created_at).getTime() >
-                5 * 60 * 1000;
-
-            // Only animate the last few messages (new arrivals), not the entire history
-            const isRecent = i >= messages.length - 3;
-
-            return (
-              <div key={msg.id} className={isRecent ? "animate-message-enter" : undefined}>
-                <MessageBubble
-                  message={msg}
-                  isOwn={msg.sender_id === CURRENT_USER_ID}
-                  showAvatar={showAvatar}
-                  currentUserId={CURRENT_USER_ID}
-                />
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Typing indicator */}
-      {typingUsers.length > 0 && (
-        <div className="px-4 py-2 animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border/50">
-            <TypingDots />
-            <span className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground/70">
-                {typingUsers.map((u) => u.display_name).join(", ")}
-              </span>
-              {" "}{typingUsers.length === 1 ? "is" : "are"} typing
-            </span>
+          /* Virtualized message list */
+          <div
+            style={{ height: virtualizer.getTotalSize(), width: "100%", position: "relative" }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              return (
+                <div
+                  key={row.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <VirtualRowRenderer
+                    row={row}
+                    prefersReducedMotion={prefersReducedMotion}
+                  />
+                </div>
+              );
+            })}
           </div>
-        </div>
-      )}
+        )}
 
-      <div ref={bottomRef} />
+        {/* Agent thinking indicators */}
+        <div aria-live="polite" aria-atomic="false">
+        <AnimatePresence>
+          {thinkingAgents.map((agent) => (
+            <motion.div
+              key={agent.id}
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 5, height: 0 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 25 }}
+              className="overflow-hidden"
+            >
+              <AgentThinkingIndicator
+                agentName={agent.name}
+                agentIcon={agent.office_station_icon}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        </div>
+
+        {/* Typing indicator */}
+        <div aria-live="polite" aria-atomic="true">
+        <AnimatePresence>
+          {typingUsers.length > 0 && (
+            <motion.div
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 5, height: 0 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 25 }}
+              className="px-4 py-2 overflow-hidden"
+            >
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border/50">
+                <TypingDots />
+                <span className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground/70">
+                    {typingUsers.map((u) => u.display_name).join(", ")}
+                  </span>
+                  {" "}{typingUsers.length === 1 ? "is" : "are"} typing
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        </div>
+      </motion.div>
+      </AnimatePresence>
+
+      {/* Jump to bottom button */}
+      {isScrolledUp && (
+        <button
+          onClick={jumpToBottom}
+          className={cn(
+            "absolute bottom-4 left-1/2 -translate-x-1/2 z-30",
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-full",
+            "bg-card border border-border shadow-lg",
+            "text-xs font-medium text-foreground/80",
+            "hover:bg-accent hover:shadow-xl transition-all duration-200",
+            "animate-fade-in-up"
+          )}
+          aria-label={unreadCount > 0 ? `${unreadCount} new messages — jump to bottom` : "Jump to bottom"}
+        >
+          <ArrowDown className="w-3.5 h-3.5" />
+          {unreadCount > 0 ? (
+            <span className="flex items-center gap-1">
+              <span className="px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold min-w-[18px] text-center">
+                {unreadCount}
+              </span>
+              new
+            </span>
+          ) : (
+            "Jump to latest"
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Renders a single virtual row — date separator, unread divider, or message */
+function VirtualRowRenderer({
+  row,
+  prefersReducedMotion,
+}: {
+  row: VirtualRow;
+  prefersReducedMotion: boolean;
+}) {
+  const currentUserId = useCurrentUserId();
+
+  if (row.type === "date-separator") {
+    return <DateSeparator label={row.label} />;
+  }
+  if (row.type === "unread-divider") {
+    return <UnreadDivider />;
+  }
+  return (
+    <motion.div
+      layout={!prefersReducedMotion}
+      initial={row.isRecent && !prefersReducedMotion ? { opacity: 0, y: 15, scale: 0.98 } : false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={prefersReducedMotion
+        ? { duration: 0 }
+        : { type: "spring", stiffness: 400, damping: 30, mass: 0.8 }
+      }
+      className="origin-bottom"
+    >
+      <MessageBubble
+        message={row.message}
+        isOwn={row.message.sender_id === currentUserId}
+        showAvatar={row.showAvatar}
+        currentUserId={currentUserId}
+      />
+    </motion.div>
+  );
+}
+
+/** Date separator line with centered label */
+function DateSeparator({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3" role="separator" aria-label={label}>
+      <div className="flex-1 h-px bg-border" />
+      <span className="text-[11px] font-medium text-muted-foreground select-none">
+        {label}
+      </span>
+      <div className="flex-1 h-px bg-border" />
+    </div>
+  );
+}
+
+/** Unread messages divider */
+function UnreadDivider() {
+  return (
+    <div className="flex items-center gap-3 px-4 py-2" role="separator" aria-label="New messages">
+      <div className="flex-1 h-px bg-destructive/40" />
+      <span className="text-[11px] font-semibold text-destructive select-none">
+        New messages
+      </span>
+      <div className="flex-1 h-px bg-destructive/40" />
     </div>
   );
 }

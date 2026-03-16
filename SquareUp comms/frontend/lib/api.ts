@@ -1,12 +1,22 @@
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 class ApiClient {
   private baseUrl: string;
-  private userId: string;
 
   constructor() {
     this.baseUrl = API_URL;
-    this.userId = "dev-user-001"; // TODO: Replace with Firebase auth
+  }
+
+  private getAuthHeaders(): Record<string, string> {
+    const token = useAuthStore.getState().token;
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+    // Dev mode fallback — backend accepts X-User-Id when ENABLE_DEV_AUTH=true
+    return { "X-User-Id": getCurrentUserId() };
   }
 
   private async request<T>(
@@ -17,7 +27,7 @@ class ApiClient {
       ...options,
       headers: {
         "Content-Type": "application/json",
-        "X-User-Id": this.userId,
+        ...this.getAuthHeaders(),
         ...options.headers,
       },
     });

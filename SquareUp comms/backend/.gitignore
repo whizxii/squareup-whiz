@@ -1,0 +1,17 @@
+# Secrets (belt-and-suspenders)
+.env
+firebase-credentials.json
+
+# Database
+dev.db
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/

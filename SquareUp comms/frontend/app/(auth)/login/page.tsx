@@ -1,17 +1,43 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { signInWithGoogle } from "@/lib/firebase";
+import { useAuthStore } from "@/lib/stores/auth-store";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  const user = useAuthStore((s) => s.user);
+  const authLoading = useAuthStore((s) => s.loading);
+  const needsOnboarding = useAuthStore((s) => s.needsOnboarding);
+
+  // Redirect based on auth state — AuthProvider determines the destination
+  useEffect(() => {
+    if (authLoading || !user) return;
+    if (needsOnboarding) {
+      router.replace("/onboarding");
+    } else {
+      router.replace("/office");
+    }
+  }, [authLoading, user, needsOnboarding, router]);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
-    // TODO: Firebase Google sign-in
-    // const provider = new GoogleAuthProvider();
-    // await signInWithPopup(auth, provider);
-    setTimeout(() => setLoading(false), 2000);
+    setError(null);
+    try {
+      await signInWithGoogle();
+      // AuthProvider will detect the auth state change and update the store.
+      // The useEffect above will handle the redirect once verification completes.
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Sign-in failed. Please try again.";
+      setError(message);
+      setLoading(false);
+    }
   };
 
   return (
@@ -63,6 +89,9 @@ export default function LoginPage() {
             {loading ? "Signing in..." : "Continue with Google"}
           </button>
 
+          {error && (
+            <p className="text-xs text-center text-red-500">{error}</p>
+          )}
           <p className="text-xs text-center text-muted-foreground/60">
             Only available for the SquareUp team
           </p>

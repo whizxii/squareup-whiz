@@ -7,29 +7,16 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.core.auth import get_current_user
 from app.core.db import get_session
 from app.models.chat import Message, Reaction
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
-
-
-# ---------------------------------------------------------------------------
-# Dev auth dependency
-# ---------------------------------------------------------------------------
-
-async def get_current_user_id(
-    x_user_id: Optional[str] = Header(default="dev-user-001"),
-) -> str:
-    """Extract user ID from the X-User-Id header.
-
-    Falls back to 'dev-user-001' during development.
-    """
-    return x_user_id or "dev-user-001"
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +168,7 @@ async def _get_message_or_404(
 async def send_message(
     body: MessageCreate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> MessageResponse:
     """Send a new message to a channel (or as a thread reply)."""
 
@@ -218,7 +205,7 @@ async def list_messages(
     ),
     limit: int = Query(default=50, ge=1, le=100, description="Max messages to return"),
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> MessageListResponse:
     """Get messages for a channel with cursor-based pagination.
 
@@ -268,7 +255,7 @@ async def get_thread_replies(
     before_id: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> MessageListResponse:
     """Get thread replies for a parent message."""
 
@@ -307,7 +294,7 @@ async def get_thread_replies(
 async def get_message(
     message_id: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> MessageResponse:
     """Get a single message by ID."""
 
@@ -329,7 +316,7 @@ async def edit_message(
     message_id: str,
     body: MessageUpdate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> MessageResponse:
     """Edit a message's content. Only the sender may edit."""
 
@@ -369,7 +356,7 @@ async def edit_message(
 async def delete_message(
     message_id: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> None:
     """Delete a message. Only the sender may delete."""
 
@@ -408,7 +395,7 @@ async def add_reaction(
     message_id: str,
     body: ReactionCreate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> Reaction:
     """Add an emoji reaction to a message."""
 
@@ -448,7 +435,7 @@ async def remove_reaction(
     message_id: str,
     emoji: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> None:
     """Remove your emoji reaction from a message."""
 

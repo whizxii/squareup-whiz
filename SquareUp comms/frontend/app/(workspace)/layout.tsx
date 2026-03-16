@@ -11,11 +11,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { CommandPalette, openCommandPalette } from "@/components/CommandPalette";
 import { ToastContainer } from "@/components/ToastContainer";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
 import { useSettingsStore } from "@/lib/stores/settings-store";
+import { AuthGuard } from "@/components/AuthGuard";
+import { CallOverlay } from "@/components/calls/CallOverlay";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useSeedData } from "@/hooks/use-seed-data";
 
 const navItems = [
@@ -37,7 +41,8 @@ export default function WorkspaceLayout({
   useSeedData();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <AuthGuard>
+      <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar — desktop */}
       <aside className="hidden md:flex w-16 lg:w-56 flex-col border-r border-border bg-card shrink-0">
         {/* Logo */}
@@ -51,7 +56,7 @@ export default function WorkspaceLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-3 px-2 space-y-1">
+        <nav className="flex-1 py-3 px-2 space-y-1" onMouseLeave={() => { }}>
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
             return (
@@ -59,14 +64,27 @@ export default function WorkspaceLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150",
+                  "relative flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors z-10",
                   isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <item.icon className="w-5 h-5 shrink-0" />
-                <span className="hidden lg:block">{item.label}</span>
+                {/* Framer motion sliding active indicator */}
+                {isActive && (
+                  <motion.div
+                    layoutId="sidebar-active-indicator"
+                    className="absolute inset-0 rounded-lg bg-primary/10 z-0"
+                    initial={false}
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 30,
+                    }}
+                  />
+                )}
+                <item.icon className="w-5 h-5 shrink-0 relative z-10" />
+                <span className="hidden lg:block relative z-10">{item.label}</span>
               </Link>
             );
           })}
@@ -97,12 +115,12 @@ export default function WorkspaceLayout({
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* TopBar */}
-        <header className="h-14 flex items-center justify-between px-4 border-b border-border bg-card shrink-0">
+        <header className="h-14 flex items-center justify-between px-4 border-b border-border bg-card/80 backdrop-blur-md shrink-0 sticky top-0 z-20">
           <div className="flex items-center gap-2 flex-1 max-w-md">
-            <button onClick={openCommandPalette} className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg border border-border bg-background text-muted-foreground text-sm hover:border-primary/30 transition-colors">
+            <button onClick={openCommandPalette} className="sq-tap sq-focus-ring flex items-center gap-2 w-full px-3 py-1.5 rounded-lg border border-border bg-background/50 text-muted-foreground text-sm hover:border-primary/30 hover:bg-background transition-colors">
               <Search className="w-4 h-4" />
               <span>Search or Cmd+K</span>
-              <kbd className="ml-auto hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-border bg-muted text-[10px] font-mono">
+              <kbd className="ml-auto hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-border bg-muted/50 text-[10px] font-mono">
                 ⌘K
               </kbd>
             </button>
@@ -117,7 +135,7 @@ export default function WorkspaceLayout({
 
         {/* Page content */}
         <main className="flex-1 overflow-auto">
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>
 
@@ -146,6 +164,10 @@ export default function WorkspaceLayout({
 
       {/* Toast Notifications */}
       <ToastContainer />
-    </div>
+
+      {/* Call Overlay — floating controls during active call */}
+      <CallOverlay />
+      </div>
+    </AuthGuard>
   );
 }

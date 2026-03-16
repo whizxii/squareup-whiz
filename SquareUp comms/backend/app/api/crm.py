@@ -6,11 +6,12 @@ import json
 from datetime import datetime, timezone
 from typing import Optional, List, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, func, col
 
+from app.core.auth import get_current_user
 from app.core.db import get_session
 from app.models.crm import CRMContact, CRMActivity
 
@@ -28,6 +29,16 @@ VALID_ACTIVITY_TYPES = {
     "deal_update",
     "agent_action",
     "follow_up",
+    "recording",
+    "enrichment",
+    "score_update",
+    "calendar_event",
+    "email_sent",
+    "email_received",
+    "email_opened",
+    "form_submitted",
+    "page_visited",
+    "workflow_triggered",
 }
 
 PIPELINE_STAGES = [
@@ -40,20 +51,6 @@ PIPELINE_STAGES = [
     "lost",
     "churned",
 ]
-
-# ---------------------------------------------------------------------------
-# Dev auth dependency
-# ---------------------------------------------------------------------------
-
-
-async def get_current_user_id(
-    x_user_id: Optional[str] = Header(default="dev-user-001"),
-) -> str:
-    """Extract user ID from the X-User-Id header.
-
-    Falls back to 'dev-user-001' during development.
-    """
-    return x_user_id or "dev-user-001"
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +278,7 @@ async def _get_contact_or_404(
 async def create_contact(
     body: ContactCreate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> ContactResponse:
     """Create a new CRM contact."""
     now = datetime.now(timezone.utc)
@@ -322,7 +319,7 @@ async def list_contacts(
     limit: int = Query(default=50, ge=1, le=200, description="Max contacts to return"),
     offset: int = Query(default=0, ge=0, description="Offset for pagination"),
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> ContactListResponse:
     """List CRM contacts with filtering, search, sorting, and pagination."""
 
@@ -382,7 +379,7 @@ async def list_contacts(
 async def get_contact(
     contact_id: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> ContactResponse:
     """Get a single CRM contact by ID."""
     contact = await _get_contact_or_404(session, contact_id)
@@ -394,7 +391,7 @@ async def update_contact(
     contact_id: str,
     body: ContactUpdate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> ContactResponse:
     """Update fields on an existing CRM contact."""
     contact = await _get_contact_or_404(session, contact_id)
@@ -425,7 +422,7 @@ async def update_contact(
 async def delete_contact(
     contact_id: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> None:
     """Delete a CRM contact and all associated activities."""
     contact = await _get_contact_or_404(session, contact_id)
@@ -455,7 +452,7 @@ async def list_contact_activities(
     limit: int = Query(default=50, ge=1, le=200, description="Max activities to return"),
     offset: int = Query(default=0, ge=0, description="Offset for pagination"),
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> ActivityListResponse:
     """Get the activities timeline for a contact (newest first, with pagination)."""
     # Ensure contact exists
@@ -498,7 +495,7 @@ async def create_activity(
     contact_id: str,
     body: ActivityCreate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> ActivityResponse:
     """Log an activity against a contact."""
     # Ensure contact exists
@@ -544,7 +541,7 @@ async def create_activity(
 @router.get("/pipeline", response_model=PipelineResponse)
 async def get_pipeline(
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> PipelineResponse:
     """Get contacts grouped by pipeline stage with counts."""
     stages: List[PipelineStage] = []
@@ -577,7 +574,7 @@ async def update_contact_stage(
     contact_id: str,
     body: StageUpdate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> ContactResponse:
     """Move a contact to a new pipeline stage.
 

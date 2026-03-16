@@ -9,6 +9,7 @@ class UserProfile(SQLModel, table=True):
 
     firebase_uid: str = Field(primary_key=True, max_length=128)
     display_name: str = Field(max_length=100)
+    nickname: Optional[str] = Field(default=None, max_length=50)
     email: Optional[str] = Field(default=None, max_length=200)
     avatar_url: Optional[str] = None
     avatar_config: Optional[str] = Field(default="{}")  # JSON string

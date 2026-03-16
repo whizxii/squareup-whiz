@@ -49,9 +49,9 @@
   --radius-pill: 999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 20px 40px -10px rgba(0,0,0,0.08);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 20px 40px -10px rgba(0, 0, 0, 0.08);
   --shadow-agent-glow: 0 0 40px -10px rgba(74, 144, 217, 0.4);
   --shadow-brand-glow: 0 0 40px -10px rgba(255, 107, 0, 0.4);
 
@@ -60,26 +60,56 @@
   --animate-fade-in-up: fade-in-up 200ms ease-out;
   --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
   --animate-shimmer: shimmer 2s linear infinite;
+
+  /* World-Class UX Easing Curves (Linear/Superhuman style) */
+  --ease-squish: cubic-bezier(0.14, 0.9, 0.2, 1);
+  --ease-fluid: cubic-bezier(0.3, 0, 0, 1);
 }
 
 @keyframes slide-in-right {
-  0% { transform: translateX(100%); opacity: 0; }
-  100% { transform: translateX(0); opacity: 1; }
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 @keyframes fade-in-up {
-  0% { transform: translateY(10px); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
+  0% {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 @keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 /* CSS variables for light/dark theming */
@@ -133,9 +163,16 @@ body {
   color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Smooth theme transitions */
+  transition: background-color 0.4s var(--ease-fluid), color 0.4s var(--ease-fluid);
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-sq-display), "Space Grotesk", sans-serif;
 }
 
@@ -144,16 +181,48 @@ h1, h2, h3, h4, h5, h6 {
   background-image: linear-gradient(135deg, #FF9F43 0%, #FF6B00 50%, #FF3800 100%);
 }
 
+/* Tactile Physics (The "Button Feel") */
+/* Apply to all interactive elements to give weight and speed */
+.sq-tap {
+  transition-property: transform, opacity, background-color, border-color, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: var(--ease-squish);
+}
+
+.sq-tap:active {
+  transform: scale(0.97);
+  transition-duration: 50ms;
+  /* Instant mechanical feedback */
+}
+
+/* Organic Hover (Breathe effect) */
+.sq-hover-breathe {
+  transition: all 250ms var(--ease-fluid);
+}
+
+.sq-hover-breathe:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Premium Focus Ring (Only shows on keyboard nav, perfectly rounded) */
+.sq-focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-shadow;
+}
+
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: rgba(161, 161, 170, 0.3) transparent;
 }
+
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
 }
+
 .scrollbar-thin::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background-color: rgba(161, 161, 170, 0.3);
   border-radius: 3px;
@@ -165,6 +234,7 @@ h1, h2, h3, h4, h5, h6 {
   background-color: hsl(var(--muted));
   border-radius: var(--radius-md);
 }
+
 .skeleton::after {
   content: "";
   position: absolute;
@@ -178,20 +248,96 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Subtle message entrance */
 @keyframes message-enter {
-  0% { opacity: 0; transform: translateY(6px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 .animate-message-enter {
   animation: message-enter 180ms ease-out both;
 }
 
 /* Smooth typing dots */
 @keyframes typing-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30% { transform: translateY(-4px); opacity: 1; }
+
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
+
 .animate-typing-dot {
   animation: typing-bounce 1.4s ease-in-out infinite;
+}
+
+/* WhatsApp-style checkmark draw-on effect */
+@keyframes check-draw {
+  0% {
+    stroke-dashoffset: 20;
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.animate-check-draw {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  animation: check-draw 400ms ease-out forwards;
+}
+
+/* Unread badge scale pulse (triggers on count change via re-mount) */
+@keyframes badge-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-badge-pulse {
+  animation: badge-pulse 300ms var(--ease-squish) forwards;
+}
+
+/* Reaction pill pop on toggle */
+@keyframes reaction-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-reaction-pop {
+  animation: reaction-pop 250ms var(--ease-squish);
 }
 
 /* ---- Virtual Office animations ---- */
@@ -200,25 +346,171 @@ h1, h2, h3, h4, h5, h6 {
 .office-pulse-me {
   animation: office-pulse-me 2s ease-in-out infinite;
 }
+
 @keyframes office-pulse-me {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.45); }
-  50%      { box-shadow: 0 0 14px 4px rgba(255, 107, 0, 0.3); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.45);
+  }
+
+  50% {
+    box-shadow: 0 0 14px 4px rgba(255, 107, 0, 0.3);
+  }
 }
 
 /* Agent blue glow when working/thinking */
 .office-agent-glow {
   animation: office-agent-glow 2.4s ease-in-out infinite;
 }
+
 @keyframes office-agent-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 144, 217, 0.35); }
-  50%      { box-shadow: 0 0 16px 4px rgba(74, 144, 217, 0.45); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 144, 217, 0.35);
+  }
+
+  50% {
+    box-shadow: 0 0 16px 4px rgba(74, 144, 217, 0.45);
+  }
 }
 
 /* Mini-map pulsing dot for current user */
 .office-minimap-pulse {
   animation: office-minimap-pulse 1.6s ease-in-out infinite;
 }
+
 @keyframes office-minimap-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.6); transform: scale(1); }
-  50%      { box-shadow: 0 0 6px 2px rgba(255, 107, 0, 0.35); transform: scale(1.3); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.6);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: 0 0 6px 2px rgba(255, 107, 0, 0.35);
+    transform: scale(1.3);
+  }
+}
+
+/* Character idle breathing/bob */
+@keyframes office-idle-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+/* 4-frame walk cycle sprite stepping */
+@keyframes office-walk-cycle {
+  from { background-position-x: 0; }
+  to { background-position-x: -192px; }
+}
+
+/* Floating ambient dust particles */
+@keyframes office-dust-float {
+  0% { transform: translate(0, 0) scale(0.5); opacity: 0; }
+  20% { opacity: 0.25; }
+  80% { opacity: 0.15; }
+  100% { transform: translate(var(--drift-x, 30px), var(--drift-y, -40px)) scale(1); opacity: 0; }
+}
+
+/* Gentle plant sway */
+@keyframes office-plant-sway {
+  0%, 100% { transform: rotate(-1deg) translateY(0); }
+  50% { transform: rotate(1deg) translateY(-1px); }
+}
+
+/* Proximity awareness pulse */
+.office-proximity-pulse {
+  animation: office-proximity-pulse 2s ease-in-out infinite;
+}
+
+@keyframes office-proximity-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.12; }
+  50% { transform: scale(1.05); opacity: 0.25; }
+}
+
+/* Agent typing animation */
+@keyframes office-agent-typing {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-1px); }
+  75% { transform: translateY(1px); }
+}
+
+/* Coffee steam wisps */
+@keyframes office-steam {
+  0% { transform: translateY(0) scale(1); opacity: 0.4; }
+  100% { transform: translateY(-12px) scale(1.5); opacity: 0; }
+}
+
+/* Celebration confetti burst */
+@keyframes office-celebrate {
+  0% { transform: scale(0) rotate(0); opacity: 1; }
+  50% { transform: scale(1.2) rotate(180deg); opacity: 0.8; }
+  100% { transform: scale(0.8) rotate(360deg); opacity: 0; }
+}
+
+/* Glass panel entrance */
+@keyframes office-glass-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); backdrop-filter: blur(0); }
+  to { opacity: 1; transform: translateY(0) scale(1); backdrop-filter: blur(24px); }
+}
+
+/* ── @mention chips in Tiptap editor + rendered messages ── */
+.mention {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.875em;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.mention[data-mention-type="user"] {
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+}
+
+.mention[data-mention-type="agent"] {
+  background: var(--color-sq-agent, #4a90d9) / 0.12;
+  background: color-mix(in srgb, var(--color-sq-agent, #4a90d9) 12%, transparent);
+  color: var(--color-sq-agent, #4a90d9);
+}
+
+.mention:hover {
+  filter: brightness(0.92);
+}
+
+/* ── Mobile responsive ── */
+@media (max-width: 640px) {
+  /* Ensure touch targets are at least 44x44px (WCAG 2.5.5) */
+  .sq-tap,
+  button,
+  [role="button"],
+  a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Compact message actions on mobile */
+  .sq-tap.text-xs {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

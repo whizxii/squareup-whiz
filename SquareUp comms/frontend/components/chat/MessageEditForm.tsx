@@ -1,11 +1,14 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useCallback } from "react";
 import { Check, X, Loader2 } from "lucide-react";
+import { TiptapEditor, type TiptapEditorHandle } from "./editor/TiptapEditor";
 
 interface MessageEditFormProps {
   content: string;
+  contentHtml?: string;
   onChange: (content: string) => void;
+  onChangeHtml?: (html: string) => void;
   onSave: () => void;
   onCancel: () => void;
   loading: boolean;
@@ -13,44 +16,44 @@ interface MessageEditFormProps {
 
 export function MessageEditForm({
   content,
+  contentHtml,
   onChange,
+  onChangeHtml,
   onSave,
   onCancel,
   loading,
 }: MessageEditFormProps) {
-  const editRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<TiptapEditorHandle>(null);
 
-  // Focus and place cursor at end when mounted
-  useEffect(() => {
-    if (editRef.current) {
-      editRef.current.focus();
-      editRef.current.selectionStart = editRef.current.value.length;
-    }
-  }, []);
+  const handleUpdate = useCallback(
+    (html: string, text: string) => {
+      onChange(text);
+      onChangeHtml?.(html);
+    },
+    [onChange, onChangeHtml]
+  );
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      onSave();
-    }
-    if (e.key === "Escape") {
-      onCancel();
-    }
-  };
+  const handleSubmit = useCallback(() => {
+    if (loading) return;
+    const text = editorRef.current?.getText()?.trim();
+    if (!text) return;
+    onSave();
+  }, [loading, onSave]);
 
   return (
     <div className="space-y-2">
-      <textarea
-        ref={editRef}
-        value={content}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        className="w-full resize-none rounded-lg border border-primary/30 bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 scrollbar-thin"
-        rows={Math.min(content.split("\n").length + 1, 6)}
-      />
+      <div className="rounded-lg border border-primary/30 bg-background overflow-hidden focus-within:ring-2 focus-within:ring-ring/20">
+        <TiptapEditor
+          ref={editorRef}
+          initialContent={contentHtml || content}
+          onUpdate={handleUpdate}
+          onSubmit={handleSubmit}
+          compact
+        />
+      </div>
       <div className="flex items-center gap-2">
         <button
-          onClick={onSave}
+          onClick={handleSubmit}
           disabled={loading || !content.trim()}
           className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-40 transition-colors"
         >

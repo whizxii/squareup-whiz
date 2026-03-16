@@ -2,26 +2,20 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlmodel import SQLModel
 from app.core.config import settings
 
-# Use SQLite for dev if no PostgreSQL is configured
 db_url = settings.DATABASE_URL
-if "postgresql" in db_url:
-    try:
-        import asyncpg  # noqa: F401
-        engine_kwargs = {
-            "pool_size": 5,
-            "max_overflow": 10,
-            "pool_pre_ping": True,
-        }
-    except Exception:
-        # Fallback to SQLite if asyncpg connection fails
-        db_url = "sqlite+aiosqlite:///./dev.db"
-        engine_kwargs = {}
-else:
-    engine_kwargs = {}
+engine_kwargs = {}
 
-# If env var overrides to sqlite
-if "sqlite" in db_url:
-    engine_kwargs = {}
+if "postgresql" in db_url:
+    engine_kwargs = {
+        "pool_size": 5,
+        "max_overflow": 10,
+        "pool_pre_ping": True,
+    }
+    if "asyncpg" in db_url:
+        engine_kwargs["connect_args"] = {
+            "prepared_statement_cache_size": 0,
+            "statement_cache_size": 0,
+        }
 
 engine = create_async_engine(
     db_url,

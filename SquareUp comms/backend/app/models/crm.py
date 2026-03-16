@@ -12,22 +12,30 @@ class CRMContact(SQLModel, table=True):
     email: Optional[str] = Field(default=None, max_length=200)
     phone: Optional[str] = Field(default=None, max_length=50)
     company: Optional[str] = Field(default=None, max_length=200)
+    company_id: Optional[str] = Field(default=None, foreign_key="crm_companies.id", index=True)
     title: Optional[str] = Field(default=None, max_length=200)
     avatar_url: Optional[str] = None
-    stage: str = Field(default="lead", max_length=50)
+    stage: str = Field(default="lead", max_length=50, index=True)
     stage_changed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    lifecycle_stage: str = Field(default="lead", max_length=30)  # subscriber/lead/mql/sql/opportunity/customer/evangelist
     value: Optional[float] = None
     currency: str = Field(default="INR", max_length=3)
     source: Optional[str] = Field(default=None, max_length=100)
     tags: Optional[str] = Field(default="[]")  # JSON
     custom_fields: Optional[str] = Field(default="{}")  # JSON
     notes: Optional[str] = None
+    owner_id: Optional[str] = Field(default=None, max_length=128, index=True)
     last_contacted_at: Optional[datetime] = None
+    last_activity_at: Optional[datetime] = None
+    activity_count: int = Field(default=0)
     next_follow_up_at: Optional[datetime] = None
     follow_up_note: Optional[str] = None
+    lead_score: Optional[int] = Field(default=None, index=True)  # 0-100, denormalized
+    relationship_strength: Optional[int] = None  # 1-10, denormalized
+    is_archived: bool = Field(default=False)
     created_by: Optional[str] = Field(default=None, max_length=128)
     created_by_type: str = Field(default="user", max_length=10)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

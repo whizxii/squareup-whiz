@@ -139,7 +139,10 @@ function ChannelSection({
               {channel.name}
             </span>
             {(channel.unread_count ?? 0) > 0 && (
-              <span className="ml-auto flex-shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+              <span
+                key={channel.unread_count}
+                className="ml-auto flex-shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold animate-badge-pulse"
+              >
                 {channel.unread_count}
               </span>
             )}

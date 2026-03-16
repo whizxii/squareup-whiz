@@ -1,0 +1,44 @@
+# Environment & secrets
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# Firebase service account
+firebase-credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Database
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage & testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Docker
+docker-compose.override.yml
+
+# Node
+node_modules/
+.next/
+.npm-cache/

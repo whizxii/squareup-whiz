@@ -4,33 +4,22 @@ from __future__ import annotations
 
 import json
 import time
-import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.core.auth import get_current_user
+from app.core.config import settings
 from app.core.db import get_session
 from app.models.agents import Agent, AgentExecution
+from app.services.llm_service import llm_service
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
-
-
-# ---------------------------------------------------------------------------
-# Dev auth dependency
-# ---------------------------------------------------------------------------
-
-async def get_current_user_id(
-    x_user_id: Optional[str] = Header(default="dev-user-001"),
-) -> str:
-    """Extract user ID from the X-User-Id header.
-
-    Falls back to 'dev-user-001' during development.
-    """
-    return x_user_id or "dev-user-001"
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +150,7 @@ async def _get_active_agent(
 async def create_agent(
     body: AgentCreate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> Agent:
     """Create a new AI agent."""
 
@@ -188,7 +177,7 @@ async def create_agent(
 @router.get("/", response_model=List[AgentResponse])
 async def list_agents(
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> list[Agent]:
     """List all active agents with their stats."""
 
@@ -205,7 +194,7 @@ async def list_agents(
 async def get_agent(
     agent_id: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> Agent:
     """Get details for a single agent."""
 
@@ -217,7 +206,7 @@ async def update_agent(
     agent_id: str,
     body: AgentUpdate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> Agent:
     """Update agent fields. Only provided (non-None) fields are changed."""
 
@@ -246,7 +235,7 @@ async def update_agent(
 async def deactivate_agent(
     agent_id: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> dict:
     """Deactivate an agent (soft-delete). Sets active=false."""
 
@@ -266,7 +255,7 @@ async def update_agent_status(
     agent_id: str,
     body: AgentStatusUpdate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> Agent:
     """Update agent status and current_task."""
 
@@ -298,15 +287,25 @@ async def invoke_agent(
     agent_id: str,
     body: InvokeRequest,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> AgentExecution:
     """Invoke an agent with a message.
 
-    Currently returns a mock response. Real Claude Agent SDK integration
-    will replace this logic later.
+    Sends the user message to the configured LLM (Groq) with the agent's
+    system_prompt and records the execution in the database.
     """
 
     agent = await _get_active_agent(agent_id, session)
+
+    # ── Guard: LLM must be configured ──────────────────────────────
+    if not llm_service.available:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "AI agents require a GROQ_API_KEY. "
+                "Get one free at https://console.groq.com"
+            ),
+        )
 
     start_time = time.monotonic()
 
@@ -316,14 +315,40 @@ async def invoke_agent(
     session.add(agent)
     await session.flush()
 
-    # 2. Generate mock response
-    mock_response = (
-        f"I received your message: '{body.message}'. "
-        f"Agent SDK integration coming soon."
-    )
-    mock_input_tokens = len(body.message.split()) * 2
-    mock_output_tokens = len(mock_response.split()) * 2
-    mock_cost = (mock_input_tokens * 0.000003) + (mock_output_tokens * 0.000015)
+    # 2. Build messages and call the LLM
+    messages: list[dict] = [
+        {"role": "system", "content": agent.system_prompt},
+        {"role": "user", "content": body.message},
+    ]
+
+    exec_status = "success"
+    error_message: str | None = None
+    error_type: str | None = None
+    response_text = ""
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_cost: float | None = None
+
+    try:
+        response = await llm_service.client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            messages=messages,
+            max_tokens=1024,
+            temperature=0.7,
+        )
+        response_text = response.choices[0].message.content or ""
+        input_tokens = getattr(response.usage, "prompt_tokens", None)
+        output_tokens = getattr(response.usage, "completion_tokens", None)
+
+        # Rough cost estimate for Groq (adjust rates as needed)
+        if input_tokens is not None and output_tokens is not None:
+            total_cost = (input_tokens * 0.000003) + (output_tokens * 0.000015)
+
+    except Exception as exc:
+        exec_status = "error"
+        error_type = type(exc).__name__
+        error_message = str(exc)[:500]
+        response_text = "Sorry, I encountered an error processing your request."
 
     elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
@@ -331,25 +356,46 @@ async def invoke_agent(
     execution = AgentExecution(
         agent_id=agent.id,
         conversation_messages=json.dumps([
+            {"role": "system", "content": agent.system_prompt},
             {"role": "user", "content": body.message},
-            {"role": "assistant", "content": mock_response},
+            {"role": "assistant", "content": response_text},
         ]),
         tools_called=json.dumps([]),
-        response_text=mock_response,
-        input_tokens=mock_input_tokens,
-        output_tokens=mock_output_tokens,
-        total_cost_usd=mock_cost,
+        response_text=response_text,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_cost_usd=total_cost,
         duration_ms=elapsed_ms,
         num_tool_calls=0,
-        status="success",
+        status=exec_status,
+        error_message=error_message,
+        error_type=error_type,
     )
     session.add(execution)
 
     # 4. Update agent stats
     agent.total_executions += 1
-    agent.total_cost_usd += mock_cost
-    # Recalculate success_rate (all mocks succeed)
-    agent.success_rate = 100.0
+    if total_cost is not None:
+        agent.total_cost_usd += total_cost
+
+    # Recalculate success_rate
+    if agent.total_executions > 0:
+        success_count_stmt = (
+            select(func.count())
+            .select_from(AgentExecution)
+            .where(
+                AgentExecution.agent_id == agent.id,
+                AgentExecution.status == "success",
+            )
+        )
+        # Include the current execution (not yet committed) in the count
+        pending_success = 1 if exec_status == "success" else 0
+        result = await session.execute(success_count_stmt)
+        prior_successes = result.scalar_one()
+        agent.success_rate = round(
+            ((prior_successes + pending_success) / (agent.total_executions)) * 100,
+            2,
+        )
 
     # 5. Set agent status back to "idle"
     agent.status = "idle"
@@ -368,7 +414,7 @@ async def list_executions(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> dict:
     """List execution history for an agent, newest first, with pagination."""
 
@@ -376,8 +422,6 @@ async def list_executions(
     await _get_active_agent(agent_id, session)
 
     # Get total count
-    from sqlalchemy import func
-
     count_stmt = (
         select(func.count())
         .select_from(AgentExecution)
@@ -409,7 +453,7 @@ async def list_executions(
 async def get_execution(
     execution_id: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> AgentExecution:
     """Get details for a single execution."""
 
@@ -495,7 +539,7 @@ PREBUILT_AGENTS = [
 @router.post("/seed", response_model=List[AgentResponse])
 async def seed_prebuilt_agents(
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> list[Agent]:
     """Create the 4 pre-built agents if they don't already exist."""
 

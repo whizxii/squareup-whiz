@@ -26,10 +26,10 @@ export function DriveGridView({
             key={file.id}
             onClick={() => onSelect(isSelected ? null : file.id)}
             className={cn(
-              "group flex flex-col items-center gap-2.5 p-4 rounded-xl border text-center transition-all duration-150",
+              "sq-tap sq-hover-breathe sq-focus-ring group flex flex-col items-center gap-2.5 p-4 rounded-xl border text-center transition-all duration-150",
               isSelected
-                ? "border-primary bg-primary/5 shadow-sm"
-                : "border-border bg-card hover:border-primary/30 hover:shadow-sm"
+                ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
+                : "border-border bg-card hover:border-primary/30"
             )}
             aria-pressed={isSelected}
             aria-label={`${file.name}, ${formatBytes(file.size_bytes)}`}

@@ -129,17 +129,16 @@ function NotificationItem({
 }
 
 export function NotificationDropdown() {
-  const {
-    notifications,
-    isOpen,
-    setOpen,
-    markRead,
-    markAllRead,
-    unreadCount,
-  } = useNotificationStore();
+  // Use individual stable selectors — avoids re-render loop caused by
+  // subscribing to the whole store (unreadCount is a new fn ref every update).
+  const notifications = useNotificationStore((s) => s.notifications);
+  const isOpen = useNotificationStore((s) => s.isOpen);
+  const setOpen = useNotificationStore((s) => s.setOpen);
+  const markRead = useNotificationStore((s) => s.markRead);
+  const markAllRead = useNotificationStore((s) => s.markAllRead);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const count = unreadCount();
+  const count = notifications.filter((n) => !n.read).length;
 
   // Close when clicking outside
   useEffect(() => {

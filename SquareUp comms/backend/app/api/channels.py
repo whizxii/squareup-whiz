@@ -5,29 +5,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.core.auth import get_current_user
 from app.core.db import get_session
 from app.models.chat import Channel, ChannelMember
 
 router = APIRouter(prefix="/api/channels", tags=["channels"])
-
-
-# ---------------------------------------------------------------------------
-# Dev auth dependency
-# ---------------------------------------------------------------------------
-
-async def get_current_user_id(
-    x_user_id: Optional[str] = Header(default="dev-user-001"),
-) -> str:
-    """Extract user ID from the X-User-Id header.
-
-    Falls back to 'dev-user-001' during development.
-    """
-    return x_user_id or "dev-user-001"
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +72,7 @@ class MemberResponse(BaseModel):
 async def create_channel(
     body: ChannelCreate,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> Channel:
     """Create a new channel and add the creator as the owner member."""
 
@@ -114,7 +101,7 @@ async def create_channel(
 @router.get("/", response_model=list[ChannelResponse])
 async def list_channels(
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> list[Channel]:
     """List all channels the current user is a member of."""
 
@@ -132,7 +119,7 @@ async def list_channels(
 async def get_channel(
     channel_id: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> Channel:
     """Get details for a single channel."""
 
@@ -149,7 +136,7 @@ async def get_channel(
 async def list_members(
     channel_id: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> list[ChannelMember]:
     """List all members of a channel."""
 
@@ -179,7 +166,7 @@ async def add_member(
     channel_id: str,
     body: MemberAdd,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> ChannelMember:
     """Add a user to a channel."""
 
@@ -223,7 +210,7 @@ async def remove_member(
     channel_id: str,
     target_user_id: str,
     session: AsyncSession = Depends(get_session),
-    user_id: str = Depends(get_current_user_id),
+    user_id: str = Depends(get_current_user),
 ) -> None:
     """Remove a user from a channel."""
 

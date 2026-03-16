@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useDriveStore, DriveFile } from "@/lib/stores/drive-store";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDriveStore } from "@/lib/stores/drive-store";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutGrid,
   List,
@@ -31,133 +32,12 @@ type SortKey = "name" | "date";
 type SortDir = "asc" | "desc";
 
 /* ------------------------------------------------------------------ */
-/*  Mock seed data                                                     */
-/* ------------------------------------------------------------------ */
-
-const MOCK_FILES: DriveFile[] = [
-  {
-    id: "f1",
-    name: "Q1 Sales Proposal.pdf",
-    mime_type: "application/pdf",
-    size_bytes: 2_456_000,
-    folder: "/proposals",
-    storage_path: "/proposals/q1-sales-proposal.pdf",
-    uploaded_by: "Kunj D.",
-    uploaded_by_type: "user",
-    created_at: "2026-03-12T10:30:00Z",
-  },
-  {
-    id: "f2",
-    name: "Brand Guidelines.pdf",
-    mime_type: "application/pdf",
-    size_bytes: 8_120_000,
-    folder: "/assets",
-    storage_path: "/assets/brand-guidelines.pdf",
-    uploaded_by: "Kunj D.",
-    uploaded_by_type: "user",
-    created_at: "2026-03-10T14:00:00Z",
-  },
-  {
-    id: "f3",
-    name: "Client Call - Mar 8.mp3",
-    mime_type: "audio/mpeg",
-    size_bytes: 14_300_000,
-    folder: "/recordings",
-    storage_path: "/recordings/client-call-mar-8.mp3",
-    uploaded_by: "Sales Agent",
-    uploaded_by_type: "agent",
-    agent_id: "agent-sales",
-    created_at: "2026-03-08T16:45:00Z",
-  },
-  {
-    id: "f4",
-    name: "Product Screenshot.png",
-    mime_type: "image/png",
-    size_bytes: 540_000,
-    folder: "/assets",
-    storage_path: "/assets/product-screenshot.png",
-    uploaded_by: "Kunj D.",
-    uploaded_by_type: "user",
-    created_at: "2026-03-07T09:15:00Z",
-  },
-  {
-    id: "f5",
-    name: "Demo Recording.mp4",
-    mime_type: "video/mp4",
-    size_bytes: 78_500_000,
-    folder: "/recordings",
-    storage_path: "/recordings/demo-recording.mp4",
-    uploaded_by: "Kunj D.",
-    uploaded_by_type: "user",
-    created_at: "2026-03-05T11:20:00Z",
-  },
-  {
-    id: "f6",
-    name: "Revenue Forecast.xlsx",
-    mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    size_bytes: 320_000,
-    folder: "/proposals",
-    storage_path: "/proposals/revenue-forecast.xlsx",
-    uploaded_by: "CRM Agent",
-    uploaded_by_type: "agent",
-    agent_id: "agent-crm",
-    created_at: "2026-03-04T08:00:00Z",
-  },
-  {
-    id: "f7",
-    name: "Team Photo.jpg",
-    mime_type: "image/jpeg",
-    size_bytes: 3_100_000,
-    folder: "/assets",
-    storage_path: "/assets/team-photo.jpg",
-    uploaded_by: "Kunj D.",
-    uploaded_by_type: "user",
-    created_at: "2026-03-02T13:30:00Z",
-  },
-  {
-    id: "f8",
-    name: "Meeting Notes.docx",
-    mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    size_bytes: 85_000,
-    folder: "/",
-    storage_path: "/meeting-notes.docx",
-    uploaded_by: "Kunj D.",
-    uploaded_by_type: "user",
-    created_at: "2026-03-01T10:00:00Z",
-  },
-  {
-    id: "f9",
-    name: "api-spec.json",
-    mime_type: "application/json",
-    size_bytes: 12_400,
-    folder: "/",
-    storage_path: "/api-spec.json",
-    uploaded_by: "Dev Agent",
-    uploaded_by_type: "agent",
-    agent_id: "agent-dev",
-    created_at: "2026-02-28T17:00:00Z",
-  },
-  {
-    id: "f10",
-    name: "backup-feb.zip",
-    mime_type: "application/zip",
-    size_bytes: 45_000_000,
-    folder: "/",
-    storage_path: "/backup-feb.zip",
-    uploaded_by: "Kunj D.",
-    uploaded_by_type: "user",
-    created_at: "2026-02-25T09:00:00Z",
-  },
-];
-
-/* ------------------------------------------------------------------ */
 /*  Main Page                                                          */
 /* ------------------------------------------------------------------ */
 
 export default function DrivePage() {
   const {
     files,
-    setFiles,
     currentFolder,
     setCurrentFolder,
     view,
@@ -166,7 +46,11 @@ export default function DrivePage() {
     setSearchQuery,
     selectedFileId,
     setSelectedFile,
-    removeFile,
+    loading,
+    fetchFiles,
+    uploadFile,
+    deleteFile,
+    downloadFile,
   } = useDriveStore();
 
   const [sortKey, setSortKey] = useState<SortKey>("date");
@@ -174,13 +58,10 @@ export default function DrivePage() {
   const [uploadFileName, setUploadFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Seed mock data on first mount
+  // Fetch files from API on mount and when folder/search changes
   useEffect(() => {
-    if (files.length === 0) {
-      setFiles(MOCK_FILES);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    fetchFiles();
+  }, [fetchFiles, currentFolder, searchQuery]);
 
   // Filter and sort
   const filteredFiles = useMemo(() => {
@@ -227,33 +108,19 @@ export default function DrivePage() {
     }
   };
 
-  // Simulated upload — adds file to store with mock data
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Upload file via API
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadFileName(file.name);
-
-    // Simulate a short upload delay then add to store
-    const timer = setTimeout(() => {
-      const newFile: DriveFile = {
-        id: `f-${Date.now()}`,
-        name: file.name,
-        mime_type: file.type || "application/octet-stream",
-        size_bytes: file.size,
-        folder: currentFolder === "/" ? "/" : currentFolder,
-        storage_path: `${currentFolder}/${file.name}`,
-        uploaded_by: "Kunj D.",
-        uploaded_by_type: "user",
-        created_at: new Date().toISOString(),
-      };
-      useDriveStore.getState().addFile(newFile);
+    try {
+      await uploadFile(file);
+    } finally {
       setUploadFileName(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-    }, 800);
-
-    return () => clearTimeout(timer);
-  };
+    }
+  }, [uploadFile]);
 
   // Count files per folder
   const folderCounts = useMemo(() => {
@@ -274,29 +141,43 @@ export default function DrivePage() {
           <h2 className="font-display font-bold text-sm">Drive</h2>
 
           {/* View toggle */}
-          <div className="flex items-center bg-muted rounded-lg p-0.5">
+          <div className="flex items-center bg-muted/60 p-0.5 rounded-lg">
             <button
               onClick={() => setView("grid")}
               className={cn(
-                "p-1.5 rounded-md transition-colors",
+                "relative p-1.5 rounded-md transition-colors z-10",
                 view === "grid"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground sq-tap"
               )}
               title="Grid view"
             >
+              {view === "grid" && (
+                <motion.div
+                  layoutId="drive-view-toggle"
+                  className="absolute inset-0 bg-card rounded-md shadow-sm z-[-1]"
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+              )}
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setView("list")}
               className={cn(
-                "p-1.5 rounded-md transition-colors",
+                "relative p-1.5 rounded-md transition-colors z-10",
                 view === "list"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground sq-tap"
               )}
               title="List view"
             >
+              {view === "list" && (
+                <motion.div
+                  layoutId="drive-view-toggle"
+                  className="absolute inset-0 bg-card rounded-md shadow-sm z-[-1]"
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+              )}
               <List className="w-4 h-4" />
             </button>
           </div>
@@ -304,7 +185,7 @@ export default function DrivePage() {
           {/* Sort toggle */}
           <button
             onClick={toggleSort}
-            className="hidden sm:flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="sq-tap hidden sm:flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             title={`Sorted by ${sortKey} (${sortDir})`}
           >
             <ArrowUpDown className="w-3.5 h-3.5" />
@@ -333,7 +214,7 @@ export default function DrivePage() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+            className="sq-tap sq-focus-ring sq-hover-breathe flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:brightness-110 transition-all shadow-sm"
           >
             <Upload className="w-4 h-4" />
             <span className="hidden sm:inline">Upload</span>
@@ -342,26 +223,35 @@ export default function DrivePage() {
       </div>
 
       {/* Upload indicator */}
-      {uploadFileName && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 border-b border-border text-sm">
-          <FileText className="w-4 h-4 text-primary" />
-          <span className="text-foreground font-medium truncate">
-            {uploadFileName}
-          </span>
-          <span className="text-muted-foreground text-xs animate-pulse">
-            Uploading...
-          </span>
-          <button
-            onClick={() => {
-              setUploadFileName(null);
-              if (fileInputRef.current) fileInputRef.current.value = "";
-            }}
-            className="ml-auto p-0.5 rounded hover:bg-accent transition-colors"
+      <AnimatePresence>
+        {uploadFileName && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
           >
-            <X className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-        </div>
-      )}
+            <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 border-b border-border/50 text-sm">
+              <FileText className="w-4 h-4 text-primary" />
+              <span className="text-foreground font-medium truncate">
+                {uploadFileName}
+              </span>
+              <span className="text-muted-foreground text-xs animate-pulse">
+                Uploading...
+              </span>
+              <button
+                onClick={() => {
+                  setUploadFileName(null);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                className="sq-tap ml-auto p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              >
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar - folder navigation */}
@@ -374,12 +264,20 @@ export default function DrivePage() {
               key={folder}
               onClick={() => setCurrentFolder(folder)}
               className={cn(
-                "flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors",
+                "relative flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors z-10 sq-tap",
                 currentFolder === folder
-                  ? "bg-primary/10 text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  ? "text-primary font-medium"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
+              {currentFolder === folder && (
+                <motion.div
+                  layoutId="drive-folder-indicator"
+                  className="absolute inset-0 bg-primary/10 rounded-lg z-[-1]"
+                  initial={false}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+              )}
               <div className="flex items-center gap-2 min-w-0">
                 {folder === "/" ? (
                   <Home className="w-4 h-4 shrink-0" />
@@ -467,8 +365,8 @@ export default function DrivePage() {
           <DriveDetailPanel
             file={selectedFile}
             onClose={() => setSelectedFile(null)}
-            onDelete={() => {
-              removeFile(selectedFile.id);
+            onDelete={async () => {
+              await deleteFile(selectedFile.id);
               setSelectedFile(null);
             }}
           />
