@@ -62,6 +62,22 @@ async def handle_chat_send(user_id: str, data: dict):
 
     # Save to database
     async with async_session() as session:
+        # Check if mentions contains an agent
+        agent_mentions = []
+        if mentions:
+            from app.models.agents import Agent
+            from sqlmodel import select
+            
+            for m in mentions:
+                if m.get("type") == "agent":
+                    agent_id = m.get("id")
+                    if agent_id:
+                        agent_stmt = select(Agent).where(Agent.id == agent_id, Agent.active == True)
+                        result = await session.execute(agent_stmt)
+                        agent = result.scalar_one_or_none()
+                        if agent:
+                            agent_mentions.append(agent)
+
         session.add(message)
 
         # Increment reply count on parent if thread reply
@@ -98,6 +114,23 @@ async def handle_chat_send(user_id: str, data: dict):
 
     # Send confirmation back to sender
     await hub_manager.send_to_user(user_id, broadcast_data)
+
+    # If agents were mentioned, route to them in the background
+    if agent_mentions:
+        import asyncio
+        from app.services.agent_execution_service import execute_agent_for_message
+        
+        for agent in agent_mentions:
+             # Run in background to not block WebSocket loop
+             asyncio.create_task(
+                 execute_agent_for_message(
+                     agent_id=agent.id,
+                     trigger_message_id=message.id,
+                     channel_id=channel_id,
+                     user_id=user_id,
+                     content=content
+                 )
+             )
 
 
 async def handle_chat_typing(user_id: str, data: dict):

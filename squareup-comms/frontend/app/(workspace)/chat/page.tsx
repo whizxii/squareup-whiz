@@ -19,7 +19,9 @@ import { BookmarkedMessages } from "@/components/chat/BookmarkedMessages";
 import { MessageEffects, type EffectType } from "@/components/chat/effects/MessageEffects";
 import { useKeyboardShortcuts, type ShortcutAction } from "@/hooks/use-keyboard-shortcuts";
 import { KeyboardShortcutsDialog } from "@/components/chat/KeyboardShortcutsDialog";
+import { ChannelSettingsSidebar } from "@/components/chat/ChannelSettingsSidebar";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { Settings } from "lucide-react";
 
 export default function ChatPage() {
   const currentUserId = useCurrentUserId();
@@ -44,6 +46,7 @@ export default function ChatPage() {
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [activeEffect, setActiveEffect] = useState<EffectType | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
 
@@ -488,8 +491,8 @@ export default function ChatPage() {
               {wsStatus === "reconnecting"
                 ? "Connection lost. Reconnecting..."
                 : wsStatus === "connecting"
-                ? "Connecting..."
-                : "Disconnected. Messages may be delayed."}
+                  ? "Connecting..."
+                  : "Disconnected. Messages may be delayed."}
             </span>
           </div>
         )}
@@ -546,6 +549,15 @@ export default function ChatPage() {
                 >
                   <Search className="w-4 h-4 text-muted-foreground" />
                 </button>
+                {activeChannel.type !== "agent" && activeChannel.type !== "dm" && (
+                  <button
+                    onClick={() => setSettingsOpen((v) => !v)}
+                    className="p-1.5 rounded-md hover:bg-accent transition-colors"
+                    aria-label="Channel Settings"
+                  >
+                    <Settings className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -567,6 +579,14 @@ export default function ChatPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Settings panel */}
+      {settingsOpen && activeChannel && (
+        <ChannelSettingsSidebar
+          channel={activeChannel}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
 
       {/* Search panel */}
       <AnimatePresence>

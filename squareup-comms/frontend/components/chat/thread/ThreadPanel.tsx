@@ -168,12 +168,12 @@ export function ThreadPanel({ parentMessageId, onClose }: ThreadPanelProps) {
         prev.map((r) =>
           r.id === tempId
             ? {
-                ...r,
-                id: message.id,
-                created_at: message.created_at,
-                updated_at: message.updated_at,
-                pending: false,
-              }
+              ...r,
+              id: message.id,
+              created_at: message.created_at,
+              updated_at: message.updated_at,
+              pending: false,
+            }
             : r
         )
       );
@@ -253,8 +253,8 @@ export function ThreadPanel({ parentMessageId, onClose }: ThreadPanelProps) {
             {loading
               ? "Loading replies..."
               : replies.length === 0
-              ? "No replies yet"
-              : `${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
+                ? "No replies yet"
+                : `${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
           </span>
           <div className="flex-1 h-px bg-border" />
         </div>

@@ -7,7 +7,7 @@ export interface Channel {
   description?: string;
   icon?: string;
   agent_id?: string;
-  is_default?: boolean;
+  is_private?: boolean;
   created_by?: string;
   created_at: string;
   updated_at: string;

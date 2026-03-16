@@ -99,6 +99,23 @@ export function MessageBubble({
     });
   }, [message.content_html]);
 
+  // Attempt to parse JSON widgets from Agent responses
+  const parsedWidget = useMemo(() => {
+    if (message.sender_type !== "agent" || !message.content) return null;
+
+    try {
+      if (message.content.trim().startsWith("{") && message.content.trim().endsWith("}")) {
+        const data = JSON.parse(message.content);
+        if (data.widget_type && data.data) {
+          return data;
+        }
+      }
+    } catch (e) {
+      return null;
+    }
+    return null;
+  }, [message.content, message.sender_type]);
+
   const handleEdit = useCallback(async () => {
     if (!editContent.trim() || actionLoading) return;
     setActionLoading(true);
@@ -321,6 +338,20 @@ export function MessageBubble({
             }}
             loading={actionLoading}
           />
+        ) : parsedWidget ? (
+          <div className="mt-2 mb-1 p-4 rounded-xl border border-border bg-card shadow-sm animate-in fade-in slide-in-from-bottom-2">
+            <div className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+              <Bot className="w-3.5 h-3.5" /> Interactive Widget: {parsedWidget.widget_type.replace(/_/g, " ")}
+            </div>
+            {/* Fallback rendering of JSON data in a pretty format for now. A real app would have specific components per widget_type */}
+            <pre className="text-xs font-mono bg-muted p-2 rounded overflow-x-auto text-foreground/80">
+              {JSON.stringify(parsedWidget.data, null, 2)}
+            </pre>
+            <div className="mt-3 flex gap-2">
+              <button className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">Accept</button>
+              <button className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-accent transition-colors">Modify</button>
+            </div>
+          </div>
         ) : sanitizedHtml ? (
           <div
             className="text-sm text-foreground/90 leading-relaxed prose prose-sm max-w-none

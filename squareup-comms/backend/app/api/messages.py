@@ -117,7 +117,7 @@ class MessageListResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helper
 # ---------------------------------------------------------------------------
 
 async def _fetch_reactions_for_messages(
@@ -423,6 +423,95 @@ async def add_reaction(
     )
     session.add(reaction)
     await session.commit()
+
+
+@router.post("/ai-search", response_model=AISearchResponse)
+async def ai_search_messages(
+    body: AISearchRequest,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    """
+    Search chat history using an LLM.
+    1. Fetches recent messages from allowed channels.
+    2. Builds a context window.
+    3. Asks the LLM to answer the search query based ONLY on that context.
+    """
+    from app.models.chat import ChannelMember
+    from app.services.llm_service import llm_service
+    from app.core.config import settings
+
+    if not llm_service.available:
+        raise HTTPException(status_code=503, detail="LLM service unavailable")
+
+    # 1. Determine allowed channels
+    allowed_channels_stmt = select(ChannelMember.channel_id).where(ChannelMember.user_id == user_id)
+    result = await session.execute(allowed_channels_stmt)
+    allowed_ids = set(result.scalars().all())
+
+    if body.channel_ids:
+        search_ids = [cid for cid in body.channel_ids if cid in allowed_ids]
+    else:
+        search_ids = list(allowed_ids)
+
+    if not search_ids:
+        return {"answer": "You don't have access to any channels to search.", "referenced_message_ids": []}
+
+    # 2. Fetch the last N messages across those channels to form a context baseline
+    # (In a true production app with millions of messages, you'd use pgvector here)
+    stmt = (
+        select(Message)
+        .where(Message.channel_id.in_(search_ids))
+        .order_by(Message.created_at.desc())
+        .limit(100)
+    )
+    result = await session.execute(stmt)
+    recent_messages = list(result.scalars().all())
+    recent_messages.reverse() # chronological
+
+    # 3. Format Context
+    context_lines = []
+    referenced_ids = []
+    for m in recent_messages:
+        # We include ID so the LLM can cite it
+        line = f"[{m.created_at.strftime('%Y-%m-%d %H:%M')}] {m.sender_type} ({m.sender_id}): {m.content} [ID:{m.id}]"
+        context_lines.append(line)
+        referenced_ids.append(m.id)
+
+    context_str = "\n".join(context_lines)
+
+    system_prompt = (
+        "You are an AI Search Assistant for a team chat app. You will be provided with a raw chat log.\n"
+        "Your job is to answer the user's search query using ONLY the provided chat log.\n"
+        "If the answer is not in the chat log, say 'I could not find the answer to that in recent history.'\n"
+        "When you use information from a specific message, you MUST cite its [ID:xxx] at the end of your sentence."
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"CHAT LOG CONTEXT:\n{context_str}\n\nUSER QUERY: {body.query}"}
+    ]
+
+    try:
+        response = await llm_service.client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            messages=messages,
+            max_tokens=600,
+            temperature=0.3,
+        )
+        answer = response.choices[0].message.content or ""
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+        
+    # Extract cited IDs (very basic extraction)
+    import re
+    cited_ids = re.findall(r'\[ID:([a-f0-9\-]+)\]', answer)
+    unique_cited_ids = list(set(cited_ids))
+
+    return {
+        "answer": answer,
+        "referenced_message_ids": unique_cited_ids
+    }
     await session.refresh(reaction)
     return reaction
 

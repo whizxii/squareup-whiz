@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -53,7 +54,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.cookie = "__session=1; path=/; max-age=86400; SameSite=Lax";
 
         // Verify with backend and check onboarding status
-        const res = await fetch(`${API_URL}/api/auth/verify`, {
+        // Uses retry to handle Render free-tier cold starts (503 without CORS)
+        const res = await fetchWithRetry(`${API_URL}/api/auth/verify`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { api } from "@/lib/api";
-import { X } from "lucide-react";
+import { X, Search, Check } from "lucide-react";
+
+interface User {
+  id: string;
+  display_name: string;
+  email: string;
+}
 
 interface Props {
   open: boolean;
@@ -19,6 +25,17 @@ export function CreateChannelDialog({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Auto-fetch users when dialog opens
+  if (open && users.length === 0 && !isSearching) {
+    setIsSearching(true);
+    api.getUsers().then(res => setUsers(res)).finally(() => setIsSearching(false));
+  }
+
   if (!open) return null;
 
   const handleCreate = async () => {
@@ -32,10 +49,16 @@ export function CreateChannelDialog({ open, onClose }: Props) {
 
     try {
       const channel = await api.createChannel({
-        name: name.trim().toLowerCase().replace(/\s+/g, "-"),
+        name: type === "private" ? "Group" : name.trim().toLowerCase().replace(/\s+/g, "-"),
         type,
         description: description.trim() || undefined,
+        is_private: type === "private"
       });
+
+      // If private and users are selected, bulk add them
+      if (type === "private" && selectedUserIds.length > 0) {
+        await api.addChannelMembers(channel.id, selectedUserIds);
+      }
 
       addChannel({
         ...channel,
@@ -81,48 +104,86 @@ export function CreateChannelDialog({ open, onClose }: Props) {
               <button
                 key={t}
                 onClick={() => setType(t)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  type === t
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${type === t
                     ? "bg-primary/10 text-primary border border-primary/20"
                     : "bg-muted text-muted-foreground border border-transparent"
-                }`}
+                  }`}
               >
                 {t === "public" ? "# Public" : "🔒 Private"}
               </button>
             ))}
           </div>
 
-          {/* Name */}
-          <div>
-            <label htmlFor="channel-name" className="block text-sm font-medium mb-1.5">Name</label>
-            <input
-              id="channel-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
-              placeholder="e.g. general, sales, random"
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
-              autoFocus
-            />
-          </div>
+          {/* Conditional Name/Description OR User Selection */}
+          {type === "public" ? (
+            <>
+              <div>
+                <label htmlFor="channel-name" className="block text-sm font-medium mb-1.5">Name</label>
+                <input
+                  id="channel-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) handleCreate(); }}
+                  placeholder="e.g. general, sales, random"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
+                />
+              </div>
+              <div>
+                <label htmlFor="channel-description" className="block text-sm font-medium mb-1.5">
+                  Description <span className="text-muted-foreground font-normal">(optional)</span>
+                </label>
+                <input
+                  id="channel-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) handleCreate(); }}
+                  placeholder="What's this channel about?"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium">Add people to this group</label>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by name or email..."
+                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
+                />
+              </div>
 
-          {/* Description */}
-          <div>
-            <label htmlFor="channel-description" className="block text-sm font-medium mb-1.5">
-              Description{" "}
-              <span className="text-muted-foreground font-normal">
-                (optional)
-              </span>
-            </label>
-            <input
-              id="channel-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
-              placeholder="What's this channel about?"
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
-            />
-          </div>
+              <div className="max-h-48 overflow-y-auto space-y-1 mt-2 border border-border rounded-lg p-1 bg-background">
+                {users.filter(u => u.display_name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase())).map(u => {
+                  const isSelected = selectedUserIds.includes(u.id);
+                  return (
+                    <button
+                      key={u.id}
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedUserIds(prev => prev.filter(id => id !== u.id));
+                        } else {
+                          setSelectedUserIds(prev => [...prev, u.id]);
+                        }
+                      }}
+                      className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{u.display_name}</p>
+                        <p className="text-xs text-muted-foreground">{u.email}</p>
+                      </div>
+                      {isSelected && <Check className="w-4 h-4 text-primary" />}
+                    </button>
+                  )
+                })}
+                {users.length === 0 && !isSearching && (
+                  <p className="text-center text-xs p-3 text-muted-foreground">No users found.</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-destructive">{error}</p>
@@ -138,10 +199,10 @@ export function CreateChannelDialog({ open, onClose }: Props) {
             </button>
             <button
               onClick={handleCreate}
-              disabled={loading || !name.trim()}
+              disabled={loading || (type === "public" ? !name.trim() : selectedUserIds.length === 0)}
               className="px-4 py-2 rounded-lg text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              {loading ? "Creating..." : "Create Channel"}
+              {loading ? "Creating..." : type === "public" ? "Create Channel" : "Create Group"}
             </button>
           </div>
         </div>

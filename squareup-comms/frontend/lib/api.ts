@@ -1,5 +1,6 @@
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -19,11 +20,11 @@ class ApiClient {
     return { "X-User-Id": getCurrentUserId() };
   }
 
-  private async request<T>(
+  public async request<T>(
     path: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await fetchWithRetry(`${this.baseUrl}${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -50,6 +51,7 @@ class ApiClient {
     type: string;
     description?: string;
     icon?: string;
+    is_private?: boolean;
   }) {
     return this.request<Channel>("/api/channels/", {
       method: "POST",
@@ -59,6 +61,24 @@ class ApiClient {
 
   async getChannel(id: string) {
     return this.request<Channel>(`/api/channels/${id}`);
+  }
+
+  async deleteChannel(id: string) {
+    return this.request<void>(`/api/channels/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async addChannelMembers(channelId: string, userIds: string[]) {
+    return this.request<any>(`/api/channels/${channelId}/members/bulk`, {
+      method: "POST",
+      body: JSON.stringify({ user_ids: userIds }),
+    });
+  }
+
+  // Users
+  async getUsers() {
+    return this.request<{ id: string; email: string; display_name: string; avatar_url: string | null }[]>("/api/users/");
   }
 
   // Messages
@@ -125,6 +145,7 @@ interface Channel {
   icon?: string;
   agent_id?: string;
   is_default?: boolean;
+  is_private?: boolean;
   created_by?: string;
   created_at: string;
   updated_at: string;

@@ -14,6 +14,8 @@ class Channel(SQLModel, table=True):
     icon: Optional[str] = Field(default=None, max_length=10)
     agent_id: Optional[str] = None
     is_default: bool = Field(default=False)
+    is_private: bool = Field(default=False)
+    is_archived: bool = Field(default=False)
     created_by: Optional[str] = Field(default=None, max_length=128)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

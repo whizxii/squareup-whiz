@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -58,7 +59,7 @@ export default function OnboardingPage() {
       // Get a fresh token to avoid expiry if user sat on the form
       const freshToken = user ? await user.getIdToken() : null;
 
-      const res = await fetch(`${API_URL}/api/auth/onboard`, {
+      const res = await fetchWithRetry(`${API_URL}/api/auth/onboard`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
