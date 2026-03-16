@@ -68,6 +68,16 @@ class MessageResponse(BaseModel):
     updated_at: Optional[datetime]
     reactions: list[ReactionResponse] = Field(default_factory=list)
 
+
+class AISearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=500)
+    channel_ids: Optional[List[str]] = None
+
+
+class AISearchResponse(BaseModel):
+    answer: str
+    referenced_message_ids: List[str] = Field(default_factory=list)
+
     model_config = {"from_attributes": True}
 
     @classmethod
@@ -512,8 +522,6 @@ async def ai_search_messages(
         "answer": answer,
         "referenced_message_ids": unique_cited_ids
     }
-    await session.refresh(reaction)
-    return reaction
 
 
 @router.delete(
