@@ -133,13 +133,26 @@ async def list_channels(
     session: AsyncSession = Depends(get_session),
     user_id: str = Depends(get_current_user),
 ) -> list[Channel]:
-    """List all channels the current user is a member of."""
+    """List channels visible to the current user.
 
+    Public channels are visible to all users.
+    Private channels are only visible to members.
+    """
+    from sqlalchemy import or_
+
+    member_channels = select(ChannelMember.channel_id).where(
+        ChannelMember.user_id == user_id
+    )
     stmt = (
         select(Channel)
-        .join(ChannelMember, Channel.id == ChannelMember.channel_id)
-        .where(ChannelMember.user_id == user_id)
-        .order_by(Channel.created_at.desc())
+        .where(
+            Channel.is_archived == False,  # noqa: E712
+            or_(
+                Channel.is_private == False,  # noqa: E712
+                Channel.id.in_(member_channels),
+            ),
+        )
+        .order_by(Channel.created_at.asc())
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())

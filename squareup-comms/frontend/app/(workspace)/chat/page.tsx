@@ -270,7 +270,7 @@ export default function ChatPage() {
       offEdited();
       offDeleted();
     };
-  }, [wsOn, addMessage, updateMessage, removeMessage, setTyping, clearTyping]);
+  }, [wsOn, addMessage, updateMessage, removeMessage, setTyping, clearTyping, currentUserId]);
 
   // ─── Typing indicator broadcasting (debounced) ─────────────────────
   const typingTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -316,7 +316,7 @@ export default function ChatPage() {
         });
       }
     },
-    [activeChannelId, wsSend]
+    [activeChannelId, wsSend, currentUserId]
   );
 
   // Clean up typing timer on unmount or channel change

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, List, Dict
+from typing import Any, Optional, List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -30,7 +30,7 @@ class MessageCreate(BaseModel):
     content_html: Optional[str] = None
     attachments: Optional[list[str]] = Field(default_factory=list)
     thread_id: Optional[str] = None
-    mentions: Optional[list[str]] = Field(default_factory=list)
+    mentions: Optional[list[Any]] = Field(default_factory=list)
 
 
 class MessageUpdate(BaseModel):
