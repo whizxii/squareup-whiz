@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -166,8 +165,8 @@ const DEFAULT_LAYOUT: OfficeLayout = {
 
 const DEFAULT_ZONES: readonly OfficeZone[] = [
   { id: "desk-1", name: "Kunj's Desk", type: "desk", x: 2, y: 2, width: 2, height: 2, color: "#FF6B00", icon: "\u{1F4BB}", capacity: 1 },
-  { id: "desk-2", name: "Arjun's Desk", type: "desk", x: 5, y: 2, width: 2, height: 2, color: "#4a90d9", icon: "\u{1F4BB}", capacity: 1 },
-  { id: "desk-3", name: "Riya's Desk", type: "desk", x: 8, y: 2, width: 2, height: 2, color: "#9b59b6", icon: "\u{1F4BB}", capacity: 1 },
+  { id: "desk-2", name: "Tanmay's Desk", type: "desk", x: 5, y: 2, width: 2, height: 2, color: "#4a90d9", icon: "\u{1F4BB}", capacity: 1 },
+  { id: "desk-3", name: "Param's Desk", type: "desk", x: 8, y: 2, width: 2, height: 2, color: "#27ae60", icon: "\u{1F4BB}", capacity: 1 },
   { id: "meeting", name: "Meeting Room", type: "meeting", x: 2, y: 6, width: 3, height: 3, color: "#22c55e", icon: "\u{1F3A5}", capacity: 4, isPrivate: true },
   { id: "lounge", name: "Lounge", type: "lounge", x: 6, y: 6, width: 3, height: 2, color: "#eab308", icon: "\u{2615}", capacity: 6 },
   { id: "focus", name: "Focus Pod", type: "focus", x: 10, y: 2, width: 2, height: 2, color: "#6366f1", icon: "\u{1F3A7}", capacity: 1, isPrivate: true },
@@ -257,6 +256,28 @@ interface OfficeState {
   readonly removeFurniture: (id: string) => void;
   readonly setLayout: (layout: OfficeLayout) => void;
 
+  // Hydration
+  readonly hydrateUsers: (
+    apiUsers: readonly {
+      readonly id: string;
+      readonly display_name: string;
+      readonly avatar_url?: string;
+      readonly avatar_config?: {
+        readonly hairStyle?: number;
+        readonly hairColor?: string;
+        readonly skinTone?: string;
+        readonly shirtColor?: string;
+        readonly pantsColor?: string;
+      };
+      readonly status?: string;
+      readonly status_message?: string;
+      readonly status_emoji?: string;
+      readonly office_x?: number;
+      readonly office_y?: number;
+    }[],
+    myUserId: string,
+  ) => void;
+
   // Interaction actions
   readonly setFollowingEntity: (entity: { type: "user" | "agent"; id: string } | null) => void;
   readonly sendWave: (target: { type: "user" | "agent"; id: string }) => void;
@@ -267,59 +288,8 @@ interface OfficeState {
 }
 
 export const useOfficeStore = create<OfficeState>((set) => ({
-  // Entities
-  users: [
-    {
-      id: getCurrentUserId(),
-      name: "Kunj",
-      status: "online" as UserStatus,
-      statusEmoji: "\u{1F4BB}",
-      activity: "Building SquareUp Comms",
-      x: 3,
-      y: 3,
-      direction: "down" as Direction,
-      animationState: "idle" as AnimationState,
-      appearance: DEFAULT_APPEARANCE,
-    },
-    {
-      id: "demo-user-arjun",
-      name: "Arjun",
-      status: "online" as UserStatus,
-      statusEmoji: "🎨",
-      statusMessage: "Designing the new dashboard",
-      activity: "Working on UI components",
-      x: 6,
-      y: 3,
-      direction: "down" as Direction,
-      animationState: "idle" as AnimationState,
-      appearance: {
-        hairStyle: 0,
-        hairColor: "#1a1a1a",
-        skinTone: "#C68642",
-        shirtColor: "#4a90d9",
-        pantsColor: "#2d3436",
-      },
-    },
-    {
-      id: "demo-user-riya",
-      name: "Riya",
-      status: "away" as UserStatus,
-      statusEmoji: "☕",
-      statusMessage: "Coffee break",
-      activity: "Reviewing PRs",
-      x: 9,
-      y: 3,
-      direction: "down" as Direction,
-      animationState: "idle" as AnimationState,
-      appearance: {
-        hairStyle: 2,
-        hairColor: "#2C1810",
-        skinTone: "#D4A574",
-        shirtColor: "#9b59b6",
-        pantsColor: "#34495e",
-      },
-    },
-  ],
+  // Entities — hydrated from GET /api/users/ on office mount
+  users: [],
   agents: [
     {
       id: "crm-agent",
@@ -367,7 +337,7 @@ export const useOfficeStore = create<OfficeState>((set) => ({
   furniture: [...DEFAULT_FURNITURE],
 
   // Camera & viewport
-  myPosition: { x: 3, y: 3 },
+  myPosition: { x: 5, y: 5 },
   zoom: 1,
   cameraOffset: { x: 0, y: 0 },
 
@@ -459,6 +429,35 @@ export const useOfficeStore = create<OfficeState>((set) => ({
   removeFurniture: (id) =>
     set((s) => ({ furniture: s.furniture.filter((f) => f.id !== id) })),
   setLayout: (layout) => set({ layout }),
+
+  // Hydration — populate users from backend API response
+  hydrateUsers: (apiUsers, myUserId) => {
+    const me = apiUsers.find((u) => u.id === myUserId);
+    set({
+      users: apiUsers.map((u) => ({
+        id: u.id,
+        name: u.display_name,
+        avatar: u.avatar_url,
+        status: (u.status as UserStatus) || "online",
+        statusMessage: u.status_message,
+        statusEmoji: u.status_emoji,
+        x: u.office_x ?? 5,
+        y: u.office_y ?? 5,
+        direction: "down" as Direction,
+        animationState: "idle" as AnimationState,
+        appearance: {
+          hairStyle: u.avatar_config?.hairStyle ?? 1,
+          hairColor: u.avatar_config?.hairColor ?? "#3B2F2F",
+          skinTone: u.avatar_config?.skinTone ?? "#D2A679",
+          shirtColor: u.avatar_config?.shirtColor ?? "#FF6B00",
+          pantsColor: u.avatar_config?.pantsColor ?? "#3B4252",
+        },
+      })),
+      myPosition: me
+        ? { x: me.office_x ?? 5, y: me.office_y ?? 5 }
+        : { x: 5, y: 5 },
+    });
+  },
 
   // Interaction actions
   setFollowingEntity: (entity) => set({ followingEntity: entity }),

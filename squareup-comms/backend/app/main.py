@@ -53,6 +53,7 @@ from app.api.crm_analytics import router as crm_analytics_router
 from app.api.crm_bulk import router as crm_bulk_router
 from app.api.crm_dedup import router as crm_dedup_router
 from app.api.users import router as users_router
+from app.api.seed import router as seed_router
 
 # Initialize structured logging before anything else
 setup_logging()
@@ -178,6 +179,7 @@ app.include_router(crm_analytics_router)
 app.include_router(crm_bulk_router)
 app.include_router(crm_dedup_router)
 app.include_router(users_router)
+app.include_router(seed_router)
 
 
 @app.get("/health")

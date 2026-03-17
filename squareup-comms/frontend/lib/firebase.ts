@@ -1,28 +1,24 @@
 /**
  * Firebase client SDK initialization for SquareUp Comms.
  *
- * Provides Google sign-in and sign-out helpers.
+ * Provides email/password sign-in and sign-out helpers.
  * Config is read from NEXT_PUBLIC_FIREBASE_* environment variables.
  *
- * When NEXT_PUBLIC_ENABLE_DEV_AUTH=true and no API key is set,
- * Firebase is not initialized and all exports are safe no-ops.
+ * When no API key is set, Firebase is not initialized and all exports are safe no-ops.
  */
 
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import {
   getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
+  signInWithEmailAndPassword,
   signOut as firebaseSignOutFn,
   type Auth,
   type UserCredential,
 } from "firebase/auth";
 
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-const isDevMode = process.env.NEXT_PUBLIC_ENABLE_DEV_AUTH === "true";
 
 // Only initialize Firebase when a real API key is available.
-// In dev mode (no keys), we skip initialization entirely to avoid crashes.
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 
@@ -41,18 +37,15 @@ if (apiKey) {
 
 export { auth };
 
-const googleProvider = apiKey ? new GoogleAuthProvider() : null;
-if (googleProvider) {
-  googleProvider.addScope("email");
-  googleProvider.addScope("profile");
-}
-
-/** Open the Google sign-in popup and return the credential. */
-export async function signInWithGoogle(): Promise<UserCredential> {
-  if (!auth || !googleProvider) {
-    throw new Error("Firebase is not initialized (dev mode).");
+/** Sign in with email and password. */
+export async function signInWithEmail(
+  email: string,
+  password: string,
+): Promise<UserCredential> {
+  if (!auth) {
+    throw new Error("Firebase is not initialized.");
   }
-  return signInWithPopup(auth, googleProvider);
+  return signInWithEmailAndPassword(auth, email, password);
 }
 
 /** Sign the current user out of Firebase. */

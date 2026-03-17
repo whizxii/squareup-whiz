@@ -8,6 +8,8 @@
 import { useRef, useCallback, useMemo, useEffect } from "react";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { useOfficeTime } from "@/lib/hooks/useOfficeTime";
 import { useOfficeKeyboard } from "@/lib/hooks/useOfficeKeyboard";
 import { useOfficeCamera } from "@/lib/hooks/useOfficeCamera";
@@ -72,6 +74,45 @@ export default function OfficePage() {
     } catch {
       // silently ignore corrupt data
     }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hydrate office users from backend
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  useEffect(() => {
+    const unsub = useAuthStore.subscribe((state) => {
+      if (!state.token || !state.profile) return;
+
+      const token = state.token;
+      const uid = state.profile.firebase_uid;
+
+      fetchWithRetry(`${API_URL}/api/users/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          useOfficeStore.getState().hydrateUsers(data, uid);
+        })
+        .catch((err) => console.error("Failed to fetch office users:", err));
+
+      // Only need to hydrate once
+      unsub();
+    });
+
+    // Also try immediately if already authenticated
+    const { token, profile } = useAuthStore.getState();
+    if (token && profile) {
+      fetchWithRetry(`${API_URL}/api/users/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then((data) => {
+          useOfficeStore.getState().hydrateUsers(data, profile.firebase_uid);
+        })
+        .catch((err) => console.error("Failed to fetch office users:", err));
+      unsub();
+    }
+
+    return () => unsub();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hooks — day/night cycle, weather, agent routines, keyboard controls, camera follow
