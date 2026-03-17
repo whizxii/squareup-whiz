@@ -1,4 +1,4 @@
-"""One-time seed endpoint to bootstrap the 3 team member accounts."""
+"""One-time seed endpoint to bootstrap channels and the 3 team member accounts."""
 
 from __future__ import annotations
 
@@ -18,6 +18,24 @@ from app.models.chat import Channel, ChannelMember
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/seed", tags=["seed"])
+
+# Default channels to create if missing
+SEED_CHANNELS = [
+    {
+        "name": "general",
+        "type": "public",
+        "description": "General team chat",
+        "icon": "💬",
+        "is_default": True,
+    },
+    {
+        "name": "random",
+        "type": "public",
+        "description": "Watercooler chat",
+        "icon": "🎲",
+        "is_default": True,
+    },
+]
 
 # The 3 team members to pre-create
 SEED_USERS = [
@@ -73,18 +91,37 @@ SEED_USERS = [
 async def seed_users(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Create Firebase auth accounts + UserProfile rows + channel memberships.
+    """Create default channels + Firebase auth accounts + UserProfile rows.
 
-    Idempotent: skips users that already exist in Firebase or the database.
+    Idempotent: skips items that already exist.
     """
     results: list[dict] = []
+    now = datetime.now(timezone.utc)
 
-    # Fetch default channels once
+    # 0. Ensure default channels exist
+    channels_created = 0
     stmt = select(Channel).where(Channel.is_default == True)  # noqa: E712
     result = await session.execute(stmt)
-    default_channels = result.scalars().all()
+    existing_channels = {c.name: c for c in result.scalars().all()}
 
-    now = datetime.now(timezone.utc)
+    for ch_data in SEED_CHANNELS:
+        if ch_data["name"] not in existing_channels:
+            channel = Channel(
+                name=ch_data["name"],
+                type=ch_data["type"],
+                description=ch_data["description"],
+                icon=ch_data["icon"],
+                is_default=True,
+                is_private=False,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(channel)
+            existing_channels[ch_data["name"]] = channel
+            channels_created += 1
+
+    await session.flush()  # Assign IDs before foreign-key references
+    default_channels = list(existing_channels.values())
 
     for user_data in SEED_USERS:
         email = user_data["email"]
@@ -151,4 +188,4 @@ async def seed_users(
         results.append(entry)
 
     await session.commit()
-    return {"seeded": results}
+    return {"channels_created": channels_created, "seeded": results}
