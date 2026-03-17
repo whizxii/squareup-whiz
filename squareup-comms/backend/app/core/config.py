@@ -51,9 +51,9 @@ class Settings(BaseSettings):
     FIREBASE_STORAGE_BUCKET: Optional[str] = None
 
     # CORS
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001,https://squareup-comms.vercel.app"
     # Regex to allow Vercel preview deployments (e.g. squareup-comms-abc123-whizdome.vercel.app)
-    ALLOWED_ORIGIN_REGEX: Optional[str] = None
+    ALLOWED_ORIGIN_REGEX: Optional[str] = r"https://squareup-comms.*\.vercel\.app"
 
     # Encryption
     ENCRYPTION_KEY: Optional[str] = None  # Fernet key for OAuth tokens

@@ -102,9 +102,18 @@ async def get_current_user(
     2. Else if ENABLE_DEV_AUTH is true, use X-User-Id header (default dev-user-001).
     3. Else reject with 401.
     """
-    # Path 1: Bearer token present — always verify
+    # Path 1: Bearer token present — verify via Firebase
     if credentials and credentials.credentials:
-        return await _verify_firebase_token(credentials.credentials)
+        try:
+            return await _verify_firebase_token(credentials.credentials)
+        except HTTPException:
+            # In dev mode, fall through to dev auth if Firebase isn't configured
+            if not settings.ENABLE_DEV_AUTH:
+                raise
+            logger.warning(
+                "Bearer token verification failed, falling back to dev auth (user: %s)",
+                x_user_id or "dev-user-001",
+            )
 
     # Path 2: Dev mode fallback
     if settings.ENABLE_DEV_AUTH:

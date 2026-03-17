@@ -111,6 +111,9 @@ export const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
         StarterKit.configure({
           heading: false,
           horizontalRule: false,
+          // Disable these — we add them separately with custom config below
+          link: false,
+          underline: false,
           codeBlock: {
             HTMLAttributes: {
               class:
