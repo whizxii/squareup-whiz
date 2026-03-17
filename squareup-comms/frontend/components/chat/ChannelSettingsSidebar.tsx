@@ -81,7 +81,7 @@ export function ChannelSettingsSidebar({ channel, onClose }: Props) {
     const nonMembers = users.filter(
         u => !memberUserIds.has(u.id) &&
             (u.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                u.email.toLowerCase().includes(searchQuery.toLowerCase()))
+                (u.email || "").toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     return (

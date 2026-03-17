@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func
 from sqlmodel import select
@@ -14,6 +16,8 @@ from sqlmodel import select
 from app.core.auth import get_current_user
 from app.core.db import get_session
 from app.models.chat import Channel, ChannelMember
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/channels", tags=["channels"])
 
@@ -112,19 +116,38 @@ async def create_channel(
 
     # Auto-add all team members to public channels
     if not body.is_private and body.type == "public":
-        from app.models.users import UserProfile
-        all_users_result = await session.execute(select(UserProfile))
-        for user in all_users_result.scalars().all():
-            if user.firebase_uid != user_id:
-                member = ChannelMember(
-                    channel_id=channel.id,
-                    user_id=user.firebase_uid,
-                    role="member",
-                )
-                session.add(member)
+        try:
+            from app.models.users import UserProfile
+            all_users_result = await session.execute(select(UserProfile))
+            for user in all_users_result.scalars().all():
+                if user.firebase_uid != user_id:
+                    member = ChannelMember(
+                        channel_id=channel.id,
+                        user_id=user.firebase_uid,
+                        role="member",
+                    )
+                    session.add(member)
+        except Exception as exc:
+            logger.warning("Could not auto-add members to public channel: %s", exc)
 
-    await session.commit()
-    await session.refresh(channel)
+    try:
+        await session.commit()
+        await session.refresh(channel)
+    except IntegrityError as exc:
+        await session.rollback()
+        logger.warning("Channel creation failed (integrity): %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A channel with that name may already exist.",
+        )
+    except Exception as exc:
+        await session.rollback()
+        logger.error("Channel creation failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create channel.",
+        )
+
     return channel
 
 

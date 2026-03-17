@@ -1,24 +1,26 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useAuthStore } from "@/lib/stores/auth-store";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SEED_KEY = "squareup-comms-seeded";
 
 export function useSeedData() {
   const seeded = useRef(false);
+  const token = useAuthStore((s) => s.token);
 
   useEffect(() => {
     if (seeded.current) return;
+    if (!token) return; // Wait for auth
     if (typeof window !== "undefined" && localStorage.getItem(SEED_KEY)) return;
     seeded.current = true;
 
     const seed = async () => {
       try {
-        const headers = {
+        const headers: Record<string, string> = {
           "Content-Type": "application/json",
-          "X-User-Id": getCurrentUserId(),
+          Authorization: `Bearer ${token}`,
         };
 
         // Check if channels exist
@@ -104,5 +106,5 @@ export function useSeedData() {
     };
 
     seed();
-  }, []);
+  }, [token]);
 }

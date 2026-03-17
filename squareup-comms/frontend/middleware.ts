@@ -13,7 +13,7 @@ export function middleware(request: NextRequest) {
   const hasSession = request.cookies.has("__session");
 
   // Unauthenticated users trying to access protected routes → login
-  if (!hasSession && (pathname.startsWith("/office") || pathname.startsWith("/workspace") || pathname.startsWith("/onboarding"))) {
+  if (!hasSession && (pathname.startsWith("/office") || pathname.startsWith("/workspace") || pathname.startsWith("/onboarding") || pathname.startsWith("/chat") || pathname.startsWith("/crm") || pathname.startsWith("/drive") || pathname.startsWith("/agents") || pathname.startsWith("/settings"))) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -24,5 +24,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/office/:path*", "/workspace/:path*", "/onboarding/:path*", "/login"],
+  matcher: ["/office/:path*", "/workspace/:path*", "/onboarding/:path*", "/chat/:path*", "/crm/:path*", "/drive/:path*", "/agents/:path*", "/settings/:path*", "/login"],
 };

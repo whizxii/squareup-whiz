@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional, List, Dict
@@ -16,6 +17,8 @@ from app.core.auth import get_current_user
 from app.core.db import get_session
 from app.models.chat import Message, Reaction
 from app.websocket.manager import hub_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 
@@ -206,25 +209,28 @@ async def send_message(
     await session.commit()
     await session.refresh(message)
 
-    # Broadcast to other connected users via WebSocket
-    await hub_manager.broadcast_all({
-        "type": "chat.message",
-        "id": message.id,
-        "channel_id": message.channel_id,
-        "sender_id": message.sender_id,
-        "sender_type": message.sender_type,
-        "content": message.content,
-        "content_html": message.content_html,
-        "attachments": json.loads(message.attachments) if message.attachments else [],
-        "thread_id": message.thread_id,
-        "reply_count": message.reply_count,
-        "mentions": json.loads(message.mentions) if message.mentions else [],
-        "edited": message.edited,
-        "pinned": message.pinned,
-        "created_at": message.created_at.isoformat(),
-        "updated_at": None,
-        "reactions": [],
-    }, exclude=user_id)
+    # Broadcast to other connected users via WebSocket (non-fatal)
+    try:
+        await hub_manager.broadcast_all({
+            "type": "chat.message",
+            "id": message.id,
+            "channel_id": message.channel_id,
+            "sender_id": message.sender_id,
+            "sender_type": message.sender_type,
+            "content": message.content,
+            "content_html": message.content_html,
+            "attachments": json.loads(message.attachments) if message.attachments else [],
+            "thread_id": message.thread_id,
+            "reply_count": message.reply_count,
+            "mentions": json.loads(message.mentions) if message.mentions else [],
+            "edited": message.edited,
+            "pinned": message.pinned,
+            "created_at": message.created_at.isoformat(),
+            "updated_at": None,
+            "reactions": [],
+        }, exclude=user_id)
+    except Exception as exc:
+        logger.warning("WS broadcast failed for message %s: %s", message.id, exc)
 
     return MessageResponse.from_message(message)
 
@@ -372,15 +378,18 @@ async def edit_message(
     await session.commit()
     await session.refresh(message)
 
-    # Broadcast edit to other connected users
-    await hub_manager.broadcast_all({
-        "type": "chat.edited",
-        "message_id": message.id,
-        "channel_id": message.channel_id,
-        "content": message.content,
-        "content_html": message.content_html,
-        "updated_at": message.updated_at.isoformat() if message.updated_at else None,
-    }, exclude=user_id)
+    # Broadcast edit to other connected users (non-fatal)
+    try:
+        await hub_manager.broadcast_all({
+            "type": "chat.edited",
+            "message_id": message.id,
+            "channel_id": message.channel_id,
+            "content": message.content,
+            "content_html": message.content_html,
+            "updated_at": message.updated_at.isoformat() if message.updated_at else None,
+        }, exclude=user_id)
+    except Exception as exc:
+        logger.warning("WS broadcast failed for edit %s: %s", message.id, exc)
 
     # Fetch reactions for response
     stmt = (
@@ -430,12 +439,15 @@ async def delete_message(
     await session.delete(message)
     await session.commit()
 
-    # Broadcast deletion to other connected users
-    await hub_manager.broadcast_all({
-        "type": "chat.deleted",
-        "message_id": message_id,
-        "channel_id": channel_id,
-    }, exclude=user_id)
+    # Broadcast deletion to other connected users (non-fatal)
+    try:
+        await hub_manager.broadcast_all({
+            "type": "chat.deleted",
+            "message_id": message_id,
+            "channel_id": channel_id,
+        }, exclude=user_id)
+    except Exception as exc:
+        logger.warning("WS broadcast failed for delete %s: %s", message_id, exc)
 
 
 @router.post(
@@ -477,15 +489,18 @@ async def add_reaction(
     await session.commit()
     await session.refresh(reaction)
 
-    # Broadcast reaction to other connected users
-    await hub_manager.broadcast_all({
-        "type": "chat.reaction",
-        "message_id": message_id,
-        "channel_id": msg.channel_id,
-        "emoji": reaction.emoji,
-        "user_id": user_id,
-        "created_at": reaction.created_at.isoformat(),
-    }, exclude=user_id)
+    # Broadcast reaction to other connected users (non-fatal)
+    try:
+        await hub_manager.broadcast_all({
+            "type": "chat.reaction",
+            "message_id": message_id,
+            "channel_id": msg.channel_id,
+            "emoji": reaction.emoji,
+            "user_id": user_id,
+            "created_at": reaction.created_at.isoformat(),
+        }, exclude=user_id)
+    except Exception as exc:
+        logger.warning("WS broadcast failed for reaction on %s: %s", message_id, exc)
 
     return reaction
 
@@ -611,12 +626,15 @@ async def remove_reaction(
     await session.delete(reaction)
     await session.commit()
 
-    # Broadcast reaction removal to other connected users
-    await hub_manager.broadcast_all({
-        "type": "chat.reaction",
-        "message_id": message_id,
-        "channel_id": msg.channel_id,
-        "emoji": emoji,
-        "user_id": user_id,
-        "removed": True,
-    }, exclude=user_id)
+    # Broadcast reaction removal to other connected users (non-fatal)
+    try:
+        await hub_manager.broadcast_all({
+            "type": "chat.reaction",
+            "message_id": message_id,
+            "channel_id": msg.channel_id,
+            "emoji": emoji,
+            "user_id": user_id,
+            "removed": True,
+        }, exclude=user_id)
+    except Exception as exc:
+        logger.warning("WS broadcast failed for reaction removal on %s: %s", message_id, exc)

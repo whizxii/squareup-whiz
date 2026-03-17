@@ -155,7 +155,7 @@ export function CreateChannelDialog({ open, onClose }: Props) {
               </div>
 
               <div className="max-h-48 overflow-y-auto space-y-1 mt-2 border border-border rounded-lg p-1 bg-background">
-                {users.filter(u => u.display_name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase())).map(u => {
+                {users.filter(u => u.display_name.toLowerCase().includes(searchQuery.toLowerCase()) || (u.email || "").toLowerCase().includes(searchQuery.toLowerCase())).map(u => {
                   const isSelected = selectedUserIds.includes(u.id);
                   return (
                     <button
