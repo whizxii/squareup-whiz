@@ -5,11 +5,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithGoogle } from "@/lib/firebase";
 import { useAuthStore } from "@/lib/stores/auth-store";
-import { warmUpBackend } from "@/lib/fetch-with-retry";
+import { warmUpBackend, isBackendReady } from "@/lib/fetch-with-retry";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serverWaking, setServerWaking] = useState(false);
   const router = useRouter();
 
   const user = useAuthStore((s) => s.user);
@@ -18,7 +19,9 @@ export default function LoginPage() {
 
   // Wake up Render backend as soon as the login page loads
   useEffect(() => {
-    warmUpBackend();
+    if (isBackendReady()) return;
+    setServerWaking(true);
+    warmUpBackend().then(() => setServerWaking(false));
   }, []);
 
   // Redirect based on auth state — AuthProvider determines the destination
@@ -94,6 +97,14 @@ export default function LoginPage() {
             </svg>
             {loading ? "Signing in..." : "Continue with Google"}
           </button>
+
+          {/* Server waking indicator */}
+          {serverWaking && (
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              Waking up server... this may take up to a minute
+            </div>
+          )}
 
           {error && (
             <p className="text-xs text-center text-red-500">{error}</p>

@@ -5,7 +5,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
-import { fetchWithRetry } from "@/lib/fetch-with-retry";
+import { fetchWithRetry, warmUpBackend } from "@/lib/fetch-with-retry";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -54,13 +54,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Set session cookie so Next.js middleware can detect auth state
         document.cookie = "__session=1; path=/; max-age=86400; SameSite=Lax";
 
+        // Wait for backend to be warm before sending auth request
+        await warmUpBackend();
+
+        // Re-fetch token in case warmup took a long time and token expired
+        const freshToken = await firebaseUser.getIdToken(true);
+
         // Verify with backend and check onboarding status
-        // Uses retry to handle Render free-tier cold starts (503 without CORS)
         const res = await fetchWithRetry(`${API_URL}/api/auth/verify`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
+            Authorization: `Bearer ${freshToken}`,
           },
         });
 

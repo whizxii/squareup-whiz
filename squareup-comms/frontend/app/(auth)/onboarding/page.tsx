@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/auth-store";
-import { fetchWithRetry, warmUpBackend } from "@/lib/fetch-with-retry";
+import { fetchWithRetry, warmUpBackend, isBackendReady } from "@/lib/fetch-with-retry";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -61,8 +61,11 @@ export default function OnboardingPage() {
     setError(null);
 
     try {
-      // Get a fresh token to avoid expiry if user sat on the form
-      const freshToken = user ? await user.getIdToken() : null;
+      // Ensure backend is warm before sending the request
+      await warmUpBackend();
+
+      // Get a fresh token (force refresh) — warmup may have taken a while
+      const freshToken = user ? await user.getIdToken(true) : null;
 
       const res = await fetchWithRetry(`${API_URL}/api/auth/onboard`, {
         method: "POST",
