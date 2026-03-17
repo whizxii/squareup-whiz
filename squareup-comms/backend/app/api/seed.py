@@ -148,11 +148,16 @@ async def seed_users(
                 results.append(entry)
                 continue
 
-        # 2. Create UserProfile row (or skip if exists)
+        # 2. Create or update UserProfile row
         existing = await session.get(UserProfile, firebase_uid)
         if existing:
-            entry["profile"] = "already_exists"
-            entry["status"] = "exists"
+            existing.office_x = user_data["office_x"]
+            existing.office_y = user_data["office_y"]
+            existing.avatar_config = json.dumps(user_data["avatar_config"])
+            existing.display_name = user_data["display_name"]
+            session.add(existing)
+            entry["profile"] = "updated"
+            entry["status"] = "updated"
         else:
             profile = UserProfile(
                 firebase_uid=firebase_uid,

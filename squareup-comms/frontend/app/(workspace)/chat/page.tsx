@@ -21,10 +21,12 @@ import { useKeyboardShortcuts, type ShortcutAction } from "@/hooks/use-keyboard-
 import { KeyboardShortcutsDialog } from "@/components/chat/KeyboardShortcutsDialog";
 import { ChannelSettingsSidebar } from "@/components/chat/ChannelSettingsSidebar";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useAuthStore } from "@/lib/stores/auth-store";
 import { Settings } from "lucide-react";
 
 export default function ChatPage() {
   const currentUserId = useCurrentUserId();
+  const token = useAuthStore((s) => s.token);
   const channels = useChatStore((s) => s.channels);
   const activeChannelId = useChatStore((s) => s.activeChannelId);
   const setChannels = useChatStore((s) => s.setChannels);
@@ -141,7 +143,7 @@ export default function ChatPage() {
   // ─── WebSocket connection ──────────────────────────────────────────
   // The hook builds the URL from NEXT_PUBLIC_WS_URL and appends ?token=<value>.
   // We pass the user ID as the token so the backend can identify us.
-  const { status: wsStatus, send: wsSend, on: wsOn } = useWebSocket(currentUserId);
+  const { status: wsStatus, send: wsSend, on: wsOn } = useWebSocket(token);
 
   // Expose wsStatus for the disconnection banner
   const isWsConnected = wsStatus === "connected";
