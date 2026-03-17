@@ -378,9 +378,15 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, [clearTyping]);
 
-  // ─── Fetch channels on mount (REST fallback always works) ──────────
+  // ─── Fetch channels once token is ready (auth-gated) ──────────────
   useEffect(() => {
+    if (!token) {
+      // Auth not yet ready — don't spin forever, just show empty state
+      setLoading(false);
+      return;
+    }
     const fetchChannels = async () => {
+      setLoading(true);
       try {
         const data = await api.getChannels();
         const mapped = data.map((c) => ({
@@ -401,7 +407,7 @@ export default function ChatPage() {
       }
     };
     fetchChannels();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Fetch messages when active channel changes (REST) ─────────────
   useEffect(() => {
