@@ -9,6 +9,7 @@ import { useRef, useCallback, useMemo, useEffect } from "react";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { useWebSocket } from "@/hooks/use-websocket";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { useOfficeTime } from "@/lib/hooks/useOfficeTime";
 import { useOfficeKeyboard } from "@/lib/hooks/useOfficeKeyboard";
@@ -42,6 +43,9 @@ const LAYOUT_STORAGE_KEY = "sq-office-layout";
 export default function OfficePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const myUserId = useCurrentUserId();
+
+  const token = useAuthStore((s) => s.token);
+  const { send: wsSend, on: wsOn } = useWebSocket(token);
 
   const users = useOfficeStore((s) => s.users);
   const agents = useOfficeStore((s) => s.agents);
@@ -115,6 +119,15 @@ export default function OfficePage() {
     return () => unsub();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Real-time: update other users' positions when they move
+  useEffect(() => {
+    return wsOn("office.user_moved", (data) => {
+      const userId = data.user_id as string;
+      if (userId === myUserId) return;
+      moveUser(userId, data.x as number, data.y as number, "down");
+    });
+  }, [wsOn, moveUser, myUserId]);
+
   // Hooks — day/night cycle, weather, agent routines, keyboard controls, camera follow
   useOfficeTime();
   useWeather();
@@ -182,6 +195,7 @@ export default function OfficePage() {
 
         moveUser(myUserId, x, y, dir);
         setMyPosition(x, y);
+        wsSend({ type: "office.move", x, y });
         step += 1;
         setTimeout(walkStep, 150);
       };
@@ -198,6 +212,7 @@ export default function OfficePage() {
       updateUserAnimation,
       setMyPosition,
       myUserId,
+      wsSend,
     ]
   );
 
