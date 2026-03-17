@@ -39,7 +39,9 @@ services:
       - key: LIVEKIT_API_SECRET
         sync: false
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: "http://localhost:3000,http://localhost:3001,https://squareup-comms.vercel.app,https://squareup-comms-whizdome.vercel.app,https://squareup-comms-git-main-whizdome.vercel.app,https://squareup-comms-whizxii-whizdome.vercel.app"
+      - key: ALLOWED_ORIGIN_REGEX
+        value: "https://squareup-comms.*\\.vercel\\.app"
       - key: ENCRYPTION_KEY
         sync: false
       - key: LOG_LEVEL

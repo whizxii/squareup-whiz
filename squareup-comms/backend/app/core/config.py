@@ -52,6 +52,8 @@ class Settings(BaseSettings):
 
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
+    # Regex to allow Vercel preview deployments (e.g. squareup-comms-abc123-whizdome.vercel.app)
+    ALLOWED_ORIGIN_REGEX: Optional[str] = None
 
     # Encryption
     ENCRYPTION_KEY: Optional[str] = None  # Fernet key for OAuth tokens
