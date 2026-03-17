@@ -23,14 +23,14 @@ export function useMessagesQuery(channelId: string | null) {
   return useInfiniteQuery({
     queryKey: channelId ? messageKeys.channel(channelId) : ["messages", "none"],
     queryFn: async ({ pageParam }) => {
-      if (!channelId) return [];
+      if (!channelId) return { messages: [], has_more: false };
       return api.getMessages(channelId, pageParam, MESSAGES_PAGE_SIZE);
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => {
-      // If we got fewer messages than requested, we've reached the start
-      if (lastPage.length < MESSAGES_PAGE_SIZE) return undefined;
-      return lastPage[0]?.id;
+      if (!lastPage.has_more) return undefined;
+      const msgs = lastPage.messages;
+      return msgs.length > 0 ? msgs[0].id : undefined;
     },
     enabled: !!channelId,
     staleTime: 60_000,
@@ -42,7 +42,7 @@ export function useThreadQuery(messageId: string | null) {
   return useInfiniteQuery({
     queryKey: messageId ? messageKeys.thread(messageId) : ["messages", "thread", "none"],
     queryFn: async () => {
-      if (!messageId) return [];
+      if (!messageId) return { messages: [], has_more: false };
       return api.getThreadReplies(messageId);
     },
     initialPageParam: undefined as string | undefined,

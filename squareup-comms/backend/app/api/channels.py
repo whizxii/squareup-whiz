@@ -110,6 +110,19 @@ async def create_channel(
     )
     session.add(membership)
 
+    # Auto-add all team members to public channels
+    if not body.is_private and body.type == "public":
+        from app.models.users import UserProfile
+        all_users_result = await session.execute(select(UserProfile))
+        for user in all_users_result.scalars().all():
+            if user.firebase_uid != user_id:
+                member = ChannelMember(
+                    channel_id=channel.id,
+                    user_id=user.firebase_uid,
+                    role="member",
+                )
+                session.add(member)
+
     await session.commit()
     await session.refresh(channel)
     return channel

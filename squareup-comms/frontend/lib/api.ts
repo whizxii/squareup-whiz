@@ -88,7 +88,7 @@ class ApiClient {
       limit: String(limit),
     });
     if (beforeId) params.set("before_id", beforeId);
-    return this.request<Message[]>(`/api/messages/?${params}`);
+    return this.request<MessageListResponse>(`/api/messages/?${params}`);
   }
 
   async sendMessage(data: {
@@ -132,7 +132,7 @@ class ApiClient {
   }
 
   async getThreadReplies(messageId: string) {
-    return this.request<Message[]>(`/api/messages/threads/${messageId}`);
+    return this.request<MessageListResponse>(`/api/messages/threads/${messageId}`);
   }
 }
 
@@ -151,6 +151,11 @@ interface Channel {
   updated_at: string;
 }
 
+interface MessageListResponse {
+  messages: Message[];
+  has_more: boolean;
+}
+
 interface Message {
   id: string;
   channel_id: string;
@@ -158,10 +163,10 @@ interface Message {
   sender_type: string;
   content?: string;
   content_html?: string;
-  attachments?: string;
+  attachments?: { id: string; name: string; url: string; type: string; size: number }[];
   thread_id?: string;
   reply_count: number;
-  mentions?: string;
+  mentions?: { type: string; id: string }[];
   edited: boolean;
   pinned: boolean;
   created_at: string;

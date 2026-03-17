@@ -49,7 +49,7 @@ export function CreateChannelDialog({ open, onClose }: Props) {
 
     try {
       const channel = await api.createChannel({
-        name: type === "private" ? "Group" : name.trim().toLowerCase().replace(/\s+/g, "-"),
+        name: name.trim().toLowerCase().replace(/\s+/g, "-"),
         type,
         description: description.trim() || undefined,
         is_private: type === "private"
@@ -114,35 +114,34 @@ export function CreateChannelDialog({ open, onClose }: Props) {
             ))}
           </div>
 
-          {/* Conditional Name/Description OR User Selection */}
-          {type === "public" ? (
-            <>
-              <div>
-                <label htmlFor="channel-name" className="block text-sm font-medium mb-1.5">Name</label>
-                <input
-                  id="channel-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) handleCreate(); }}
-                  placeholder="e.g. general, sales, random"
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
-                />
-              </div>
-              <div>
-                <label htmlFor="channel-description" className="block text-sm font-medium mb-1.5">
-                  Description <span className="text-muted-foreground font-normal">(optional)</span>
-                </label>
-                <input
-                  id="channel-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) handleCreate(); }}
-                  placeholder="What's this channel about?"
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
-                />
-              </div>
-            </>
-          ) : (
+          {/* Name & Description — always shown */}
+          <div>
+            <label htmlFor="channel-name" className="block text-sm font-medium mb-1.5">Name</label>
+            <input
+              id="channel-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) handleCreate(); }}
+              placeholder={type === "public" ? "e.g. general, sales, random" : "e.g. project-alpha, design-team"}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
+            />
+          </div>
+          <div>
+            <label htmlFor="channel-description" className="block text-sm font-medium mb-1.5">
+              Description <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <input
+              id="channel-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) handleCreate(); }}
+              placeholder="What's this channel about?"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
+            />
+          </div>
+
+          {/* User picker — only for private channels */}
+          {type === "private" && (
             <div className="space-y-3">
               <label className="block text-sm font-medium">Add people to this group</label>
               <div className="relative">
@@ -176,7 +175,7 @@ export function CreateChannelDialog({ open, onClose }: Props) {
                       </div>
                       {isSelected && <Check className="w-4 h-4 text-primary" />}
                     </button>
-                  )
+                  );
                 })}
                 {users.length === 0 && !isSearching && (
                   <p className="text-center text-xs p-3 text-muted-foreground">No users found.</p>

@@ -152,7 +152,9 @@ export default function ChatPage() {
   useEffect(() => {
     // chat.message — a new message was posted in a channel
     const offMessage = wsOn("chat.message", (data) => {
-      const msg = data as Record<string, unknown>;
+      const raw = data as Record<string, unknown>;
+      // Support both flat and nested (handlers.py wraps under "message" key)
+      const msg = (raw.message ?? raw) as Record<string, unknown>;
       const channelId = msg.channel_id as string;
       if (!channelId) return;
 
@@ -409,9 +411,7 @@ export default function ChatPage() {
       setMessagesLoading(true);
       try {
         const data = await api.getMessages(activeChannelId);
-        const rawMessages = Array.isArray(data)
-          ? data
-          : ((data as Record<string, unknown>).messages as typeof data) || [];
+        const rawMessages = data.messages ?? [];
         const messages = rawMessages.map((m) => ({
           id: m.id,
           channel_id: m.channel_id,
@@ -430,7 +430,8 @@ export default function ChatPage() {
           mentions: [],
           sender_name: m.sender_id === currentUserId ? "You" : m.sender_id,
         }));
-        setMessages(activeChannelId, messages);
+        // Backend returns newest-first; reverse for oldest-first display
+        setMessages(activeChannelId, [...messages].reverse());
       } catch {
         // API not available
       } finally {

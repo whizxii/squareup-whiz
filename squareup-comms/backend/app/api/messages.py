@@ -15,6 +15,7 @@ from sqlmodel import select
 from app.core.auth import get_current_user
 from app.core.db import get_session
 from app.models.chat import Message, Reaction
+from app.websocket.manager import hub_manager
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 
@@ -204,6 +205,27 @@ async def send_message(
 
     await session.commit()
     await session.refresh(message)
+
+    # Broadcast to other connected users via WebSocket
+    await hub_manager.broadcast_all({
+        "type": "chat.message",
+        "id": message.id,
+        "channel_id": message.channel_id,
+        "sender_id": message.sender_id,
+        "sender_type": message.sender_type,
+        "content": message.content,
+        "content_html": message.content_html,
+        "attachments": json.loads(message.attachments) if message.attachments else [],
+        "thread_id": message.thread_id,
+        "reply_count": message.reply_count,
+        "mentions": json.loads(message.mentions) if message.mentions else [],
+        "edited": message.edited,
+        "pinned": message.pinned,
+        "created_at": message.created_at.isoformat(),
+        "updated_at": None,
+        "reactions": [],
+    }, exclude=user_id)
+
     return MessageResponse.from_message(message)
 
 
@@ -350,6 +372,16 @@ async def edit_message(
     await session.commit()
     await session.refresh(message)
 
+    # Broadcast edit to other connected users
+    await hub_manager.broadcast_all({
+        "type": "chat.edited",
+        "message_id": message.id,
+        "channel_id": message.channel_id,
+        "content": message.content,
+        "content_html": message.content_html,
+        "updated_at": message.updated_at.isoformat() if message.updated_at else None,
+    }, exclude=user_id)
+
     # Fetch reactions for response
     stmt = (
         select(Reaction)
@@ -385,6 +417,9 @@ async def delete_message(
             parent.reply_count -= 1
             session.add(parent)
 
+    # Capture channel_id before deletion for broadcast
+    channel_id = message.channel_id
+
     # Delete associated reactions first
     stmt = select(Reaction).where(Reaction.message_id == message_id)
     result = await session.execute(stmt)
@@ -394,6 +429,13 @@ async def delete_message(
 
     await session.delete(message)
     await session.commit()
+
+    # Broadcast deletion to other connected users
+    await hub_manager.broadcast_all({
+        "type": "chat.deleted",
+        "message_id": message_id,
+        "channel_id": channel_id,
+    }, exclude=user_id)
 
 
 @router.post(
@@ -409,8 +451,8 @@ async def add_reaction(
 ) -> Reaction:
     """Add an emoji reaction to a message."""
 
-    # Ensure the message exists
-    await _get_message_or_404(session, message_id)
+    # Ensure the message exists and get channel_id for broadcast
+    msg = await _get_message_or_404(session, message_id)
 
     # Check for duplicate
     stmt = select(Reaction).where(
@@ -434,6 +476,17 @@ async def add_reaction(
     session.add(reaction)
     await session.commit()
     await session.refresh(reaction)
+
+    # Broadcast reaction to other connected users
+    await hub_manager.broadcast_all({
+        "type": "chat.reaction",
+        "message_id": message_id,
+        "channel_id": msg.channel_id,
+        "emoji": reaction.emoji,
+        "user_id": user_id,
+        "created_at": reaction.created_at.isoformat(),
+    }, exclude=user_id)
+
     return reaction
 
 
@@ -538,6 +591,9 @@ async def remove_reaction(
 ) -> None:
     """Remove your emoji reaction from a message."""
 
+    # Get message for channel_id broadcast
+    msg = await _get_message_or_404(session, message_id)
+
     stmt = select(Reaction).where(
         Reaction.message_id == message_id,
         Reaction.user_id == user_id,
@@ -554,3 +610,13 @@ async def remove_reaction(
 
     await session.delete(reaction)
     await session.commit()
+
+    # Broadcast reaction removal to other connected users
+    await hub_manager.broadcast_all({
+        "type": "chat.reaction",
+        "message_id": message_id,
+        "channel_id": msg.channel_id,
+        "emoji": emoji,
+        "user_id": user_id,
+        "removed": True,
+    }, exclude=user_id)

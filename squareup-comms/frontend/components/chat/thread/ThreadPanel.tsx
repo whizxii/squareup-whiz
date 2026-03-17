@@ -75,7 +75,8 @@ export function ThreadPanel({ parentMessageId, onClose }: ThreadPanelProps) {
     const fetchReplies = async () => {
       setLoading(true);
       try {
-        const threadReplies = await api.getThreadReplies(parentMessageId);
+        const data = await api.getThreadReplies(parentMessageId);
+        const threadReplies = data.messages ?? [];
         setReplies(
           threadReplies.map((r) => ({
             ...r,
