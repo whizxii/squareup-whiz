@@ -75,7 +75,10 @@ export function ChannelSettingsSidebar({ channel, onClose }: Props) {
             // Refresh channel list by closing and re-opening would be simplest,
             // but let's update the store directly
             const updated = await api.getChannel(channel.id);
-            useChatStore.getState().updateChannel(updated.id, updated);
+            useChatStore.getState().updateChannel(updated.id, {
+                ...updated,
+                type: updated.type as "public" | "private" | "dm" | "agent",
+            });
         } catch (err) {
             setEditError(err instanceof Error ? err.message : "Failed to update channel");
         } finally {
