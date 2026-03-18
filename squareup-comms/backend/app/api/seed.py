@@ -6,8 +6,11 @@ import json
 import logging
 from datetime import datetime, timezone
 
+import traceback
+
 import httpx
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -150,7 +153,11 @@ async def seed_users(
         return await _seed_users_impl(session)
     except Exception as exc:
         logger.exception("seed_users failed")
-        return {"error": str(exc), "type": type(exc).__name__}
+        tb = traceback.format_exc()
+        return JSONResponse(
+            status_code=200,
+            content={"error": str(exc), "type": type(exc).__name__, "traceback": tb},
+        )
 
 
 async def _seed_users_impl(session: AsyncSession) -> dict:
