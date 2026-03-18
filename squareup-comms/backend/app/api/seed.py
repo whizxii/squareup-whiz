@@ -513,7 +513,7 @@ async def delete_orphan_profile(
         {"uid": uid},
     )
     await session.execute(
-        text("UPDATE messages SET sender_id = NULL WHERE sender_id = :uid"),
+        text("DELETE FROM messages WHERE sender_id = :uid"),
         {"uid": uid},
     )
     await session.execute(
