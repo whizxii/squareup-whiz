@@ -159,7 +159,7 @@ export function EnrollmentList({ sequenceId }: EnrollmentListProps) {
   const unenroll = useUnenrollFromSequence();
 
   const enrollments: SequenceEnrollment[] = useMemo(
-    () => data?.data ?? [],
+    () => data ?? [],
     [data]
   );
 

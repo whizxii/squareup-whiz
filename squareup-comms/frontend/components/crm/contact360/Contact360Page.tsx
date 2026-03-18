@@ -111,7 +111,7 @@ export function Contact360Page({ contactId, onBack }: Contact360PageProps) {
   }
 
   // Error state
-  if (error || !data?.data) {
+  if (error || !data) {
     return (
       <div className="h-full flex items-center justify-center p-8">
         <EmptyState
@@ -126,7 +126,7 @@ export function Contact360Page({ contactId, onBack }: Contact360PageProps) {
     );
   }
 
-  const c360 = data.data;
+  const c360 = data;
 
   return (
     <div className="h-full flex flex-col bg-background">

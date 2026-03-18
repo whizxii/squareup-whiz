@@ -38,6 +38,11 @@ class ApiClient {
       throw new Error(error.detail || `API Error: ${res.status}`);
     }
 
+    // 204 No Content — nothing to parse
+    if (res.status === 204) {
+      return undefined as T;
+    }
+
     return res.json();
   }
 

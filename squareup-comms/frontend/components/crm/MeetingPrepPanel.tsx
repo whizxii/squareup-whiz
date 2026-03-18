@@ -130,7 +130,7 @@ export function MeetingPrepPanel({ eventId }: MeetingPrepPanelProps) {
 
   if (isLoading) return <MeetingPrepSkeleton />;
 
-  const prep = data?.data;
+  const prep = data;
 
   if (error || !prep) {
     return (

@@ -56,8 +56,8 @@ export function MergeContactsDialog({
   });
   const mergeMutation = useMergeContacts();
 
-  const primary = selectedPrimary === "a" ? contactA?.data : contactB?.data;
-  const secondary = selectedPrimary === "a" ? contactB?.data : contactA?.data;
+  const primary = selectedPrimary === "a" ? contactA : contactB;
+  const secondary = selectedPrimary === "a" ? contactB : contactA;
 
   const handleMerge = () => {
     if (!primary?.id || !secondary?.id) return;
@@ -114,8 +114,8 @@ export function MergeContactsDialog({
               {/* Primary selector */}
               <div className="grid grid-cols-2 gap-3 mb-4">
                 {[
-                  { key: "a" as const, contact: contactA?.data },
-                  { key: "b" as const, contact: contactB?.data },
+                  { key: "a" as const, contact: contactA },
+                  { key: "b" as const, contact: contactB },
                 ].map(({ key, contact }) => (
                   <button
                     key={key}

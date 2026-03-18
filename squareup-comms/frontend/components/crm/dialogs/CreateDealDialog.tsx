@@ -23,8 +23,8 @@ export function CreateDealDialog({ open, onOpenChange }: CreateDealDialogProps) 
   const { data: defaultRes } = useDefaultPipeline();
   const createDeal = useCreateDeal();
 
-  const pipelines = pipelinesRes?.data ?? [];
-  const defaultPipeline = defaultRes?.data ?? null;
+  const pipelines = pipelinesRes ?? [];
+  const defaultPipeline = defaultRes ?? null;
 
   const initialPipelineId =
     (dialogData as { pipeline_id?: string })?.pipeline_id ??

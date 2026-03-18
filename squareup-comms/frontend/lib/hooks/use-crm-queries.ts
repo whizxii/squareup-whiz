@@ -40,7 +40,6 @@ import type {
   ActivityAnalytics,
   CRMNotification,
   PaginatedResponse,
-  ApiResponse,
 } from "@/lib/types/crm";
 
 // ─── Query key factory ───────────────────────────────────────────
@@ -210,12 +209,9 @@ export function useUpdateContact() {
       crmApi.updateContact(id, updates),
     onMutate: async ({ id, updates }) => {
       await qc.cancelQueries({ queryKey: crmKeys.contactDetail(id) });
-      const previous = qc.getQueryData<ApiResponse<Contact>>(crmKeys.contactDetail(id));
-      if (previous?.data) {
-        qc.setQueryData(crmKeys.contactDetail(id), {
-          ...previous,
-          data: { ...previous.data, ...updates },
-        });
+      const previous = qc.getQueryData<Contact>(crmKeys.contactDetail(id));
+      if (previous) {
+        qc.setQueryData(crmKeys.contactDetail(id), { ...previous, ...updates });
       }
       return { previous };
     },

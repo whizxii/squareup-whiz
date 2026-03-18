@@ -66,7 +66,7 @@ class MessageResponse(BaseModel):
     attachments: Optional[list[str]]
     thread_id: Optional[str]
     reply_count: int
-    mentions: Optional[list[str]]
+    mentions: Optional[list[Any]]
     agent_execution_id: Optional[str]
     edited: bool
     pinned: bool
@@ -91,7 +91,7 @@ class MessageResponse(BaseModel):
             except (json.JSONDecodeError, TypeError):
                 attachments_list = []
 
-        mentions_list: list[str] = []
+        mentions_list: list[Any] = []
         if message.mentions:
             try:
                 mentions_list = json.loads(message.mentions)

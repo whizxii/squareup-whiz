@@ -23,8 +23,8 @@ export function PipelineView() {
   const { data: defaultRes, isLoading: loadingDefault } = useDefaultPipeline();
   const { data: pipelinesRes } = usePipelines();
 
-  const defaultPipeline = defaultRes?.data ?? null;
-  const pipelines = pipelinesRes?.data ?? [];
+  const defaultPipeline = defaultRes ?? null;
+  const pipelines = pipelinesRes ?? [];
 
   // Use active pipeline or fall back to default
   const effectivePipelineId = activePipelineId ?? defaultPipeline?.id ?? "";
@@ -43,7 +43,7 @@ export function PipelineView() {
   );
   const moveDealStage = useMoveDealStage();
 
-  const dealsByStage: Record<string, Deal[]> = dealsRes?.data ?? {};
+  const dealsByStage: Record<string, Deal[]> = dealsRes ?? {};
 
   const handleDragEnd = useCallback(
     (result: DropResult) => {

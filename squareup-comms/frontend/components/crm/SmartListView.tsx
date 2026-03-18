@@ -76,7 +76,7 @@ const OPERATOR_OPTIONS: { value: CriteriaOperator; label: string }[] = [
 
 function MemberTable({ listId }: { listId: string }) {
   const { data, isLoading } = useSmartListMembers(listId);
-  const members: Contact[] = data?.data?.items ?? [];
+  const members: Contact[] = data?.items ?? [];
 
   if (isLoading) {
     return (
@@ -138,7 +138,7 @@ function LookalikePanel({ listId }: { listId: string }) {
 
   const handleGenerate = useCallback(async () => {
     const res = await mutation.mutateAsync({ id: listId, limit: 20 });
-    setResults(res?.data?.items ?? []);
+    setResults(res?.items ?? []);
   }, [listId, mutation]);
 
   return (
@@ -519,7 +519,7 @@ function SmartListDetail({
 }) {
   const { data } = useSmartList(listId);
   const refreshMutation = useRefreshSmartList();
-  const list = data?.data;
+  const list = data;
 
   if (!list) {
     return (
@@ -603,7 +603,7 @@ export function SmartListsView() {
   const { data, isLoading } = useSmartLists({ search: search || undefined });
   const deleteMutation = useDeleteSmartList();
 
-  const lists: SmartList[] = data?.data?.items ?? [];
+  const lists: SmartList[] = data?.items ?? [];
 
   const handleView = useCallback((id: string) => {
     setSelectedId(id);

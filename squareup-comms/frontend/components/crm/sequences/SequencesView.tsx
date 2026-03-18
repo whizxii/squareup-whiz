@@ -271,7 +271,7 @@ export function SequencesView() {
   const pauseSequence = usePauseSequence();
   const activateSequence = useActivateSequence();
 
-  const sequences: EmailSequence[] = data?.data ?? [];
+  const sequences: EmailSequence[] = data ?? [];
 
   const handleCreate = useCallback(
     (formData: { name: string; description: string; steps: SequenceStep[] }) => {

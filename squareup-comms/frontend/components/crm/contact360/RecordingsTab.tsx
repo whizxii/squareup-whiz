@@ -238,7 +238,7 @@ function TranscriptionDetail({
   onBack: () => void;
 }) {
   const { data, isLoading, error } = useRecording(recordingId);
-  const recording: CallRecording | undefined = data?.data ?? undefined;
+  const recording: CallRecording | undefined = data ?? undefined;
 
   if (isLoading) {
     return (

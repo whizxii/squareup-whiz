@@ -81,8 +81,7 @@ function AnalyticsSkeleton() {
 // ─── Win / Loss Panel ───────────────────────────────────────────
 
 function WinLossPanel({ period }: { period: string }) {
-  const { data: res, isLoading } = useWinLossAnalytics(period);
-  const d = res?.data;
+  const { data: d, isLoading } = useWinLossAnalytics(period);
 
   if (isLoading) return <div className="h-64 rounded-xl bg-muted/40 animate-pulse" />;
   if (!d) return null;
@@ -130,8 +129,7 @@ function WinLossPanel({ period }: { period: string }) {
 // ─── Stage Duration Panel ───────────────────────────────────────
 
 function StageDurationPanel() {
-  const { data: res, isLoading } = useStageDuration();
-  const stages = res?.data ?? [];
+  const { data: stages = [], isLoading } = useStageDuration();
 
   if (isLoading) return <div className="h-64 rounded-xl bg-muted/40 animate-pulse" />;
   if (stages.length === 0) return null;
@@ -179,8 +177,7 @@ function StageDurationPanel() {
 // ─── Deal Velocity Panel ────────────────────────────────────────
 
 function DealVelocityPanel({ period }: { period: string }) {
-  const { data: res, isLoading } = useDealVelocity(period);
-  const d = res?.data;
+  const { data: d, isLoading } = useDealVelocity(period);
 
   if (isLoading) return <div className="h-48 rounded-xl bg-muted/40 animate-pulse" />;
   if (!d) return null;
@@ -207,8 +204,7 @@ function DealVelocityPanel({ period }: { period: string }) {
 // ─── Lead Source Panel ──────────────────────────────────────────
 
 function LeadSourcePanel({ period }: { period: string }) {
-  const { data: res, isLoading } = useLeadSourceAnalytics(period);
-  const sources = res?.data ?? [];
+  const { data: sources = [], isLoading } = useLeadSourceAnalytics(period);
 
   if (isLoading) return <div className="h-64 rounded-xl bg-muted/40 animate-pulse" />;
   if (sources.length === 0) return null;
@@ -252,8 +248,8 @@ function LeadSourcePanel({ period }: { period: string }) {
 // ─── Pipeline Conversion Panel ──────────────────────────────────
 
 function PipelineConversionPanel() {
-  const { data: res, isLoading } = usePipelineAnalytics();
-  const stages = res?.data?.stages ?? [];
+  const { data: pipelineData, isLoading } = usePipelineAnalytics();
+  const stages = pipelineData?.stages ?? [];
 
   if (isLoading) return <div className="h-48 rounded-xl bg-muted/40 animate-pulse" />;
   if (stages.length === 0) return null;

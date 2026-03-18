@@ -77,8 +77,8 @@ export function EditContactDialog({
 
   // Populate form when contact data loads
   useEffect(() => {
-    if (data?.data) {
-      const c = data.data;
+    if (data) {
+      const c = data;
       setForm({
         name: c.name ?? "",
         email: c.email ?? "",
@@ -103,7 +103,7 @@ export function EditContactDialog({
   const handleSave = useCallback(() => {
     if (!contactId || !form.name.trim()) return;
 
-    const original = data?.data;
+    const original = data;
     if (!original) return;
 
     // Only send changed fields

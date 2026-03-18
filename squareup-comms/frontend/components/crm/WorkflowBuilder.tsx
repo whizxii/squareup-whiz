@@ -70,7 +70,7 @@ const ACTION_OPTIONS: { type: WorkflowActionType; label: string }[] = [
 
 function ExecutionHistory({ workflowId }: { workflowId: string }) {
   const { data, isLoading } = useWorkflowHistory(workflowId);
-  const items = data?.data?.items ?? [];
+  const items = data?.items ?? [];
 
   if (isLoading) {
     return <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>;
@@ -593,7 +593,7 @@ export function WorkflowsView() {
   const deactivateMutation = useDeactivateWorkflow();
   const deleteMutation = useDeleteWorkflow();
 
-  const workflows: Workflow[] = data?.data?.items ?? [];
+  const workflows: Workflow[] = data?.items ?? [];
 
   const handleEdit = useCallback((id: string) => {
     setEditingId(id);

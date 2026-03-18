@@ -244,8 +244,8 @@ export function EmailsTab({ contactId }: EmailsTabProps) {
   const { data: enrollmentsData } = useContactEnrollments(contactId);
   const enrollInSequence = useEnrollInSequence();
 
-  const sequences = sequencesData?.data ?? [];
-  const allEnrollments = enrollmentsData?.data ?? [];
+  const sequences = sequencesData ?? [];
+  const allEnrollments = enrollmentsData ?? [];
   const activeEnrollments = useMemo(
     () => allEnrollments.filter((e) => e.status === "active"),
     [allEnrollments]
@@ -256,7 +256,7 @@ export function EmailsTab({ contactId }: EmailsTabProps) {
   );
 
   const emails: Email[] = useMemo(() => {
-    const items = data?.data ?? [];
+    const items = data ?? [];
     if (dirFilter === "all") return items;
     return items.filter((e) => e.direction === dirFilter);
   }, [data, dirFilter]);
@@ -297,7 +297,7 @@ export function EmailsTab({ contactId }: EmailsTabProps) {
     );
   }
 
-  const allEmails = data?.data ?? [];
+  const allEmails = data ?? [];
   const inboundCount = allEmails.filter((e) => e.direction === "inbound").length;
   const outboundCount = allEmails.filter((e) => e.direction === "outbound").length;
 

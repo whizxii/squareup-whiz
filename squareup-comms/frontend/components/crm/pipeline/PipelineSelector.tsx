@@ -10,8 +10,8 @@ export function PipelineSelector() {
   const { data: pipelinesRes } = usePipelines();
   const { data: defaultRes } = useDefaultPipeline();
 
-  const pipelines = pipelinesRes?.data ?? [];
-  const defaultPipeline = defaultRes?.data ?? null;
+  const pipelines = pipelinesRes ?? [];
+  const defaultPipeline = defaultRes ?? null;
 
   const activePipelineId = useCRMUIStore((s) => s.activePipelineId);
   const setActivePipelineId = useCRMUIStore((s) => s.setActivePipelineId);

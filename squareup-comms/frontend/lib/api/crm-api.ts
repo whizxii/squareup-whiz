@@ -40,7 +40,6 @@ import type {
   ActivityAnalytics,
   CRMNotification,
   PaginatedResponse,
-  ApiResponse,
 } from "@/lib/types/crm";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -134,7 +133,19 @@ class CRMApiClient {
       throw new Error(error.error || error.detail || `API Error: ${res.status}`);
     }
 
-    return res.json();
+    // 204 No Content — nothing to parse
+    if (res.status === 204) {
+      return undefined as T;
+    }
+
+    const json = await res.json();
+
+    // Backend wraps all CRM responses in { success, data } envelope — unwrap it
+    if (json && typeof json === "object" && "success" in json && "data" in json) {
+      return json.data as T;
+    }
+
+    return json as T;
   }
 
   // ─── Contacts ────────────────────────────────────────────────
@@ -152,17 +163,17 @@ class CRMApiClient {
     return this.request(`/api/crm/v2/contacts${params}`);
   }
 
-  async getContact(id: string): Promise<ApiResponse<Contact>> {
+  async getContact(id: string): Promise<Contact> {
     return this.request(`/api/crm/v2/contacts/${id}`);
   }
 
-  async getContact360(id: string): Promise<ApiResponse<Contact360Response>> {
+  async getContact360(id: string): Promise<Contact360Response> {
     return this.request(`/api/crm/v2/contacts/${id}/360`);
   }
 
   async createContact(
     data: Partial<Contact>
-  ): Promise<ApiResponse<Contact>> {
+  ): Promise<Contact> {
     return this.request("/api/crm/v2/contacts", {
       method: "POST",
       body: JSON.stringify(data),
@@ -172,20 +183,20 @@ class CRMApiClient {
   async updateContact(
     id: string,
     updates: Partial<Contact>
-  ): Promise<ApiResponse<Contact>> {
+  ): Promise<Contact> {
     return this.request(`/api/crm/v2/contacts/${id}`, {
       method: "PUT",
       body: JSON.stringify(updates),
     });
   }
 
-  async archiveContact(id: string): Promise<ApiResponse<void>> {
+  async archiveContact(id: string): Promise<void> {
     return this.request(`/api/crm/v2/contacts/${id}`, {
       method: "DELETE",
     });
   }
 
-  async restoreContact(id: string): Promise<ApiResponse<void>> {
+  async restoreContact(id: string): Promise<void> {
     return this.request(`/api/crm/v2/contacts/${id}/restore`, {
       method: "POST",
     });
@@ -194,7 +205,7 @@ class CRMApiClient {
   async mergeContacts(
     primaryId: string,
     secondaryId: string
-  ): Promise<ApiResponse<Contact>> {
+  ): Promise<Contact> {
     return this.request("/api/crm/v2/contacts/merge", {
       method: "POST",
       body: JSON.stringify({
@@ -206,14 +217,14 @@ class CRMApiClient {
 
   async findDuplicates(
     contactId: string
-  ): Promise<ApiResponse<Contact[]>> {
+  ): Promise<Contact[]> {
     return this.request(`/api/crm/v2/contacts/${contactId}/duplicates`);
   }
 
   async searchCRM(
     query: string,
     pagination?: PaginationParams
-  ): Promise<ApiResponse<{ contacts: Contact[]; companies: Company[]; deals: Deal[] }>> {
+  ): Promise<{ contacts: Contact[]; companies: Company[]; deals: Deal[] }> {
     const params = buildParams({ q: query, ...pagination });
     return this.request(`/api/crm/v2/search${params}`);
   }
@@ -228,13 +239,13 @@ class CRMApiClient {
     return this.request(`/api/crm/v2/companies${params}`);
   }
 
-  async getCompany(id: string): Promise<ApiResponse<Company>> {
+  async getCompany(id: string): Promise<Company> {
     return this.request(`/api/crm/v2/companies/${id}`);
   }
 
   async createCompany(
     data: Partial<Company>
-  ): Promise<ApiResponse<Company>> {
+  ): Promise<Company> {
     return this.request("/api/crm/v2/companies", {
       method: "POST",
       body: JSON.stringify(data),
@@ -244,14 +255,14 @@ class CRMApiClient {
   async updateCompany(
     id: string,
     updates: Partial<Company>
-  ): Promise<ApiResponse<Company>> {
+  ): Promise<Company> {
     return this.request(`/api/crm/v2/companies/${id}`, {
       method: "PUT",
       body: JSON.stringify(updates),
     });
   }
 
-  async deleteCompany(id: string): Promise<ApiResponse<void>> {
+  async deleteCompany(id: string): Promise<void> {
     return this.request(`/api/crm/v2/companies/${id}`, {
       method: "DELETE",
     });
@@ -275,11 +286,11 @@ class CRMApiClient {
 
   // ─── Tags ────────────────────────────────────────────────────
 
-  async listTags(): Promise<ApiResponse<Tag[]>> {
+  async listTags(): Promise<Tag[]> {
     return this.request("/api/crm/v2/tags");
   }
 
-  async createTag(data: { name: string; color: string }): Promise<ApiResponse<Tag>> {
+  async createTag(data: { name: string; color: string }): Promise<Tag> {
     return this.request("/api/crm/v2/tags", {
       method: "POST",
       body: JSON.stringify(data),
@@ -289,7 +300,7 @@ class CRMApiClient {
   async addTagToContact(
     contactId: string,
     tagId: string
-  ): Promise<ApiResponse<void>> {
+  ): Promise<void> {
     return this.request(`/api/crm/v2/contacts/${contactId}/tags`, {
       method: "POST",
       body: JSON.stringify({ tag_id: tagId }),
@@ -299,7 +310,7 @@ class CRMApiClient {
   async removeTagFromContact(
     contactId: string,
     tagId: string
-  ): Promise<ApiResponse<void>> {
+  ): Promise<void> {
     return this.request(`/api/crm/v2/contacts/${contactId}/tags/${tagId}`, {
       method: "DELETE",
     });
@@ -318,7 +329,7 @@ class CRMApiClient {
   async createNote(
     contactId: string,
     data: { content: string; deal_id?: string; is_pinned?: boolean; mentions?: string[] }
-  ): Promise<ApiResponse<ContactNote>> {
+  ): Promise<ContactNote> {
     return this.request("/api/crm/v2/notes", {
       method: "POST",
       body: JSON.stringify({ contact_id: contactId, ...data }),
@@ -328,26 +339,26 @@ class CRMApiClient {
   async updateNote(
     noteId: string,
     updates: Partial<ContactNote>
-  ): Promise<ApiResponse<ContactNote>> {
+  ): Promise<ContactNote> {
     return this.request(`/api/crm/v2/notes/${noteId}`, {
       method: "PUT",
       body: JSON.stringify(updates),
     });
   }
 
-  async deleteNote(noteId: string): Promise<ApiResponse<void>> {
+  async deleteNote(noteId: string): Promise<void> {
     return this.request(`/api/crm/v2/notes/${noteId}`, {
       method: "DELETE",
     });
   }
 
-  async pinNote(noteId: string): Promise<ApiResponse<void>> {
+  async pinNote(noteId: string): Promise<void> {
     return this.request(`/api/crm/v2/notes/${noteId}/pin`, {
       method: "PUT",
     });
   }
 
-  async unpinNote(noteId: string): Promise<ApiResponse<void>> {
+  async unpinNote(noteId: string): Promise<void> {
     return this.request(`/api/crm/v2/notes/${noteId}/unpin`, {
       method: "PUT",
     });
@@ -365,7 +376,7 @@ class CRMApiClient {
 
   async createActivity(
     data: Partial<Activity>
-  ): Promise<ApiResponse<Activity>> {
+  ): Promise<Activity> {
     return this.request("/api/crm/v2/activities", {
       method: "POST",
       body: JSON.stringify(data),
@@ -383,11 +394,11 @@ class CRMApiClient {
     return this.request(`/api/crm/v2/deals${params}`);
   }
 
-  async getDeal(id: string): Promise<ApiResponse<Deal>> {
+  async getDeal(id: string): Promise<Deal> {
     return this.request(`/api/crm/v2/deals/${id}`);
   }
 
-  async createDeal(data: Partial<Deal>): Promise<ApiResponse<Deal>> {
+  async createDeal(data: Partial<Deal>): Promise<Deal> {
     return this.request("/api/crm/v2/deals", {
       method: "POST",
       body: JSON.stringify(data),
@@ -397,7 +408,7 @@ class CRMApiClient {
   async updateDeal(
     id: string,
     updates: Partial<Deal>
-  ): Promise<ApiResponse<Deal>> {
+  ): Promise<Deal> {
     return this.request(`/api/crm/v2/deals/${id}`, {
       method: "PUT",
       body: JSON.stringify(updates),
@@ -407,14 +418,14 @@ class CRMApiClient {
   async moveDealStage(
     id: string,
     stage: string
-  ): Promise<ApiResponse<Deal>> {
+  ): Promise<Deal> {
     return this.request(`/api/crm/v2/deals/${id}/stage`, {
       method: "PUT",
       body: JSON.stringify({ stage }),
     });
   }
 
-  async winDeal(id: string): Promise<ApiResponse<Deal>> {
+  async winDeal(id: string): Promise<Deal> {
     return this.request(`/api/crm/v2/deals/${id}/win`, {
       method: "PUT",
     });
@@ -424,7 +435,7 @@ class CRMApiClient {
     id: string,
     reason: string,
     detail?: string
-  ): Promise<ApiResponse<Deal>> {
+  ): Promise<Deal> {
     return this.request(`/api/crm/v2/deals/${id}/lose`, {
       method: "PUT",
       body: JSON.stringify({ loss_reason: reason, loss_reason_detail: detail }),
@@ -433,7 +444,7 @@ class CRMApiClient {
 
   async getDealsPipeline(
     pipelineId: string
-  ): Promise<ApiResponse<Record<string, Deal[]>>> {
+  ): Promise<Record<string, Deal[]>> {
     return this.request(`/api/crm/v2/deals/pipeline/${pipelineId}`);
   }
 
@@ -445,31 +456,31 @@ class CRMApiClient {
     return this.request(`/api/crm/v2/contacts/${contactId}/deals${params}`);
   }
 
-  async getDealsForecast(): Promise<ApiResponse<{ weighted_value: number; period: string }[]>> {
+  async getDealsForecast(): Promise<{ weighted_value: number; period: string }[]> {
     return this.request("/api/crm/v2/deals/forecast");
   }
 
-  async getStaleDeals(): Promise<ApiResponse<Deal[]>> {
+  async getStaleDeals(): Promise<Deal[]> {
     return this.request("/api/crm/v2/deals/stale");
   }
 
   // ─── Pipelines ───────────────────────────────────────────────
 
-  async listPipelines(): Promise<ApiResponse<Pipeline[]>> {
+  async listPipelines(): Promise<Pipeline[]> {
     return this.request("/api/crm/v2/pipelines");
   }
 
-  async getPipeline(id: string): Promise<ApiResponse<Pipeline>> {
+  async getPipeline(id: string): Promise<Pipeline> {
     return this.request(`/api/crm/v2/pipelines/${id}`);
   }
 
-  async getDefaultPipeline(): Promise<ApiResponse<Pipeline>> {
+  async getDefaultPipeline(): Promise<Pipeline> {
     return this.request("/api/crm/v2/pipelines/default");
   }
 
   async createPipeline(
     data: Partial<Pipeline>
-  ): Promise<ApiResponse<Pipeline>> {
+  ): Promise<Pipeline> {
     return this.request("/api/crm/v2/pipelines", {
       method: "POST",
       body: JSON.stringify(data),
@@ -479,7 +490,7 @@ class CRMApiClient {
   async updatePipeline(
     id: string,
     updates: Partial<Pipeline>
-  ): Promise<ApiResponse<Pipeline>> {
+  ): Promise<Pipeline> {
     return this.request(`/api/crm/v2/pipelines/${id}`, {
       method: "PUT",
       body: JSON.stringify(updates),
@@ -496,13 +507,13 @@ class CRMApiClient {
     return this.request(`/api/crm/v2/calendar/events${qp}`);
   }
 
-  async getCalendarEvent(id: string): Promise<ApiResponse<CalendarEvent>> {
+  async getCalendarEvent(id: string): Promise<CalendarEvent> {
     return this.request(`/api/crm/v2/calendar/events/${id}`);
   }
 
   async createCalendarEvent(
     data: Partial<CalendarEvent>
-  ): Promise<ApiResponse<CalendarEvent>> {
+  ): Promise<CalendarEvent> {
     return this.request("/api/crm/v2/calendar/events", {
       method: "POST",
       body: JSON.stringify(data),
@@ -512,14 +523,14 @@ class CRMApiClient {
   async updateCalendarEvent(
     id: string,
     updates: Partial<CalendarEvent>
-  ): Promise<ApiResponse<CalendarEvent>> {
+  ): Promise<CalendarEvent> {
     return this.request(`/api/crm/v2/calendar/events/${id}`, {
       method: "PUT",
       body: JSON.stringify(updates),
     });
   }
 
-  async cancelCalendarEvent(id: string): Promise<ApiResponse<void>> {
+  async cancelCalendarEvent(id: string): Promise<void> {
     return this.request(`/api/crm/v2/calendar/events/${id}`, {
       method: "DELETE",
     });
@@ -529,18 +540,18 @@ class CRMApiClient {
     id: string,
     outcome: string,
     notes?: string
-  ): Promise<ApiResponse<CalendarEvent>> {
+  ): Promise<CalendarEvent> {
     return this.request(`/api/crm/v2/calendar/events/${id}/complete`, {
       method: "PUT",
       body: JSON.stringify({ outcome, outcome_notes: notes }),
     });
   }
 
-  async getUpcomingEvents(): Promise<ApiResponse<CalendarEvent[]>> {
+  async getUpcomingEvents(): Promise<CalendarEvent[]> {
     return this.request("/api/crm/v2/calendar/upcoming");
   }
 
-  async getOverdueFollowUps(): Promise<ApiResponse<CalendarEvent[]>> {
+  async getOverdueFollowUps(): Promise<CalendarEvent[]> {
     return this.request("/api/crm/v2/calendar/overdue");
   }
 
@@ -549,7 +560,7 @@ class CRMApiClient {
   async uploadRecording(
     file: File,
     metadata: { contact_id: string; deal_id?: string; title?: string }
-  ): Promise<ApiResponse<CallRecording>> {
+  ): Promise<CallRecording> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("contact_id", metadata.contact_id);
@@ -567,14 +578,18 @@ class CRMApiClient {
       throw new Error(error.error || error.detail || `Upload failed: ${res.status}`);
     }
 
-    return res.json();
+    const json = await res.json();
+    if (json && typeof json === "object" && "success" in json && "data" in json) {
+      return json.data as CallRecording;
+    }
+    return json;
   }
 
-  async getRecording(id: string): Promise<ApiResponse<CallRecording>> {
+  async getRecording(id: string): Promise<CallRecording> {
     return this.request(`/api/crm/v2/recordings/${id}`);
   }
 
-  async triggerTranscription(id: string): Promise<ApiResponse<void>> {
+  async triggerTranscription(id: string): Promise<void> {
     return this.request(`/api/crm/v2/recordings/${id}/transcribe`, {
       method: "POST",
     });
@@ -590,19 +605,19 @@ class CRMApiClient {
 
   // ─── AI Endpoints ────────────────────────────────────────────
 
-  async enrichContact(contactId: string): Promise<ApiResponse<ContactEnrichment>> {
+  async enrichContact(contactId: string): Promise<ContactEnrichment> {
     return this.request(`/api/crm/v2/ai/enrich/${contactId}`, {
       method: "POST",
     });
   }
 
-  async scoreContact(contactId: string): Promise<ApiResponse<LeadScore>> {
+  async scoreContact(contactId: string): Promise<LeadScore> {
     return this.request(`/api/crm/v2/ai/score/${contactId}`, {
       method: "POST",
     });
   }
 
-  async scoreBatch(): Promise<ApiResponse<{ scored: number }>> {
+  async scoreBatch(): Promise<{ scored: number }> {
     return this.request("/api/crm/v2/ai/score/batch", {
       method: "POST",
     });
@@ -610,50 +625,50 @@ class CRMApiClient {
 
   async getRelationshipStrength(
     contactId: string
-  ): Promise<ApiResponse<RelationshipStrength>> {
+  ): Promise<RelationshipStrength> {
     return this.request(`/api/crm/v2/ai/relationship/${contactId}`, {
       method: "POST",
     });
   }
 
-  async assessDealRisk(dealId: string): Promise<ApiResponse<DealRisk>> {
+  async assessDealRisk(dealId: string): Promise<DealRisk> {
     return this.request(`/api/crm/v2/ai/deal-risk/${dealId}`, {
       method: "POST",
     });
   }
 
-  async getMeetingPrep(eventId: string): Promise<ApiResponse<MeetingPrep>> {
+  async getMeetingPrep(eventId: string): Promise<MeetingPrep> {
     return this.request(`/api/crm/v2/ai/meeting-prep/${eventId}`);
   }
 
   async getNextActions(
     contactId: string
-  ): Promise<ApiResponse<FollowUpSuggestion[]>> {
+  ): Promise<FollowUpSuggestion[]> {
     return this.request(`/api/crm/v2/ai/next-actions/${contactId}`);
   }
 
-  async getDashboardActions(): Promise<ApiResponse<FollowUpSuggestion[]>> {
+  async getDashboardActions(): Promise<FollowUpSuggestion[]> {
     return this.request("/api/crm/v2/ai/next-actions/dashboard");
   }
 
   async aiCopilot(
     query: string
-  ): Promise<ApiResponse<{ type: string; message: string; data?: unknown }>> {
+  ): Promise<{ type: string; message: string; data?: unknown }> {
     return this.request("/api/crm/v2/ai/copilot", {
       method: "POST",
       body: JSON.stringify({ query }),
     });
   }
 
-  async getAtRiskDeals(): Promise<ApiResponse<Deal[]>> {
+  async getAtRiskDeals(): Promise<Deal[]> {
     return this.request("/api/crm/v2/ai/insights/at-risk-deals");
   }
 
-  async getStaleContacts(): Promise<ApiResponse<Contact[]>> {
+  async getStaleContacts(): Promise<Contact[]> {
     return this.request("/api/crm/v2/ai/insights/stale-contacts");
   }
 
-  async getHotLeads(): Promise<ApiResponse<Contact[]>> {
+  async getHotLeads(): Promise<Contact[]> {
     return this.request("/api/crm/v2/ai/insights/hot-leads");
   }
 
@@ -661,47 +676,47 @@ class CRMApiClient {
 
   async getAnalyticsOverview(
     period?: string
-  ): Promise<ApiResponse<AnalyticsOverview>> {
+  ): Promise<AnalyticsOverview> {
     const params = buildParams({ period });
     return this.request(`/api/crm/v2/analytics/overview${params}`);
   }
 
-  async getPipelineAnalytics(): Promise<ApiResponse<PipelineMetrics>> {
+  async getPipelineAnalytics(): Promise<PipelineMetrics> {
     return this.request("/api/crm/v2/analytics/pipeline");
   }
 
   async getRevenueAnalytics(
     period?: string
-  ): Promise<ApiResponse<{ period: string; actual: number; forecast: number }[]>> {
+  ): Promise<{ period: string; actual: number; forecast: number }[]> {
     const params = buildParams({ period });
     return this.request(`/api/crm/v2/analytics/revenue${params}`);
   }
 
-  async getActivityAnalytics(): Promise<ApiResponse<ActivityAnalytics>> {
+  async getActivityAnalytics(): Promise<ActivityAnalytics> {
     return this.request("/api/crm/v2/analytics/activity");
   }
 
   async getWinLossAnalytics(
     period?: string
-  ): Promise<ApiResponse<WinLossAnalytics>> {
+  ): Promise<WinLossAnalytics> {
     const params = buildParams({ period });
     return this.request(`/api/crm/v2/analytics/win-loss${params}`);
   }
 
-  async getStageDuration(): Promise<ApiResponse<StageDurationMetric[]>> {
+  async getStageDuration(): Promise<StageDurationMetric[]> {
     return this.request("/api/crm/v2/analytics/stage-duration");
   }
 
   async getDealVelocity(
     period?: string
-  ): Promise<ApiResponse<DealVelocity>> {
+  ): Promise<DealVelocity> {
     const params = buildParams({ period });
     return this.request(`/api/crm/v2/analytics/deal-velocity${params}`);
   }
 
   async getLeadSourceAnalytics(
     period?: string
-  ): Promise<ApiResponse<LeadSourceMetric[]>> {
+  ): Promise<LeadSourceMetric[]> {
     const params = buildParams({ period });
     return this.request(`/api/crm/v2/analytics/lead-sources${params}`);
   }
@@ -710,7 +725,7 @@ class CRMApiClient {
 
   async sendEmail(
     data: EmailSendPayload
-  ): Promise<ApiResponse<Email>> {
+  ): Promise<Email> {
     return this.request("/api/crm/v2/emails/send", {
       method: "POST",
       body: JSON.stringify(data),
@@ -720,7 +735,7 @@ class CRMApiClient {
   async listEmails(
     filters?: EmailFilters,
     pagination?: PaginationParams
-  ): Promise<ApiResponse<PaginatedResponse<Email>>> {
+  ): Promise<PaginatedResponse<Email>> {
     const params = buildParams({
       ...filters,
       ...pagination,
@@ -728,21 +743,21 @@ class CRMApiClient {
     return this.request(`/api/crm/v2/emails${params}`);
   }
 
-  async getEmail(id: string): Promise<ApiResponse<Email>> {
+  async getEmail(id: string): Promise<Email> {
     return this.request(`/api/crm/v2/emails/${id}`);
   }
 
-  async getEmailThread(threadId: string): Promise<ApiResponse<Email[]>> {
+  async getEmailThread(threadId: string): Promise<Email[]> {
     return this.request(`/api/crm/v2/emails/thread/${threadId}`);
   }
 
-  async trackEmailOpen(emailId: string): Promise<ApiResponse<Email>> {
+  async trackEmailOpen(emailId: string): Promise<Email> {
     return this.request(`/api/crm/v2/emails/${emailId}/track/open`, {
       method: "PUT",
     });
   }
 
-  async trackEmailClick(emailId: string): Promise<ApiResponse<Email>> {
+  async trackEmailClick(emailId: string): Promise<Email> {
     return this.request(`/api/crm/v2/emails/${emailId}/track/click`, {
       method: "PUT",
     });
@@ -750,23 +765,23 @@ class CRMApiClient {
 
   async getEmailsForContact(
     contactId: string
-  ): Promise<ApiResponse<Email[]>> {
+  ): Promise<Email[]> {
     return this.request(`/api/crm/v2/contacts/${contactId}/emails`);
   }
 
   // ─── Email Sequences ─────────────────────────────────────────
 
-  async listSequences(): Promise<ApiResponse<EmailSequence[]>> {
+  async listSequences(): Promise<EmailSequence[]> {
     return this.request("/api/crm/v2/sequences");
   }
 
-  async getSequence(id: string): Promise<ApiResponse<EmailSequence>> {
+  async getSequence(id: string): Promise<EmailSequence> {
     return this.request(`/api/crm/v2/sequences/${id}`);
   }
 
   async createSequence(
     data: Partial<EmailSequence>
-  ): Promise<ApiResponse<EmailSequence>> {
+  ): Promise<EmailSequence> {
     return this.request("/api/crm/v2/sequences", {
       method: "POST",
       body: JSON.stringify(data),
@@ -776,7 +791,7 @@ class CRMApiClient {
   async enrollInSequence(
     sequenceId: string,
     contactId: string
-  ): Promise<ApiResponse<SequenceEnrollment>> {
+  ): Promise<SequenceEnrollment> {
     return this.request(`/api/crm/v2/sequences/${sequenceId}/enroll`, {
       method: "POST",
       body: JSON.stringify({ contact_id: contactId }),
@@ -786,20 +801,20 @@ class CRMApiClient {
   async updateSequence(
     id: string,
     data: Partial<EmailSequence>
-  ): Promise<ApiResponse<EmailSequence>> {
+  ): Promise<EmailSequence> {
     return this.request(`/api/crm/v2/sequences/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     });
   }
 
-  async pauseSequence(id: string): Promise<ApiResponse<EmailSequence>> {
+  async pauseSequence(id: string): Promise<EmailSequence> {
     return this.request(`/api/crm/v2/sequences/${id}/pause`, {
       method: "POST",
     });
   }
 
-  async activateSequence(id: string): Promise<ApiResponse<EmailSequence>> {
+  async activateSequence(id: string): Promise<EmailSequence> {
     return this.request(`/api/crm/v2/sequences/${id}/activate`, {
       method: "POST",
     });
@@ -807,7 +822,7 @@ class CRMApiClient {
 
   async unenrollFromSequence(
     enrollmentId: string
-  ): Promise<ApiResponse<void>> {
+  ): Promise<void> {
     return this.request(`/api/crm/v2/sequences/enrollments/${enrollmentId}`, {
       method: "DELETE",
     });
@@ -815,14 +830,14 @@ class CRMApiClient {
 
   async getSequenceStats(
     id: string
-  ): Promise<ApiResponse<Record<string, number>>> {
+  ): Promise<Record<string, number>> {
     return this.request(`/api/crm/v2/sequences/${id}/stats`);
   }
 
   async getSequenceEnrollments(
     sequenceId: string,
     status?: string
-  ): Promise<ApiResponse<SequenceEnrollment[]>> {
+  ): Promise<SequenceEnrollment[]> {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
     const qs = params.toString();
@@ -833,7 +848,7 @@ class CRMApiClient {
 
   async getEnrollmentsForContact(
     contactId: string
-  ): Promise<ApiResponse<SequenceEnrollment[]>> {
+  ): Promise<SequenceEnrollment[]> {
     return this.request(`/api/crm/v2/contacts/${contactId}/enrollments`);
   }
 
@@ -847,19 +862,19 @@ class CRMApiClient {
     return this.request(`/api/crm/v2/notifications${params}`);
   }
 
-  async markNotificationRead(id: string): Promise<ApiResponse<void>> {
+  async markNotificationRead(id: string): Promise<void> {
     return this.request(`/api/crm/v2/notifications/${id}/read`, {
       method: "PUT",
     });
   }
 
-  async markAllNotificationsRead(): Promise<ApiResponse<void>> {
+  async markAllNotificationsRead(): Promise<void> {
     return this.request("/api/crm/v2/notifications/read-all", {
       method: "PUT",
     });
   }
 
-  async getUnreadCount(): Promise<ApiResponse<{ count: number }>> {
+  async getUnreadCount(): Promise<{ count: number }> {
     return this.request("/api/crm/v2/notifications/unread-count");
   }
 
@@ -868,7 +883,7 @@ class CRMApiClient {
   async bulkUpdateStage(
     contactIds: string[],
     stage: string
-  ): Promise<ApiResponse<{ updated: number }>> {
+  ): Promise<{ updated: number }> {
     return this.request("/api/crm/v2/bulk/contacts/stage", {
       method: "PUT",
       body: JSON.stringify({ contact_ids: contactIds, stage }),
@@ -878,7 +893,7 @@ class CRMApiClient {
   async bulkAddTag(
     contactIds: string[],
     tagId: string
-  ): Promise<ApiResponse<{ updated: number }>> {
+  ): Promise<{ updated: number }> {
     return this.request("/api/crm/v2/bulk/contacts/tag", {
       method: "PUT",
       body: JSON.stringify({ contact_ids: contactIds, tag_id: tagId, action: "add" }),
@@ -887,7 +902,7 @@ class CRMApiClient {
 
   async bulkArchive(
     contactIds: string[]
-  ): Promise<ApiResponse<{ archived: number }>> {
+  ): Promise<{ archived: number }> {
     return this.request("/api/crm/v2/bulk/contacts", {
       method: "DELETE",
       body: JSON.stringify({ contact_ids: contactIds }),
@@ -912,12 +927,12 @@ class CRMApiClient {
     search?: string;
     cursor?: string;
     limit?: number;
-  }): Promise<ApiResponse<PaginatedResponse<Workflow>>> {
+  }): Promise<PaginatedResponse<Workflow>> {
     const qs = buildParams({ ...params });
     return this.request(`/api/crm/v2/workflows${qs}`);
   }
 
-  async getWorkflow(id: string): Promise<ApiResponse<Workflow>> {
+  async getWorkflow(id: string): Promise<Workflow> {
     return this.request(`/api/crm/v2/workflows/${id}`);
   }
 
@@ -927,7 +942,7 @@ class CRMApiClient {
     trigger: { type: string; conditions: { field: string; operator: string; value: unknown }[] };
     actions: { type: string; params: Record<string, unknown> }[];
     is_active?: boolean;
-  }): Promise<ApiResponse<Workflow>> {
+  }): Promise<Workflow> {
     return this.request("/api/crm/v2/workflows", {
       method: "POST",
       body: JSON.stringify(data),
@@ -942,7 +957,7 @@ class CRMApiClient {
       trigger: { type: string; conditions: { field: string; operator: string; value: unknown }[] };
       actions: { type: string; params: Record<string, unknown> }[];
     }>
-  ): Promise<ApiResponse<Workflow>> {
+  ): Promise<Workflow> {
     return this.request(`/api/crm/v2/workflows/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
@@ -953,18 +968,18 @@ class CRMApiClient {
     return this.request(`/api/crm/v2/workflows/${id}`, { method: "DELETE" });
   }
 
-  async activateWorkflow(id: string): Promise<ApiResponse<Workflow>> {
+  async activateWorkflow(id: string): Promise<Workflow> {
     return this.request(`/api/crm/v2/workflows/${id}/activate`, { method: "PUT" });
   }
 
-  async deactivateWorkflow(id: string): Promise<ApiResponse<Workflow>> {
+  async deactivateWorkflow(id: string): Promise<Workflow> {
     return this.request(`/api/crm/v2/workflows/${id}/deactivate`, { method: "PUT" });
   }
 
   async testWorkflow(
     id: string,
     context: Record<string, unknown>
-  ): Promise<ApiResponse<{ conditions_met: boolean; conditions_evaluated: number; actions: { type: string; params: Record<string, unknown>; would_execute: boolean }[] }>> {
+  ): Promise<{ conditions_met: boolean; conditions_evaluated: number; actions: { type: string; params: Record<string, unknown>; would_execute: boolean }[] }> {
     return this.request(`/api/crm/v2/workflows/${id}/test`, {
       method: "POST",
       body: JSON.stringify({ context }),
@@ -974,7 +989,7 @@ class CRMApiClient {
   async getWorkflowHistory(
     id: string,
     pagination?: PaginationParams
-  ): Promise<ApiResponse<PaginatedResponse<{ id: string; workflow_id: string; trigger_event: string; status: string; actions_executed: number; actions_failed: number; executed_at: string }>>> {
+  ): Promise<PaginatedResponse<{ id: string; workflow_id: string; trigger_event: string; status: string; actions_executed: number; actions_failed: number; executed_at: string }>> {
     const qs = buildParams({ ...pagination });
     return this.request(`/api/crm/v2/workflows/${id}/history${qs}`);
   }
@@ -986,12 +1001,12 @@ class CRMApiClient {
     search?: string;
     cursor?: string;
     limit?: number;
-  }): Promise<ApiResponse<PaginatedResponse<SmartList>>> {
+  }): Promise<PaginatedResponse<SmartList>> {
     const qs = buildParams({ ...params });
     return this.request(`/api/crm/v2/smart-lists${qs}`);
   }
 
-  async getSmartList(id: string): Promise<ApiResponse<SmartList>> {
+  async getSmartList(id: string): Promise<SmartList> {
     return this.request(`/api/crm/v2/smart-lists/${id}`);
   }
 
@@ -1004,7 +1019,7 @@ class CRMApiClient {
     columns?: string[];
     is_shared?: boolean;
     auto_refresh?: boolean;
-  }): Promise<ApiResponse<SmartList>> {
+  }): Promise<SmartList> {
     return this.request("/api/crm/v2/smart-lists", {
       method: "POST",
       body: JSON.stringify(data),
@@ -1023,7 +1038,7 @@ class CRMApiClient {
       is_shared: boolean;
       auto_refresh: boolean;
     }>
-  ): Promise<ApiResponse<SmartList>> {
+  ): Promise<SmartList> {
     return this.request(`/api/crm/v2/smart-lists/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
@@ -1037,19 +1052,19 @@ class CRMApiClient {
   async getSmartListMembers(
     id: string,
     pagination?: PaginationParams
-  ): Promise<ApiResponse<PaginatedResponse<Contact>>> {
+  ): Promise<PaginatedResponse<Contact>> {
     const qs = buildParams({ ...pagination });
     return this.request(`/api/crm/v2/smart-lists/${id}/members${qs}`);
   }
 
-  async refreshSmartList(id: string): Promise<ApiResponse<SmartList>> {
+  async refreshSmartList(id: string): Promise<SmartList> {
     return this.request(`/api/crm/v2/smart-lists/${id}/refresh`, { method: "POST" });
   }
 
   async generateLookalike(
     id: string,
     limit: number = 20
-  ): Promise<ApiResponse<{ items: Contact[]; count: number }>> {
+  ): Promise<{ items: Contact[]; count: number }> {
     const qs = buildParams({ limit });
     return this.request(`/api/crm/v2/smart-lists/${id}/lookalike${qs}`, { method: "POST" });
   }
@@ -1059,7 +1074,7 @@ class CRMApiClient {
   async importContacts(
     file: File,
     mappings: Record<string, string>
-  ): Promise<ApiResponse<{ created: number; updated: number; skipped: number; errors: string[] }>> {
+  ): Promise<{ created: number; updated: number; skipped: number; errors: string[] }> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("mappings", JSON.stringify(mappings));
@@ -1075,20 +1090,24 @@ class CRMApiClient {
       throw new Error(error.error || error.detail || `Import failed: ${res.status}`);
     }
 
-    return res.json();
+    const json = await res.json();
+    if (json && typeof json === "object" && "success" in json && "data" in json) {
+      return json.data;
+    }
+    return json;
   }
   // ─── Deduplication ──────────────────────────────────────────
 
   async scanDuplicates(
     limit: number = 100
-  ): Promise<ApiResponse<{ contact_a_id: string; contact_b_id: string; confidence: number; match_reasons: string[] }[]>> {
+  ): Promise<{ contact_a_id: string; contact_b_id: string; confidence: number; match_reasons: string[] }[]> {
     return this.request(`/api/crm/v2/dedup/scan?limit=${limit}`);
   }
 
   async dismissDuplicate(
     contactAId: string,
     contactBId: string
-  ): Promise<ApiResponse<{ dismissed: boolean }>> {
+  ): Promise<{ dismissed: boolean }> {
     return this.request("/api/crm/v2/dedup/dismiss", {
       method: "POST",
       body: JSON.stringify({

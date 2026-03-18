@@ -170,7 +170,7 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
 
     try {
       const res = await crmApi.importContacts(file, activeMappings);
-      setResult(res.data);
+      setResult(res);
       setStep("result");
       queryClient.invalidateQueries({ queryKey: ["crm"] });
     } catch (err) {

@@ -117,11 +117,11 @@ export function DashboardView() {
   const { data: activityRes } = useActivityAnalytics();
   const { data: velocityRes } = useDealVelocity(period);
 
-  const overviewData = overview?.data;
-  const pipelineData = pipeline?.data;
-  const revenueData = revenueRes?.data;
-  const activityData = activityRes?.data;
-  const velocityData = velocityRes?.data;
+  const overviewData = overview;
+  const pipelineData = pipeline;
+  const revenueData = revenueRes;
+  const activityData = activityRes;
+  const velocityData = velocityRes;
 
   if (loadingOverview && loadingPipeline) {
     return (

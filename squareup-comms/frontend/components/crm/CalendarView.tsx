@@ -358,7 +358,7 @@ function DayDetail({
 
 function UpcomingSidebar({ onCreateEvent }: { onCreateEvent: () => void }) {
   const { data, isLoading } = useUpcomingEvents();
-  const events = data?.data ?? [];
+  const events = data ?? [];
 
   return (
     <div className="w-72 border-l border-border bg-card/50 p-4 overflow-y-auto scrollbar-thin hidden xl:block">
