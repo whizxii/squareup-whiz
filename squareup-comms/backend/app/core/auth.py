@@ -6,10 +6,12 @@ Dual-mode auth:
 """
 
 import logging
+import threading
 
+import httpx
 from fastapi import Header, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import jwt, JWTError
+from jose import jwt, jwk, JWTError
 from typing import Optional
 
 from app.core.config import settings
@@ -21,6 +23,40 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _bearer_scheme = HTTPBearer(auto_error=False)
 
+# ---------------------------------------------------------------------------
+# JWKS cache for ES256 verification
+# ---------------------------------------------------------------------------
+_jwks_cache: dict | None = None
+_jwks_lock = threading.Lock()
+
+
+def _get_jwks() -> dict:
+    """Fetch and cache JWKS from Supabase for ES256 token verification."""
+    global _jwks_cache
+    if _jwks_cache is not None:
+        return _jwks_cache
+
+    with _jwks_lock:
+        if _jwks_cache is not None:
+            return _jwks_cache
+
+        url = f"{settings.SUPABASE_URL}/auth/v1/.well-known/jwks.json"
+        logger.info("Fetching JWKS from %s", url)
+        resp = httpx.get(url, timeout=10)
+        resp.raise_for_status()
+        _jwks_cache = resp.json()
+        logger.info("JWKS fetched: %d keys", len(_jwks_cache.get("keys", [])))
+        return _jwks_cache
+
+
+def _find_jwk_key(kid: str) -> dict:
+    """Find a JWK key by key ID from the cached JWKS."""
+    jwks_data = _get_jwks()
+    for key in jwks_data.get("keys", []):
+        if key.get("kid") == kid:
+            return key
+    raise ValueError(f"No JWK found for kid={kid}")
+
 
 # ---------------------------------------------------------------------------
 # Core token verification
@@ -28,27 +64,61 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 def _verify_supabase_token(token: str) -> str:
     """Verify a Supabase JWT and return the user's UUID (sub claim).
 
-    Uses python-jose to decode HS256 tokens signed with the Supabase JWT secret.
-    This is a synchronous operation (no I/O) so no need for run_in_executor.
+    Supports both:
+    - ES256 (new Supabase signing keys) — verified via JWKS public key
+    - HS256 (legacy) — verified via SUPABASE_JWT_SECRET
     """
-    if not settings.SUPABASE_JWT_SECRET:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Supabase JWT secret not configured. Set SUPABASE_JWT_SECRET env var.",
-        )
     try:
-        payload = jwt.decode(
-            token,
-            settings.SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg", "HS256")
+
+        if alg == "ES256":
+            if not settings.SUPABASE_URL:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="SUPABASE_URL not configured (needed for JWKS fetch).",
+                )
+            kid = header.get("kid")
+            if not kid:
+                raise ValueError("ES256 token missing kid header")
+
+            jwk_key = _find_jwk_key(kid)
+            public_key = jwk.construct(jwk_key, algorithm="ES256")
+            payload = jwt.decode(
+                token,
+                public_key,
+                algorithms=["ES256"],
+                options={"verify_aud": False},
+            )
+        else:
+            if not settings.SUPABASE_JWT_SECRET:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Supabase JWT secret not configured.",
+                )
+            payload = jwt.decode(
+                token,
+                settings.SUPABASE_JWT_SECRET,
+                algorithms=["HS256"],
+                options={"verify_aud": False},
+            )
+
         uid = payload.get("sub")
         if not uid:
             raise ValueError("Token missing sub claim")
         return uid
+
+    except HTTPException:
+        raise
     except JWTError as exc:
         logger.warning("Supabase JWT verification failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired authentication token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except Exception as exc:
+        logger.warning("Token verification error: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired authentication token.",
