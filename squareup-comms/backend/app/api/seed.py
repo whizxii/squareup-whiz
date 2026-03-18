@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 import traceback
 
@@ -173,7 +173,7 @@ async def seed_users(
 
 async def _seed_users_impl(session: AsyncSession) -> dict:
     results: list[dict] = []
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
 
     # 0. Ensure default channels exist
     channels_created = 0
