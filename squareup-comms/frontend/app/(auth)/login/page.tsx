@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmail } from "@/lib/firebase";
+import { signInWithEmail } from "@/lib/supabase";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { warmUpBackend, isBackendReady } from "@/lib/fetch-with-retry";
 
@@ -51,13 +51,8 @@ export default function LoginPage() {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Sign-in failed. Please try again.";
-      // Make Firebase error messages friendlier
-      if (message.includes("auth/invalid-credential") || message.includes("auth/wrong-password")) {
+      if (message.includes("Invalid login credentials")) {
         setError("Invalid email or password.");
-      } else if (message.includes("auth/user-not-found")) {
-        setError("No account found with that email.");
-      } else if (message.includes("auth/too-many-requests")) {
-        setError("Too many attempts. Please try again later.");
       } else {
         setError(message);
       }

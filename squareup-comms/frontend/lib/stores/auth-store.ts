@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import type { User } from "firebase/auth";
+
+/** Lightweight user info extracted from Supabase session. */
+export interface AuthUser {
+  id: string;
+  email: string | null;
+  displayName: string | null;
+}
 
 /** Backend user profile shape (mirrors ProfileResponse). */
 export interface UserProfile {
@@ -26,19 +32,19 @@ export interface UserProfile {
 }
 
 interface AuthState {
-  /** Firebase user object (null when signed out). */
-  user: User | null;
-  /** Firebase ID token for API calls. */
+  /** Authenticated user info (null when signed out). */
+  user: AuthUser | null;
+  /** Supabase access token for API calls. */
   token: string | null;
   /** Backend profile (null until fetched). */
   profile: UserProfile | null;
   /** True while auth state is being determined. */
   loading: boolean;
-  /** True when Firebase user exists but no backend profile yet. */
+  /** True when authenticated but no backend profile yet. */
   needsOnboarding: boolean;
 
   // Actions
-  setUser: (user: User | null) => void;
+  setUser: (user: AuthUser | null) => void;
   setToken: (token: string | null) => void;
   setProfile: (profile: UserProfile | null) => void;
   setLoading: (loading: boolean) => void;

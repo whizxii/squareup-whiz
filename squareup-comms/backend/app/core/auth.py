@@ -1,56 +1,20 @@
 """Centralized authentication for SquareUp Comms.
 
 Dual-mode auth:
-- Production: Requires Authorization: Bearer <firebase-token>
+- Production: Requires Authorization: Bearer <supabase-jwt>
 - Dev mode (ENABLE_DEV_AUTH=true): Falls back to X-User-Id header
 """
 
-import asyncio
-import json
 import logging
-import os
 
-import firebase_admin
-from fastapi import Depends, Header, HTTPException, Security, status
+from fastapi import Header, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from firebase_admin import auth as firebase_auth, credentials
+from jose import jwt, JWTError
 from typing import Optional
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Firebase Admin SDK initialization (module-level, runs once on import)
-# ---------------------------------------------------------------------------
-_firebase_initialized = False
-
-if not firebase_admin._apps:
-    if settings.FIREBASE_CREDENTIALS_JSON:
-        try:
-            cred_dict = json.loads(settings.FIREBASE_CREDENTIALS_JSON)
-            cred = credentials.Certificate(cred_dict)
-            firebase_admin.initialize_app(cred)
-            _firebase_initialized = True
-            logger.info("Firebase initialized from FIREBASE_CREDENTIALS_JSON env var.")
-        except Exception as exc:
-            logger.error("Failed to initialize Firebase from JSON env var: %s", exc)
-    elif os.path.exists(settings.FIREBASE_CREDENTIALS_PATH):
-        try:
-            cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-            firebase_admin.initialize_app(cred)
-            _firebase_initialized = True
-            logger.info("Firebase initialized from file: %s", settings.FIREBASE_CREDENTIALS_PATH)
-        except Exception as exc:
-            logger.error("Failed to initialize Firebase from file: %s", exc)
-    else:
-        logger.warning(
-            "No Firebase credentials found. Set FIREBASE_CREDENTIALS_JSON or "
-            "place credentials at %s. Auth will only work in dev mode.",
-            settings.FIREBASE_CREDENTIALS_PATH,
-        )
-else:
-    _firebase_initialized = True
 
 # ---------------------------------------------------------------------------
 # Security scheme
@@ -59,29 +23,32 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 
 
 # ---------------------------------------------------------------------------
-# Core token verification (async-safe)
+# Core token verification
 # ---------------------------------------------------------------------------
-async def _verify_firebase_token(token: str) -> str:
-    """Verify a Firebase ID token and return the uid.
+def _verify_supabase_token(token: str) -> str:
+    """Verify a Supabase JWT and return the user's UUID (sub claim).
 
-    Runs the blocking verify_id_token call in a thread pool executor.
+    Uses python-jose to decode HS256 tokens signed with the Supabase JWT secret.
+    This is a synchronous operation (no I/O) so no need for run_in_executor.
     """
-    if not _firebase_initialized:
+    if not settings.SUPABASE_JWT_SECRET:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Firebase is not configured. Cannot verify tokens.",
+            detail="Supabase JWT secret not configured. Set SUPABASE_JWT_SECRET env var.",
         )
     try:
-        loop = asyncio.get_running_loop()
-        decoded = await loop.run_in_executor(None, firebase_auth.verify_id_token, token)
-        uid = decoded.get("uid") or decoded.get("user_id")
+        payload = jwt.decode(
+            token,
+            settings.SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False},
+        )
+        uid = payload.get("sub")
         if not uid:
-            raise ValueError("Token missing uid")
+            raise ValueError("Token missing sub claim")
         return uid
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.warning("Firebase token verification failed: %s", exc)
+    except JWTError as exc:
+        logger.warning("Supabase JWT verification failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired authentication token.",
@@ -98,16 +65,16 @@ async def get_current_user(
 ) -> str:
     """Return the authenticated user's ID.
 
-    1. If a Bearer token is present, verify it via Firebase.
+    1. If a Bearer token is present, verify it as a Supabase JWT.
     2. Else if ENABLE_DEV_AUTH is true, use X-User-Id header (default dev-user-001).
     3. Else reject with 401.
     """
-    # Path 1: Bearer token present — verify via Firebase
+    # Path 1: Bearer token present — verify via Supabase JWT
     if credentials and credentials.credentials:
         try:
-            return await _verify_firebase_token(credentials.credentials)
+            return _verify_supabase_token(credentials.credentials)
         except HTTPException:
-            # In dev mode, fall through to dev auth if Firebase isn't configured
+            # In dev mode, fall through to dev auth if JWT verification fails
             if not settings.ENABLE_DEV_AUTH:
                 raise
             logger.warning(
@@ -141,6 +108,6 @@ async def verify_ws_token(token: Optional[str]) -> str:
         return token or "dev-user-001"
 
     if token:
-        return await _verify_firebase_token(token)
+        return _verify_supabase_token(token)
 
     raise Exception("WebSocket authentication required")

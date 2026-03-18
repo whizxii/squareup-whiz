@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/auth-store";
-import { fetchWithRetry, warmUpBackend, isBackendReady } from "@/lib/fetch-with-retry";
+import { fetchWithRetry, warmUpBackend } from "@/lib/fetch-with-retry";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -28,6 +28,7 @@ const AVATAR_OPTIONS: AvatarOption[] = [
 export default function OnboardingPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
   const authLoading = useAuthStore((s) => s.loading);
   const needsOnboarding = useAuthStore((s) => s.needsOnboarding);
   const setProfile = useAuthStore((s) => s.setProfile);
@@ -64,14 +65,11 @@ export default function OnboardingPage() {
       // Ensure backend is warm before sending the request
       await warmUpBackend();
 
-      // Get a fresh token (force refresh) — warmup may have taken a while
-      const freshToken = user ? await user.getIdToken(true) : null;
-
       const res = await fetchWithRetry(`${API_URL}/api/auth/onboard`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(freshToken ? { Authorization: `Bearer ${freshToken}` } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           full_name: fullName.trim(),

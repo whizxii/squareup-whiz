@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { fetchWithRetry, warmUpBackend } from "@/lib/fetch-with-retry";
@@ -10,16 +9,15 @@ import { fetchWithRetry, warmUpBackend } from "@/lib/fetch-with-retry";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 /**
- * Subscribes to Firebase auth state changes and syncs with the backend.
+ * Subscribes to Supabase auth state changes and syncs with the backend.
  *
  * Place this high in the component tree (root layout) so every page
  * has access to the auth store.
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // In dev mode, auth is null (Firebase not initialized).
-    // Use getState() to batch all updates in one shot — avoids re-render loops.
-    if (!auth) {
+    // In dev mode, supabase is null (not initialized).
+    if (!supabase) {
       useAuthStore.setState({
         user: null,
         token: null,
@@ -29,8 +27,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
+    // Check for an existing session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        handleSession(session);
+      } else {
+        useAuthStore.setState({ loading: false });
+      }
+    });
+
+    // Subscribe to auth state changes (sign in, sign out, token refresh)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
         // Clear session cookie so middleware redirects to login
         document.cookie = "__session=; path=/; max-age=0; SameSite=Lax";
         useAuthStore.setState({
@@ -43,61 +53,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Block redirects while we verify with the backend
-      useAuthStore.setState({ loading: true });
-
-      try {
-        const idToken = await firebaseUser.getIdToken();
-        // Atomic update — prevents intermediate renders where user is set but loading is false
-        useAuthStore.setState({ user: firebaseUser, token: idToken });
-
-        // Set session cookie so Next.js middleware can detect auth state
-        document.cookie = "__session=1; path=/; max-age=86400; SameSite=Lax";
-
-        // Wait for backend to be warm before sending auth request
-        await warmUpBackend();
-
-        // Re-fetch token in case warmup took a long time and token expired
-        const freshToken = await firebaseUser.getIdToken(true);
-
-        // Verify with backend and check onboarding status
-        const res = await fetchWithRetry(`${API_URL}/api/auth/verify`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${freshToken}`,
-          },
-        });
-
-        if (!res.ok) {
-          throw new Error(`Auth verify failed: ${res.status}`);
-        }
-
-        const data = await res.json();
-
-        if (data.needs_onboarding) {
-          useAuthStore.setState({ needsOnboarding: true, profile: null });
-        } else {
-          useAuthStore.setState({ needsOnboarding: false, profile: data.profile });
-          // Hydrate settings store from backend profile
-          useSettingsStore.getState().hydrateFromProfile();
-        }
-      } catch (err) {
-        console.error("Auth verification failed:", err);
-        document.cookie = "__session=; path=/; max-age=0; SameSite=Lax";
-        useAuthStore.setState({
-          user: null,
-          token: null,
-          profile: null,
-          needsOnboarding: false,
-        });
-      } finally {
-        useAuthStore.getState().setLoading(false);
-      }
+      handleSession(session);
     });
 
-    return () => unsubscribe();
+    return () => subscription.unsubscribe();
   }, []); // Stable — Zustand setState/getState never change
 
   return <>{children}</>;
+}
+
+async function handleSession(session: {
+  access_token: string;
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown> };
+}) {
+  // Block redirects while we verify with the backend
+  useAuthStore.setState({ loading: true });
+
+  try {
+    const { access_token, user: supabaseUser } = session;
+
+    // Store user info and token
+    useAuthStore.setState({
+      user: {
+        id: supabaseUser.id,
+        email: supabaseUser.email ?? null,
+        displayName:
+          (supabaseUser.user_metadata?.display_name as string) ?? null,
+      },
+      token: access_token,
+    });
+
+    // Set session cookie so Next.js middleware can detect auth state
+    document.cookie = "__session=1; path=/; max-age=86400; SameSite=Lax";
+
+    // Wait for backend to be warm before sending auth request
+    await warmUpBackend();
+
+    // Verify with backend and check onboarding status
+    const res = await fetchWithRetry(`${API_URL}/api/auth/verify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${access_token}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Auth verify failed: ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    if (data.needs_onboarding) {
+      useAuthStore.setState({ needsOnboarding: true, profile: null });
+    } else {
+      useAuthStore.setState({
+        needsOnboarding: false,
+        profile: data.profile,
+      });
+      // Hydrate settings store from backend profile
+      useSettingsStore.getState().hydrateFromProfile();
+    }
+  } catch (err) {
+    console.error("Auth verification failed:", err);
+    document.cookie = "__session=; path=/; max-age=0; SameSite=Lax";
+    useAuthStore.setState({
+      user: null,
+      token: null,
+      profile: null,
+      needsOnboarding: false,
+    });
+  } finally {
+    useAuthStore.getState().setLoading(false);
+  }
 }

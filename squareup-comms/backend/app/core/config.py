@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     # Supabase
     SUPABASE_URL: Optional[str] = None
     SUPABASE_SERVICE_KEY: Optional[str] = None
+    SUPABASE_JWT_SECRET: Optional[str] = None
 
     # File Storage
     FIREBASE_STORAGE_BUCKET: Optional[str] = None

@@ -6,11 +6,12 @@ import json
 import logging
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
-from firebase_admin import auth as firebase_auth
 
+from app.core.config import settings
 from app.core.db import get_session
 from app.models.users import UserProfile
 from app.models.chat import Channel, ChannelMember
@@ -25,14 +26,14 @@ SEED_CHANNELS = [
         "name": "general",
         "type": "public",
         "description": "General team chat",
-        "icon": "💬",
+        "icon": "\U0001f4ac",
         "is_default": True,
     },
     {
         "name": "random",
         "type": "public",
         "description": "Watercooler chat",
-        "icon": "🎲",
+        "icon": "\U0001f3b2",
         "is_default": True,
     },
 ]
@@ -87,11 +88,61 @@ SEED_USERS = [
 ]
 
 
+async def _get_or_create_supabase_user(email: str, password: str, display_name: str) -> tuple[str | None, str]:
+    """Create a Supabase Auth user or retrieve the existing one.
+
+    Returns (user_id, status) where status is 'created', 'already_exists', or 'error: ...'.
+    Uses Supabase Admin API via service key.
+    """
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
+        return None, "error: SUPABASE_URL or SUPABASE_SERVICE_KEY not configured"
+
+    base_url = settings.SUPABASE_URL
+    headers = {
+        "apikey": settings.SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient() as client:
+        # Try to create the user
+        resp = await client.post(
+            f"{base_url}/auth/v1/admin/users",
+            headers=headers,
+            json={
+                "email": email,
+                "password": password,
+                "email_confirm": True,
+                "user_metadata": {"display_name": display_name},
+            },
+        )
+
+        if resp.status_code == 200:
+            user_id = resp.json().get("id")
+            return user_id, "created"
+
+        # If user already exists, look them up
+        if resp.status_code == 422 or "already" in resp.text.lower():
+            # List users and find by email
+            list_resp = await client.get(
+                f"{base_url}/auth/v1/admin/users",
+                headers=headers,
+                params={"page": 1, "per_page": 100},
+            )
+            if list_resp.status_code == 200:
+                users = list_resp.json().get("users", [])
+                for u in users:
+                    if u.get("email") == email:
+                        return u["id"], "already_exists"
+
+        return None, f"error: {resp.status_code} {resp.text[:200]}"
+
+
 @router.post("/users")
 async def seed_users(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Create default channels + Firebase auth accounts + UserProfile rows.
+    """Create default channels + Supabase auth accounts + UserProfile rows.
 
     Idempotent: skips items that already exist.
     """
@@ -127,29 +178,18 @@ async def seed_users(
         email = user_data["email"]
         entry: dict = {"email": email, "status": "skipped"}
 
-        # 1. Create Firebase auth user (or get existing)
-        firebase_uid: str | None = None
-        try:
-            fb_user = firebase_auth.get_user_by_email(email)
-            firebase_uid = fb_user.uid
-            entry["firebase"] = "already_exists"
-        except firebase_auth.UserNotFoundError:
-            try:
-                fb_user = firebase_auth.create_user(
-                    email=email,
-                    password=user_data["password"],
-                    display_name=user_data["display_name"],
-                )
-                firebase_uid = fb_user.uid
-                entry["firebase"] = "created"
-            except Exception as exc:
-                entry["firebase"] = f"error: {exc}"
-                logger.error("Failed to create Firebase user %s: %s", email, exc)
-                results.append(entry)
-                continue
+        # 1. Create Supabase auth user (or get existing)
+        user_id, auth_status = await _get_or_create_supabase_user(
+            email, user_data["password"], user_data["display_name"],
+        )
+        entry["auth"] = auth_status
+
+        if not user_id:
+            results.append(entry)
+            continue
 
         # 2. Create or update UserProfile row
-        existing = await session.get(UserProfile, firebase_uid)
+        existing = await session.get(UserProfile, user_id)
         if existing:
             existing.office_x = user_data["office_x"]
             existing.office_y = user_data["office_y"]
@@ -160,7 +200,7 @@ async def seed_users(
             entry["status"] = "updated"
         else:
             profile = UserProfile(
-                firebase_uid=firebase_uid,
+                firebase_uid=user_id,
                 display_name=user_data["display_name"],
                 email=email,
                 avatar_config=json.dumps(user_data["avatar_config"]),
@@ -178,12 +218,12 @@ async def seed_users(
         channels_joined = 0
         for channel in default_channels:
             existing_member = await session.get(
-                ChannelMember, (channel.id, firebase_uid)
+                ChannelMember, (channel.id, user_id)
             )
             if not existing_member:
                 member = ChannelMember(
                     channel_id=channel.id,
-                    user_id=firebase_uid,
+                    user_id=user_id,
                     role="member",
                 )
                 session.add(member)

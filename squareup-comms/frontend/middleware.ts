@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
  *
  * Uses a lightweight `__session` cookie (set by AuthProvider on the client)
  * to detect whether the user is authenticated. This cookie is NOT used for
- * actual authentication — Firebase tokens handle that. It's purely a signal
+ * actual authentication — Supabase JWT tokens handle that. It's purely a signal
  * so middleware can redirect before the page renders.
  */
 export function middleware(request: NextRequest) {
