@@ -489,3 +489,43 @@ async def _cleanup_duplicates_impl(session: AsyncSession) -> dict:
         "migrated_refs": migrated_refs,
         "summary": f"Removed {len(removed)} duplicate profiles, kept {len(kept)}",
     }
+
+
+@router.delete("/orphan/{uid}")
+async def delete_orphan_profile(
+    uid: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Delete an orphan user profile by UID and clean up all FK references."""
+    from sqlalchemy import text
+
+    profile = await session.get(UserProfile, uid)
+    if not profile:
+        return {"error": f"No profile found for uid={uid}"}
+
+    # Clean up FK references
+    await session.execute(
+        text("DELETE FROM channel_members WHERE user_id = :uid"),
+        {"uid": uid},
+    )
+    await session.execute(
+        text("DELETE FROM reactions WHERE user_id = :uid"),
+        {"uid": uid},
+    )
+    await session.execute(
+        text("UPDATE messages SET sender_id = NULL WHERE sender_id = :uid"),
+        {"uid": uid},
+    )
+    await session.execute(
+        text("UPDATE channels SET created_by = NULL WHERE created_by = :uid"),
+        {"uid": uid},
+    )
+
+    await session.delete(profile)
+    await session.commit()
+
+    return {
+        "deleted": uid,
+        "email": profile.email,
+        "display_name": profile.display_name,
+    }
