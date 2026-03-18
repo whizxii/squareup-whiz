@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional, List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -281,7 +281,7 @@ async def create_contact(
     user_id: str = Depends(get_current_user),
 ) -> ContactResponse:
     """Create a new CRM contact."""
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
 
     contact = CRMContact(
         name=body.name,
@@ -395,7 +395,7 @@ async def update_contact(
 ) -> ContactResponse:
     """Update fields on an existing CRM contact."""
     contact = await _get_contact_or_404(session, contact_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
 
     update_data = body.model_dump(exclude_unset=True)
 
@@ -524,8 +524,8 @@ async def create_activity(
     if body.type in {"call", "email", "meeting"}:
         contact = await session.get(CRMContact, contact_id)
         if contact:
-            contact.last_contacted_at = datetime.now(timezone.utc)
-            contact.updated_at = datetime.now(timezone.utc)
+            contact.last_contacted_at = datetime.utcnow()
+            contact.updated_at = datetime.utcnow()
             session.add(contact)
 
     await session.commit()
@@ -581,7 +581,7 @@ async def update_contact_stage(
     Updates the stage, stage_changed_at timestamp, and logs a deal_update activity.
     """
     contact = await _get_contact_or_404(session, contact_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
 
     old_stage = contact.stage
     new_stage = body.stage

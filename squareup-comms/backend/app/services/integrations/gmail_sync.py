@@ -17,7 +17,7 @@ from __future__ import annotations
 import base64
 import json
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
@@ -194,7 +194,7 @@ class GmailSyncService(BaseService):
         if config.last_synced_at:
             after_epoch = int(config.last_synced_at.timestamp())
         else:
-            after_epoch = int((datetime.now(timezone.utc) - timedelta(days=7)).timestamp())
+            after_epoch = int((datetime.utcnow() - timedelta(days=7)).timestamp())
 
         # Fetch messages from INBOX and SENT
         for label in ("INBOX", "SENT"):
@@ -216,10 +216,10 @@ class GmailSyncService(BaseService):
             scopes=config.scopes,
             status=config.status,
             connected_by=config.connected_by,
-            last_synced_at=datetime.now(timezone.utc),
+            last_synced_at=datetime.utcnow(),
             error_message=None,
             created_at=config.created_at,
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.utcnow(),
         )
         await self.session.merge(updated_config)
         await self.session.commit()
@@ -298,7 +298,7 @@ class GmailSyncService(BaseService):
                     stats["skipped"] += 1
                     continue
 
-                now = datetime.now(timezone.utc)
+                now = datetime.utcnow()
                 email_record = CRMEmail(
                     contact_id=contact.id,
                     direction=direction,
@@ -402,7 +402,7 @@ class GmailSyncService(BaseService):
                 stats["skipped"] += 1
                 continue
 
-            now = datetime.now(timezone.utc)
+            now = datetime.utcnow()
             thread_id = f"thread-{uuid.uuid4().hex[:12]}"
 
             email = CRMEmail(
@@ -438,7 +438,7 @@ class GmailSyncService(BaseService):
                 stats["skipped"] += 1
                 continue
 
-            now = datetime.now(timezone.utc)
+            now = datetime.utcnow()
             thread_id = f"thread-{uuid.uuid4().hex[:12]}"
 
             email = CRMEmail(

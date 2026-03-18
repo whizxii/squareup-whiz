@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, asdict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -133,7 +133,7 @@ class MockNextActionsService:
         for action, reasoning, priority in templates:
             days_offset = {"high": 1, "medium": 3, "low": 7}[priority]
             suggested_date = (
-                datetime.now(timezone.utc) + timedelta(days=random.randint(0, days_offset))
+                datetime.utcnow() + timedelta(days=random.randint(0, days_offset))
             ).strftime("%Y-%m-%d")
 
             suggestions.append(FollowUpSuggestion(
@@ -165,7 +165,7 @@ class MockNextActionsService:
 
             days_offset = {"high": 1, "medium": 3, "low": 7}[priority]
             suggested_date = (
-                datetime.now(timezone.utc) + timedelta(days=random.randint(0, days_offset))
+                datetime.utcnow() + timedelta(days=random.randint(0, days_offset))
             ).strftime("%Y-%m-%d")
 
             suggestions.append(FollowUpSuggestion(
@@ -232,7 +232,7 @@ class NextActionsService(BaseService):
 
     async def get_stale_contacts(self) -> list[CRMContact]:
         """Return contacts with no recent activity (stale > 14 days)."""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+        cutoff = datetime.utcnow() - timedelta(days=14)
         stmt = (
             select(CRMContact)
             .where(CRMContact.is_archived == False)  # noqa: E712

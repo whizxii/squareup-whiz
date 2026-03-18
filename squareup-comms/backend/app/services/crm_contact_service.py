@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Sequence
 
 from sqlalchemy import select, update as sa_update
@@ -27,7 +27,7 @@ class ContactService(BaseService):
         user_id: str,
     ) -> CRMContact:
         """Create a contact with duplicate check and audit logging."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Build tags JSON from list
         tags_list = data.pop("tags", [])
@@ -87,7 +87,7 @@ class ContactService(BaseService):
         if contact is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         changes: dict[str, dict[str, Any]] = {}
 
         # Track stage change
@@ -142,7 +142,7 @@ class ContactService(BaseService):
 
         await self.repo.update(contact, {
             "is_archived": True,
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": datetime.utcnow(),
         })
 
         audit = CRMAuditLog(
@@ -164,7 +164,7 @@ class ContactService(BaseService):
 
         return await self.repo.update(contact, {
             "is_archived": False,
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": datetime.utcnow(),
         })
 
     async def get_360(self, contact_id: str) -> dict[str, Any] | None:
@@ -182,7 +182,7 @@ class ContactService(BaseService):
         contact = await self.repo.get_by_id(contact_id)
         if contact is None:
             return
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         await self.repo.update(contact, {
             "activity_count": contact.activity_count + 1,
             "last_activity_at": now,
@@ -195,7 +195,7 @@ class ContactService(BaseService):
         self, contact_ids: list[str], stage: str, user_id: str
     ) -> int:
         """Bulk update stage for multiple contacts. Returns count updated."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         stmt = (
             sa_update(CRMContact)
             .where(CRMContact.id.in_(contact_ids))
@@ -229,7 +229,7 @@ class ContactService(BaseService):
             .where(CRMContact.is_archived == False)  # noqa: E712
         )
         contacts = list(result.scalars().all())
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         added = 0
 
         for contact in contacts:
@@ -262,7 +262,7 @@ class ContactService(BaseService):
         self, contact_ids: list[str], owner_id: str, user_id: str
     ) -> int:
         """Bulk assign owner to multiple contacts. Returns count updated."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         stmt = (
             sa_update(CRMContact)
             .where(CRMContact.id.in_(contact_ids))
@@ -290,7 +290,7 @@ class ContactService(BaseService):
         self, contact_ids: list[str], user_id: str
     ) -> int:
         """Bulk archive multiple contacts. Returns count archived."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         stmt = (
             sa_update(CRMContact)
             .where(CRMContact.id.in_(contact_ids))
@@ -330,7 +330,7 @@ class ContactService(BaseService):
         if primary is None or secondary is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Fill empty fields on primary from secondary
         fill_fields = [

@@ -1,6 +1,6 @@
 """CRM Note model — rich-text notes attached to contacts or deals."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 import uuid
 
@@ -17,5 +17,5 @@ class CRMNote(SQLModel, table=True):
     is_pinned: bool = Field(default=False)
     mentions: Optional[str] = Field(default="[]")  # JSON array of user_ids
     created_by: Optional[str] = Field(default=None, max_length=128)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())

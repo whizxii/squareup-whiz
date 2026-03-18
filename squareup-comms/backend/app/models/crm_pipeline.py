@@ -1,6 +1,6 @@
 """CRM Pipeline model — custom sales pipelines with configurable stages."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 import uuid
 
@@ -18,5 +18,5 @@ class CRMPipeline(SQLModel, table=True):
     is_default: bool = Field(default=False)
     is_archived: bool = Field(default=False)
     created_by: Optional[str] = Field(default=None, max_length=128)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())

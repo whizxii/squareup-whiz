@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import Any, Sequence
 
 from app.models.crm_audit import CRMAuditLog
@@ -32,7 +32,7 @@ class SequenceService(BaseService):
         user_id: str,
     ) -> CRMEmailSequence:
         """Create a new email sequence."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         sequence = CRMEmailSequence(
             name=data["name"],
@@ -73,7 +73,7 @@ class SequenceService(BaseService):
         if sequence is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         changes: dict[str, dict[str, Any]] = {}
 
         if "steps" in updates:
@@ -139,7 +139,7 @@ class SequenceService(BaseService):
         if first_step:
             delay_hours = first_step.get("delay_days", 0) * 24 + first_step.get("delay_hours", 0)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         next_send = now + timedelta(hours=delay_hours) if delay_hours > 0 else now
 
         enrollment = CRMSequenceEnrollment(
@@ -177,7 +177,7 @@ class SequenceService(BaseService):
         if enrollment is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         enrollment = await self.enrollment_repo.update(enrollment, {
             "status": "unenrolled",
             "next_send_at": None,
@@ -206,7 +206,7 @@ class SequenceService(BaseService):
         steps = json.loads(sequence.steps)
         next_step_index = enrollment.current_step + 1
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         if next_step_index >= len(steps):
             # Sequence completed
@@ -247,7 +247,7 @@ class SequenceService(BaseService):
         if enrollment is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         enrollment = await self.enrollment_repo.update(enrollment, {
             "status": "replied",
             "next_send_at": None,

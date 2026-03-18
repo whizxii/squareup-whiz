@@ -1,6 +1,6 @@
 """CRM Email Sequence models — automated email sequences and enrollments."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 import uuid
 
@@ -20,8 +20,8 @@ class CRMEmailSequence(SQLModel, table=True):
     total_completed: int = Field(default=0)
     total_replied: int = Field(default=0)
     created_by: Optional[str] = Field(default=None, max_length=128)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow(), index=True)
+    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
 
 
 class CRMSequenceEnrollment(SQLModel, table=True):
@@ -32,7 +32,7 @@ class CRMSequenceEnrollment(SQLModel, table=True):
     contact_id: str = Field(foreign_key="crm_contacts.id", index=True)
     current_step: int = Field(default=0)
     status: str = Field(default="active", max_length=20)  # active/completed/replied/unenrolled/bounced
-    enrolled_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    enrolled_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     completed_at: Optional[datetime] = None
     next_send_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow(), index=True)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Sequence
 
 from sqlalchemy import select
@@ -66,7 +66,7 @@ class CalendarEventRepository(BaseRepository[CRMCalendarEvent]):
         limit: int = 20,
     ) -> Sequence[CRMCalendarEvent]:
         """Get upcoming events (scheduled, starting from now)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         result = await self._session.execute(
             select(CRMCalendarEvent)
             .where(
@@ -84,7 +84,7 @@ class CalendarEventRepository(BaseRepository[CRMCalendarEvent]):
         limit: int = 50,
     ) -> Sequence[CRMCalendarEvent]:
         """Get overdue follow-ups (scheduled events past their start_at)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         result = await self._session.execute(
             select(CRMCalendarEvent)
             .where(

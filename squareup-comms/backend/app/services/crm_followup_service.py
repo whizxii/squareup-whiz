@@ -49,7 +49,7 @@ class FollowUpService(BaseService):
         self, contact_id: str, exclude_event_id: str | None = None,
     ) -> CRMCalendarEvent | None:
         """Find the next scheduled follow-up for a contact."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         stmt = (
             select(CRMCalendarEvent)
             .where(
@@ -109,7 +109,7 @@ class FollowUpService(BaseService):
     ) -> CRMCalendarEvent:
         """Create an automated follow-up event in a single atomic transaction."""
         actual_delay = delay or FOLLOW_UP_DELAYS.get(trigger, timedelta(days=2))
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         follow_up_at = now + actual_delay
 
         event = CRMCalendarEvent(
@@ -233,14 +233,14 @@ class FollowUpService(BaseService):
         user_id: str,
     ) -> CRMCalendarEvent | None:
         """Snooze a follow-up to a later time."""
-        if snooze_until <= datetime.now(timezone.utc):
+        if snooze_until <= datetime.utcnow():
             raise ValueError("snooze_until must be in the future")
 
         event = await self.calendar_repo.get_by_id(event_id)
         if event is None or event.event_type != "follow_up":
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Apply updates directly, single atomic commit
         event.start_at = snooze_until
@@ -271,7 +271,7 @@ class FollowUpService(BaseService):
         if event is None or event.event_type != "follow_up":
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Apply cancellation directly, single atomic commit
         event.status = "cancelled"

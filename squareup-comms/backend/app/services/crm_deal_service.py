@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Sequence
 
 from app.models.crm import CRMActivity
@@ -31,7 +31,7 @@ class DealService(BaseService):
         user_id: str,
     ) -> CRMDeal:
         """Create a deal with auto-probability from pipeline stage."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Resolve pipeline and probability
         pipeline_id = data.get("pipeline_id")
@@ -106,7 +106,7 @@ class DealService(BaseService):
         if deal is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         changes: dict[str, dict[str, Any]] = {}
 
         for field, value in updates.items():
@@ -146,7 +146,7 @@ class DealService(BaseService):
         if old_stage == new_stage:
             return deal
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Get probability from pipeline stage config
         pipeline = await self.pipeline_svc.get_pipeline(deal.pipeline_id)
@@ -196,7 +196,7 @@ class DealService(BaseService):
         if deal is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         deal = await self.repo.update(deal, {
             "status": "won",
             "stage": "closed_won",
@@ -240,7 +240,7 @@ class DealService(BaseService):
         if deal is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         deal = await self.repo.update(deal, {
             "status": "lost",
             "stage": "closed_lost",

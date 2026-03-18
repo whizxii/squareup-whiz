@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Sequence
 
 from app.core.logging_config import get_logger
@@ -35,7 +35,7 @@ class CalendarEventService(BaseService):
         user_id: str,
     ) -> CRMCalendarEvent:
         """Create a new calendar event with activity and audit in a single transaction."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         attendees_raw = data.get("attendees", [])
         attendees_json = json.dumps(attendees_raw) if isinstance(attendees_raw, list) else attendees_raw
@@ -118,7 +118,7 @@ class CalendarEventService(BaseService):
         if "attendees" in updates and isinstance(updates["attendees"], list):
             updates["attendees"] = json.dumps(updates["attendees"])
 
-        updates["updated_at"] = datetime.now(timezone.utc)
+        updates["updated_at"] = datetime.utcnow()
 
         # Filter to valid fields only
         valid_fields = {
@@ -171,7 +171,7 @@ class CalendarEventService(BaseService):
         if event is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Apply updates directly
         event.status = "completed"
@@ -230,7 +230,7 @@ class CalendarEventService(BaseService):
         if event is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         event.status = "cancelled"
         event.updated_at = now
 

@@ -1,6 +1,6 @@
 """CRM Workflow model — trigger → condition → action automation rules."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 import uuid
 
@@ -27,10 +27,10 @@ class CRMWorkflow(SQLModel, table=True):
 
     created_by: Optional[str] = Field(default=None, max_length=128)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), index=True
+        default_factory=lambda: datetime.utcnow(), index=True
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
+        default_factory=lambda: datetime.utcnow()
     )
 
 
@@ -48,5 +48,5 @@ class CRMWorkflowExecution(SQLModel, table=True):
     actions_failed: int = Field(default=0)
     error_details: Optional[str] = None
     executed_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), index=True
+        default_factory=lambda: datetime.utcnow(), index=True
     )

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -158,7 +158,7 @@ async def onboard_user(
             detail=f"Invalid avatar_id '{body.avatar_id}'. Must be one of: {', '.join(sorted(AVATAR_IDS))}",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     profile = UserProfile(
         firebase_uid=user_id,
         display_name=body.full_name,
@@ -232,7 +232,7 @@ async def update_my_profile(
     for field, value in update_data.items():
         setattr(profile, field, value)
 
-    profile.last_seen_at = datetime.now(timezone.utc)
+    profile.last_seen_at = datetime.utcnow()
     session.add(profile)
     await session.commit()
     await session.refresh(profile)

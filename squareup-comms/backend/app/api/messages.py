@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Optional, List, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -372,7 +372,7 @@ async def edit_message(
         message.content_html = body.content_html
 
     message.edited = True
-    message.updated_at = datetime.now(timezone.utc)
+    message.updated_at = datetime.utcnow()
 
     session.add(message)
     await session.commit()

@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 
 
@@ -16,7 +16,7 @@ class CRMContact(SQLModel, table=True):
     title: Optional[str] = Field(default=None, max_length=200)
     avatar_url: Optional[str] = None
     stage: str = Field(default="lead", max_length=50, index=True)
-    stage_changed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    stage_changed_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     lifecycle_stage: str = Field(default="lead", max_length=30)  # subscriber/lead/mql/sql/opportunity/customer/evangelist
     value: Optional[float] = None
     currency: str = Field(default="INR", max_length=3)
@@ -35,8 +35,8 @@ class CRMContact(SQLModel, table=True):
     is_archived: bool = Field(default=False)
     created_by: Optional[str] = Field(default=None, max_length=128)
     created_by_type: str = Field(default="user", max_length=10)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow(), index=True)
+    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
 
 
 class CRMActivity(SQLModel, table=True):
@@ -53,4 +53,4 @@ class CRMActivity(SQLModel, table=True):
     performer_name: Optional[str] = Field(default=None, max_length=100)
     message_id: Optional[str] = Field(default=None, foreign_key="messages.id")
     agent_execution_id: Optional[str] = Field(default=None, foreign_key="agent_executions.id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())

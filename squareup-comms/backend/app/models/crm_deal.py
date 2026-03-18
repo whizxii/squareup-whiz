@@ -1,6 +1,6 @@
 """CRM Deal model — revenue opportunities linked to contacts and pipelines."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 import uuid
 
@@ -25,8 +25,8 @@ class CRMDeal(SQLModel, table=True):
     loss_reason: Optional[str] = Field(default=None, max_length=100)
     loss_reason_detail: Optional[str] = None
     owner_id: Optional[str] = Field(default=None, max_length=128, index=True)
-    stage_entered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    stage_entered_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     deal_health: str = Field(default="green", max_length=10)  # green / yellow / red
     created_by: Optional[str] = Field(default=None, max_length=128)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow(), index=True)
+    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())

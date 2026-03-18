@@ -9,7 +9,7 @@ from __future__ import annotations
 import random
 import uuid
 from dataclasses import dataclass, asdict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from app.core.logging_config import get_logger
@@ -136,7 +136,7 @@ class MockDealRiskService:
             risk_signals += 1
 
         if deal.expected_close_date:
-            days_to_close = (deal.expected_close_date - datetime.now(timezone.utc)).days
+            days_to_close = (deal.expected_close_date - datetime.utcnow()).days
             if days_to_close < 0:
                 risk_signals += 3  # Overdue
             elif days_to_close < 7:
@@ -215,7 +215,7 @@ def serialize_deal_risk(
         "predicted_close_date": result.predicted_close_date,
         "confidence": result.confidence,
         "ai_reasoning": result.ai_reasoning,
-        "assessed_at": datetime.now(timezone.utc).isoformat(),
+        "assessed_at": datetime.utcnow().isoformat(),
     }
 
 
@@ -242,7 +242,7 @@ class DealRiskService(BaseService):
         # Update deal health based on risk
         health_map = {"low": "green", "medium": "yellow", "high": "red", "critical": "red"}
         deal.deal_health = health_map[result.risk_level]
-        deal.updated_at = datetime.now(timezone.utc)
+        deal.updated_at = datetime.utcnow()
         self.session.add(deal)
         await self.session.commit()
 

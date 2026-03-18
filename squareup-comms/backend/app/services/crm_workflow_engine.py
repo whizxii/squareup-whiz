@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -225,7 +225,7 @@ async def _action_move_stage(
     contact = await service.session.get(CRMContact, contact_id)
     if contact:
         contact.stage = new_stage
-        contact.updated_at = datetime.now(timezone.utc)
+        contact.updated_at = datetime.utcnow()
         service.session.add(contact)
         await service.session.flush()
         return {"status": "success", "stage": new_stage}
@@ -247,7 +247,7 @@ async def _action_assign_owner(
     contact = await service.session.get(CRMContact, contact_id)
     if contact:
         contact.owner_id = owner_id
-        contact.updated_at = datetime.now(timezone.utc)
+        contact.updated_at = datetime.utcnow()
         service.session.add(contact)
         await service.session.flush()
         return {"status": "success", "owner_id": owner_id}
@@ -275,7 +275,7 @@ class WorkflowEngineService(BaseService):
         self, data: dict[str, Any], user_id: str
     ) -> CRMWorkflow:
         """Create a new workflow."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         workflow = CRMWorkflow(
             name=data["name"],
             description=data.get("description"),
@@ -309,7 +309,7 @@ class WorkflowEngineService(BaseService):
             if k in ("name", "description", "trigger", "actions")
             and v is not None
         }
-        updates["updated_at"] = datetime.now(timezone.utc)
+        updates["updated_at"] = datetime.utcnow()
 
         return await self.repo.update(workflow, updates)
 
@@ -341,7 +341,7 @@ class WorkflowEngineService(BaseService):
 
         return await self.repo.update(workflow, {
             "is_active": True,
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": datetime.utcnow(),
         })
 
     async def deactivate(self, workflow_id: str) -> CRMWorkflow:
@@ -352,7 +352,7 @@ class WorkflowEngineService(BaseService):
 
         return await self.repo.update(workflow, {
             "is_active": False,
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": datetime.utcnow(),
         })
 
     # ─── Execution ───────────────────────────────────────────────
@@ -366,7 +366,7 @@ class WorkflowEngineService(BaseService):
 
         Evaluates conditions, then runs actions sequentially.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         trigger_type = workflow.trigger.get("type", "manual")
         conditions = workflow.trigger.get("conditions", [])
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, status
@@ -85,7 +85,7 @@ async def create_note(
     """Create a new note on a contact."""
     import json
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     note = CRMNote(
         contact_id=body.contact_id,
         deal_id=body.deal_id,
@@ -156,7 +156,7 @@ async def update_note(
         else:
             setattr(note, field, value)
 
-    note.updated_at = datetime.now(timezone.utc)
+    note.updated_at = datetime.utcnow()
     session.add(note)
     await session.commit()
     await session.refresh(note)
@@ -189,7 +189,7 @@ async def pin_note(
     if note is None:
         raise ApiError(status_code=404, detail="Note not found")
     note.is_pinned = True
-    note.updated_at = datetime.now(timezone.utc)
+    note.updated_at = datetime.utcnow()
     session.add(note)
     await session.commit()
     await session.refresh(note)
@@ -207,7 +207,7 @@ async def unpin_note(
     if note is None:
         raise ApiError(status_code=404, detail="Note not found")
     note.is_pinned = False
-    note.updated_at = datetime.now(timezone.utc)
+    note.updated_at = datetime.utcnow()
     session.add(note)
     await session.commit()
     await session.refresh(note)

@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 
 
@@ -19,4 +19,4 @@ class Notification(SQLModel, table=True):
     contact_id: Optional[str] = Field(default=None, foreign_key="crm_contacts.id")
     read: bool = Field(default=False)
     pushed: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())

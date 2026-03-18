@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Sequence
 
 from app.models.crm import CRMContact
@@ -26,7 +26,7 @@ class CompanyService(BaseService):
         user_id: str,
     ) -> CRMCompany:
         """Create a new company with audit logging."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         social = data.pop("social_profiles", {})
         enrichment = data.pop("enrichment_data", {})
@@ -77,7 +77,7 @@ class CompanyService(BaseService):
         if company is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         changes: dict[str, dict[str, Any]] = {}
 
         # Convert nested dicts to JSON strings
@@ -115,7 +115,7 @@ class CompanyService(BaseService):
 
         await self.repo.update(company, {
             "is_archived": True,
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": datetime.utcnow(),
         })
 
         audit = CRMAuditLog(

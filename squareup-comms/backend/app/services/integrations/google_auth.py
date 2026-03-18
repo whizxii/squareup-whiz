@@ -12,7 +12,7 @@ instead of duplicating OAuth logic.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Optional
 
 import httpx
@@ -144,7 +144,7 @@ async def get_valid_access_token(
         last_synced_at=config.last_synced_at,
         error_message=config.error_message,
         created_at=config.created_at,
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.utcnow(),
     )
     await session.merge(updated)
     await session.commit()

@@ -10,7 +10,7 @@ Orchestrates the transcription pipeline:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.core.logging_config import get_logger
 from app.models.crm_recording import CRMCallRecording
@@ -49,7 +49,7 @@ class CallIntelligenceService(BaseService):
 
         # Mark as processing
         recording.transcription_status = "processing"
-        recording.updated_at = datetime.now(timezone.utc)
+        recording.updated_at = datetime.utcnow()
         self.session.add(recording)
         await self.session.commit()
 
@@ -69,7 +69,7 @@ class CallIntelligenceService(BaseService):
             recording.ai_next_steps = serialized["ai_next_steps"]
             recording.transcription_status = "completed"
             recording.transcription_error = None
-            recording.updated_at = datetime.now(timezone.utc)
+            recording.updated_at = datetime.utcnow()
             self.session.add(recording)
             await self.session.commit()
             await self.session.refresh(recording)
@@ -98,7 +98,7 @@ class CallIntelligenceService(BaseService):
             if recording is not None:
                 recording.transcription_status = "failed"
                 recording.transcription_error = str(exc)
-                recording.updated_at = datetime.now(timezone.utc)
+                recording.updated_at = datetime.utcnow()
                 self.session.add(recording)
                 await self.session.commit()
             return recording
@@ -126,7 +126,7 @@ class CallIntelligenceService(BaseService):
         ]
 
         recording.ai_action_items = json.dumps(updated_items)
-        recording.updated_at = datetime.now(timezone.utc)
+        recording.updated_at = datetime.utcnow()
         self.session.add(recording)
         await self.session.commit()
         await self.session.refresh(recording)

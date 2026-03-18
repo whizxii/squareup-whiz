@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -223,7 +223,7 @@ async def update_agent(
     for field, value in update_data.items():
         setattr(agent, field, value)
 
-    agent.updated_at = datetime.now(timezone.utc)
+    agent.updated_at = datetime.utcnow()
 
     session.add(agent)
     await session.commit()
@@ -243,7 +243,7 @@ async def deactivate_agent(
 
     agent.active = False
     agent.status = "offline"
-    agent.updated_at = datetime.now(timezone.utc)
+    agent.updated_at = datetime.utcnow()
 
     session.add(agent)
     await session.commit()
@@ -270,7 +270,7 @@ async def update_agent_status(
 
     agent.status = body.status
     agent.current_task = body.current_task
-    agent.updated_at = datetime.now(timezone.utc)
+    agent.updated_at = datetime.utcnow()
 
     session.add(agent)
     await session.commit()
@@ -400,7 +400,7 @@ async def invoke_agent(
     # 5. Set agent status back to "idle"
     agent.status = "idle"
     agent.current_task = None
-    agent.updated_at = datetime.now(timezone.utc)
+    agent.updated_at = datetime.utcnow()
 
     session.add(agent)
     await session.commit()

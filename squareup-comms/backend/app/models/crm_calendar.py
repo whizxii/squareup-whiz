@@ -1,6 +1,6 @@
 """CRM Calendar Event model — calendar events linked to contacts and deals."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 import uuid
 
@@ -30,5 +30,5 @@ class CRMCalendarEvent(SQLModel, table=True):
     outcome_notes: Optional[str] = None
     is_auto_created: bool = Field(default=False)
     created_by: Optional[str] = Field(default=None, max_length=128)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow(), index=True)
+    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())

@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 
 
@@ -29,8 +29,8 @@ class Agent(SQLModel, table=True):
     total_cost_usd: float = Field(default=0.0)
     success_rate: float = Field(default=100.0)
     created_by: Optional[str] = Field(default=None, max_length=128)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
 
 
 class AgentExecution(SQLModel, table=True):
@@ -51,4 +51,4 @@ class AgentExecution(SQLModel, table=True):
     status: str = Field(default="success", max_length=20)
     error_message: Optional[str] = None
     error_type: Optional[str] = Field(default=None, max_length=50)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())

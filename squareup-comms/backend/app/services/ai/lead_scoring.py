@@ -14,7 +14,7 @@ from __future__ import annotations
 import random
 import uuid
 from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from app.core.logging_config import get_logger
@@ -160,7 +160,7 @@ def serialize_lead_score(
         "ai_reasoning": result.ai_reasoning,
         "score_trend": result.score_trend,
         "previous_score": 0,
-        "scored_at": datetime.now(timezone.utc).isoformat(),
+        "scored_at": datetime.utcnow().isoformat(),
     }
 
 
@@ -187,7 +187,7 @@ class LeadScoringService(BaseService):
 
         # Persist denormalized score to contact
         contact.lead_score = result.overall_score
-        contact.updated_at = datetime.now(timezone.utc)
+        contact.updated_at = datetime.utcnow()
         self.session.add(contact)
         await self.session.commit()
 
@@ -213,7 +213,7 @@ class LeadScoringService(BaseService):
         for contact in contacts:
             score_result = self._scorer.score_contact(contact)
             contact.lead_score = score_result.overall_score
-            contact.updated_at = datetime.now(timezone.utc)
+            contact.updated_at = datetime.utcnow()
             self.session.add(contact)
             scored += 1
 

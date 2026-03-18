@@ -125,10 +125,10 @@ async def handle_callback(
             scopes=json.dumps(all_scopes),
             status="active",
             connected_by=user_id,
-            last_synced_at=datetime.now(timezone.utc),
+            last_synced_at=datetime.utcnow(),
             error_message=None,
             created_at=existing.created_at,
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.utcnow(),
         )
         await session.merge(updated)
         await session.commit()
@@ -142,7 +142,7 @@ async def handle_callback(
             scopes=json.dumps(all_scopes),
             status="active",
             connected_by=user_id,
-            last_synced_at=datetime.now(timezone.utc),
+            last_synced_at=datetime.utcnow(),
         )
         session.add(cal_config)
         await session.commit()
@@ -191,7 +191,7 @@ async def _upsert_gmail_config(
     result = await session.execute(stmt)
     existing_gmail = result.scalars().first()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     if existing_gmail:
         updated = IntegrationConfig(
             id=existing_gmail.id,
@@ -249,7 +249,7 @@ async def get_events(
 
     access_token = await get_valid_access_token(config, session)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     time_max = now + timedelta(days=days)
 
     params = {
@@ -300,10 +300,10 @@ async def get_events(
         scopes=config.scopes,
         status=config.status,
         connected_by=config.connected_by,
-        last_synced_at=datetime.now(timezone.utc),
+        last_synced_at=datetime.utcnow(),
         error_message=config.error_message,
         created_at=config.created_at,
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.utcnow(),
     )
     await session.merge(updated_config)
     await session.commit()
@@ -382,7 +382,7 @@ async def disconnect(user_id: str, session: AsyncSession) -> bool:
         last_synced_at=config.last_synced_at,
         error_message=None,
         created_at=config.created_at,
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.utcnow(),
     )
     await session.merge(updated)
     await session.commit()

@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.core.config import settings
 
@@ -11,7 +11,7 @@ class StructuredFormatter(logging.Formatter):
     """JSON-like structured log formatter for production readability."""
 
     def format(self, record: logging.LogRecord) -> str:
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.utcnow().isoformat()
         level = record.levelname
         module = record.name
         message = record.getMessage()

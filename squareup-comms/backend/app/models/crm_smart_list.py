@@ -1,6 +1,6 @@
 """CRM Smart List model — dynamic contact segments with criteria-based membership."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 import uuid
 
@@ -35,8 +35,8 @@ class CRMSmartList(SQLModel, table=True):
 
     created_by: Optional[str] = Field(default=None, max_length=128)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), index=True
+        default_factory=lambda: datetime.utcnow(), index=True
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
+        default_factory=lambda: datetime.utcnow()
     )

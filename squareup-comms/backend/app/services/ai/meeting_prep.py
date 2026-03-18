@@ -9,7 +9,7 @@ from __future__ import annotations
 import random
 import uuid
 from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from app.core.logging_config import get_logger
@@ -157,7 +157,7 @@ def serialize_meeting_prep(
         "talking_points": list(result.talking_points),
         "potential_objections": list(result.potential_objections),
         "relationship_strength": result.relationship_strength,
-        "prepared_at": datetime.now(timezone.utc).isoformat(),
+        "prepared_at": datetime.utcnow().isoformat(),
     }
 
 

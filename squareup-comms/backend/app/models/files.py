@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 
 
@@ -20,4 +20,4 @@ class File(SQLModel, table=True):
     agent_id: Optional[str] = Field(default=None, foreign_key="agents.id")
     uploaded_by: Optional[str] = Field(default=None, max_length=128)
     uploaded_by_type: str = Field(default="user", max_length=10)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())

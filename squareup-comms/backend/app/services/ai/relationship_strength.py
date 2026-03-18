@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, asdict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from app.core.logging_config import get_logger
@@ -123,7 +123,7 @@ class MockRelationshipService:
         # Last interaction
         days_ago = random.randint(0, 21)
         last_interaction = (
-            (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat()
+            (datetime.utcnow() - timedelta(days=days_ago)).isoformat()
             if days_ago < 20
             else None
         )
@@ -189,7 +189,7 @@ def serialize_relationship(
         "sentiment_score": result.sentiment_score,
         "communication_frequency": result.communication_frequency,
         "factors": [asdict(f) for f in result.factors],
-        "calculated_at": datetime.now(timezone.utc).isoformat(),
+        "calculated_at": datetime.utcnow().isoformat(),
     }
 
 
@@ -215,7 +215,7 @@ class RelationshipStrengthService(BaseService):
 
         # Persist denormalized strength
         contact.relationship_strength = result.strength
-        contact.updated_at = datetime.now(timezone.utc)
+        contact.updated_at = datetime.utcnow()
         self.session.add(contact)
         await self.session.commit()
 

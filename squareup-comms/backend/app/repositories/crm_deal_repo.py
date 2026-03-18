@@ -100,9 +100,9 @@ class DealRepository(BaseRepository[CRMDeal]):
 
     async def get_stale_deals(self, sla_days: int = 7) -> Sequence[CRMDeal]:
         """Get open deals with no stage change past the SLA threshold."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
-        threshold = datetime.now(timezone.utc) - timedelta(days=sla_days)
+        threshold = datetime.utcnow() - timedelta(days=sla_days)
         result = await self._session.execute(
             select(CRMDeal)
             .where(

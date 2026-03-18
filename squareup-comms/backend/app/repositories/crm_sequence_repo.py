@@ -89,9 +89,9 @@ class EnrollmentRepository(BaseRepository[CRMSequenceEnrollment]):
 
     async def get_due_enrollments(self) -> Sequence[CRMSequenceEnrollment]:
         """Get enrollments with next_send_at in the past (ready to send)."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         result = await self._session.execute(
             select(CRMSequenceEnrollment)
             .where(

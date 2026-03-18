@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Form, Query, UploadFile, File, status

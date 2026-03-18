@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime
 import json
 
 
@@ -20,5 +20,5 @@ class UserProfile(SQLModel, table=True):
     office_y: int = Field(default=5)
     notification_prefs: Optional[str] = Field(default='{"mentions": true, "dms": true, "agent_updates": false}')
     theme: str = Field(default="system", max_length=10)
-    last_seen_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_seen_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())

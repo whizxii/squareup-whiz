@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, status

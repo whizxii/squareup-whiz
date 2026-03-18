@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -233,7 +233,7 @@ async def update_channel(
     for field, value in update_data.items():
         setattr(channel, field, value)
         
-    channel.updated_at = datetime.now(timezone.utc)
+    channel.updated_at = datetime.utcnow()
     
     session.add(channel)
     await session.commit()
@@ -269,7 +269,7 @@ async def delete_channel(
          )
 
     channel.is_archived = True
-    channel.updated_at = datetime.now(timezone.utc)
+    channel.updated_at = datetime.utcnow()
     session.add(channel)
     await session.commit()
 

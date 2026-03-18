@@ -85,7 +85,7 @@ def _build_criterion_filter(criterion: dict[str, Any]) -> Any | None:
             days = int(value)
         except (TypeError, ValueError):
             return None
-        threshold = datetime.now(timezone.utc) - timedelta(days=days)
+        threshold = datetime.utcnow() - timedelta(days=days)
         return column >= threshold
     else:
         logger.warning("Unknown operator: %s", operator)
@@ -122,7 +122,7 @@ class SmartListService(BaseService):
         self, data: dict[str, Any], user_id: str
     ) -> CRMSmartList:
         """Create a new smart list and compute initial member count."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         smart_list = CRMSmartList(
             name=data["name"],
             description=data.get("description"),
@@ -166,7 +166,7 @@ class SmartListService(BaseService):
             )
             and v is not None
         }
-        updates["updated_at"] = datetime.now(timezone.utc)
+        updates["updated_at"] = datetime.utcnow()
 
         smart_list = await self.repo.update(smart_list, updates)
 
@@ -237,7 +237,7 @@ class SmartListService(BaseService):
             raise ApiError(status_code=404, detail="Smart list not found")
 
         count = await self._count_members(smart_list.criteria)
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         return await self.repo.update(smart_list, {
             "member_count": count,
             "updated_at": now,

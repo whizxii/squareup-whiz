@@ -1,6 +1,6 @@
 """CRM Email model — email communication records linked to contacts and deals."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 import uuid
 
@@ -31,4 +31,4 @@ class CRMEmail(SQLModel, table=True):
     sent_at: Optional[datetime] = None
     received_at: Optional[datetime] = None
     created_by: Optional[str] = Field(default=None, max_length=128)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow(), index=True)

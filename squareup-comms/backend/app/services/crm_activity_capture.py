@@ -6,7 +6,7 @@ Registers handlers on the EventBus so activities are captured system-wide.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,7 +46,7 @@ class ActivityCaptureService:
         if contact is None:
             return
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         contact.last_activity_at = now
         contact.activity_count = contact.activity_count + 1
         contact.updated_at = now

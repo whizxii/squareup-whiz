@@ -3,7 +3,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlmodel import select
 
@@ -99,7 +99,7 @@ async def execute_agent_for_message(
     total_cost = (input_tokens * 0.000003) + (output_tokens * 0.000015)
 
     # 3. Create the agent's response message in the DB
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     agent_message = Message(
         id=str(uuid.uuid4()),
         channel_id=channel_id,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Sequence
 
 from app.models.crm_pipeline import CRMPipeline
@@ -56,7 +56,7 @@ class PipelineService(BaseService):
         user_id: str,
     ) -> CRMPipeline:
         """Create a new pipeline."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         stages = data.get("stages", DEFAULT_STAGES)
 
         pipeline = CRMPipeline(
@@ -90,7 +90,7 @@ class PipelineService(BaseService):
         if "stages" in updates:
             updates["stages"] = json.dumps(updates["stages"])
 
-        updates["updated_at"] = datetime.now(timezone.utc)
+        updates["updated_at"] = datetime.utcnow()
         pipeline = await self.repo.update(pipeline, updates)
 
         if pipeline.is_default:

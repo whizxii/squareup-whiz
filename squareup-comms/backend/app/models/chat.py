@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 
 
@@ -17,8 +17,8 @@ class Channel(SQLModel, table=True):
     is_private: bool = Field(default=False)
     is_archived: bool = Field(default=False)
     created_by: Optional[str] = Field(default=None, max_length=128)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
 
 
 class ChannelMember(SQLModel, table=True):
@@ -28,10 +28,10 @@ class ChannelMember(SQLModel, table=True):
     user_id: str = Field(max_length=128, primary_key=True)
     role: str = Field(default="member", max_length=20)
     last_read_message_id: Optional[str] = None
-    last_read_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_read_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     muted: bool = Field(default=False)
     notification_override: Optional[str] = Field(default=None, max_length=20)
-    joined_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    joined_at: datetime = Field(default_factory=lambda: datetime.utcnow())
 
 
 class Message(SQLModel, table=True):
@@ -50,7 +50,7 @@ class Message(SQLModel, table=True):
     agent_execution_id: Optional[str] = None
     edited: bool = Field(default=False)
     pinned: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     updated_at: Optional[datetime] = None
 
 
@@ -60,4 +60,4 @@ class Reaction(SQLModel, table=True):
     message_id: str = Field(foreign_key="messages.id", primary_key=True)
     user_id: str = Field(max_length=128, primary_key=True)
     emoji: str = Field(max_length=10, primary_key=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Sequence
 import uuid
 
@@ -116,7 +116,7 @@ class EmailService(BaseService):
         user_id: str,
     ) -> CRMEmail:
         """Send an email — resolves merge fields, injects tracking, creates record."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Resolve merge fields in subject and body
         contact_id = data["contact_id"]
@@ -192,7 +192,7 @@ class EmailService(BaseService):
         user_id: str,
     ) -> CRMEmail:
         """Record an inbound email (from sync or manual)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         email = CRMEmail(
             contact_id=data["contact_id"],
@@ -242,7 +242,7 @@ class EmailService(BaseService):
         if email is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         if email.opened_at is None:
             email = await self.repo.update(email, {
                 "opened_at": now,
@@ -262,7 +262,7 @@ class EmailService(BaseService):
         if email is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         updates: dict[str, Any] = {"clicked_at": now, "status": "clicked"}
         if email.opened_at is None:
             updates["opened_at"] = now
@@ -316,7 +316,7 @@ class EmailService(BaseService):
             if current_step_idx < len(steps):
                 step = steps[current_step_idx]
                 if step.get("stop_on_reply", False):
-                    now = datetime.now(timezone.utc)
+                    now = datetime.utcnow()
                     enrollment.status = "replied"
                     enrollment.next_send_at = None
                     self.session.add(enrollment)

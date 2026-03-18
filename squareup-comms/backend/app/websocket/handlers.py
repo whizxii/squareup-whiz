@@ -5,7 +5,7 @@ from app.models.users import UserProfile
 from sqlmodel import select
 import uuid
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ async def handle_chat_send(user_id: str, data: dict):
     if not channel_id or not content.strip():
         return
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     message = Message(
         id=str(uuid.uuid4()),
         channel_id=channel_id,
@@ -169,7 +169,7 @@ async def handle_chat_read(user_id: str, data: dict):
         member = result.scalars().first()
         if member:
             member.last_read_message_id = message_id
-            member.last_read_at = datetime.now(timezone.utc)
+            member.last_read_at = datetime.utcnow()
             session.add(member)
             await session.commit()
 

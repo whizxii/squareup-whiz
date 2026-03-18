@@ -33,7 +33,7 @@ _PERIOD_DAYS = {
 
 def _period_start(period: str) -> datetime:
     """Return the UTC datetime marking the start of the requested period."""
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     if period == "ytd":
         return datetime(now.year, 1, 1, tzinfo=timezone.utc)
     days = _PERIOD_DAYS.get(period, 30)
@@ -58,7 +58,7 @@ class AnalyticsService(BaseService):
             return cached
 
         start = _period_start(period)
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Contact counts
         total_contacts = (
@@ -307,7 +307,7 @@ class AnalyticsService(BaseService):
         if cached is not None:
             return cached
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         thirty_days_ago = now - timedelta(days=30)
 
         # By type

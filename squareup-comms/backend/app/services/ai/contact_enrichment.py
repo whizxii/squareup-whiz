@@ -169,7 +169,7 @@ def serialize_enrichment(
         "mutual_connections": list(result.mutual_connections),
         "company_news": list(result.company_news),
         "confidence_score": result.confidence_score,
-        "enriched_at": datetime.now(timezone.utc).isoformat(),
+        "enriched_at": datetime.utcnow().isoformat(),
         "source": result.source,
     }
 
