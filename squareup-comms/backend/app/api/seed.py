@@ -9,8 +9,11 @@ from datetime import datetime
 import traceback
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Security
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import jwt
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -21,6 +24,7 @@ from app.models.chat import Channel, ChannelMember
 
 logger = logging.getLogger(__name__)
 
+_bearer_scheme = HTTPBearer(auto_error=False)
 router = APIRouter(prefix="/api/seed", tags=["seed"])
 
 # Default channels to create if missing
@@ -149,7 +153,46 @@ async def seed_debug() -> dict:
         "supabase_service_key_set": bool(settings.SUPABASE_SERVICE_KEY),
         "supabase_jwt_secret_set": bool(settings.SUPABASE_JWT_SECRET),
         "supabase_url_prefix": (settings.SUPABASE_URL or "")[:30],
+        "jwt_secret_length": len(settings.SUPABASE_JWT_SECRET or ""),
+        "jwt_secret_prefix": (settings.SUPABASE_JWT_SECRET or "")[:4],
     }
+
+
+@router.post("/debug-token")
+async def debug_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(_bearer_scheme),
+) -> dict:
+    """Temporary debug endpoint to diagnose JWT verification failures."""
+    if not credentials or not credentials.credentials:
+        return {"error": "No Bearer token provided"}
+
+    token = credentials.credentials
+    result: dict = {}
+
+    # Decode header without verification
+    try:
+        header = jwt.get_unverified_header(token)
+        result["header"] = header
+    except Exception as e:
+        result["header_error"] = str(e)
+
+    # Decode claims without verification
+    try:
+        claims = jwt.get_unverified_claims(token)
+        result["claims"] = {k: v for k, v in claims.items() if k != "session_id"}
+    except Exception as e:
+        result["claims_error"] = str(e)
+
+    # Try to verify with HS256
+    secret = settings.SUPABASE_JWT_SECRET or ""
+    try:
+        payload = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_aud": False})
+        result["verify_hs256"] = "SUCCESS"
+        result["sub"] = payload.get("sub")
+    except Exception as e:
+        result["verify_hs256"] = f"FAILED: {e}"
+
+    return result
 
 
 @router.post("/users")
