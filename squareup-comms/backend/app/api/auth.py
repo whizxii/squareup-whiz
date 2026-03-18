@@ -3,20 +3,26 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials
+from jose import jwt as jose_jwt
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from app.core.auth import get_current_user
-from app.core.avatars import AVATAR_IDS, AVATAR_OPTIONS, AvatarOption
+from app.core.auth import get_current_user, _bearer_scheme
 from app.core.db import get_session
+from app.core.avatars import AVATAR_IDS, AVATAR_OPTIONS, AvatarOption
 from app.core.rate_limit import limiter
 from app.models.chat import Channel, ChannelMember
 from app.models.users import UserProfile
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -120,9 +126,41 @@ async def verify_token(
     request: Request,
     session: AsyncSession = Depends(get_session),
     user_id: str = Depends(get_current_user),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> VerifyResponse:
-    """Verify the current user's auth and check if onboarding is needed."""
+    """Verify the current user's auth and check if onboarding is needed.
+
+    If no profile exists for the UID but one exists for the same email
+    (e.g. seeded profile with a stale UID), migrate it to the current UID.
+    """
     profile = await session.get(UserProfile, user_id)
+
+    if not profile:
+        # Extract email from JWT claims to find a profile by email
+        email = _extract_email_from_token(credentials)
+        if email:
+            email_stmt = select(UserProfile).where(UserProfile.email == email)
+            email_result = await session.execute(email_stmt)
+            existing = email_result.scalars().first()
+
+            if existing:
+                old_uid = existing.firebase_uid
+                logger.info(
+                    "Migrating profile for %s from UID %s to %s",
+                    email, old_uid, user_id,
+                )
+                # Migrate all references from old UID to new UID
+                await _migrate_user_uid(session, old_uid, user_id)
+                # Update the profile's primary key
+                await session.execute(
+                    text(
+                        "UPDATE user_profiles SET firebase_uid = :new "
+                        "WHERE firebase_uid = :old"
+                    ),
+                    {"new": user_id, "old": old_uid},
+                )
+                await session.commit()
+                profile = await session.get(UserProfile, user_id)
 
     if profile:
         return VerifyResponse(
@@ -132,6 +170,69 @@ async def verify_token(
         )
 
     return VerifyResponse(uid=user_id, needs_onboarding=True)
+
+
+def _extract_email_from_token(
+    credentials: Optional[HTTPAuthorizationCredentials],
+) -> Optional[str]:
+    """Extract email from JWT claims without verification (already verified)."""
+    if not credentials or not credentials.credentials:
+        return None
+    try:
+        claims = jose_jwt.get_unverified_claims(credentials.credentials)
+        return claims.get("email")
+    except Exception:
+        return None
+
+
+async def _migrate_user_uid(
+    session: AsyncSession, old_uid: str, new_uid: str
+) -> None:
+    """Migrate all foreign-key references from old_uid to new_uid."""
+    # channel_members: delete if conflict, else update
+    existing_memberships = await session.execute(
+        select(ChannelMember).where(ChannelMember.user_id == old_uid)
+    )
+    for membership in existing_memberships.scalars().all():
+        kept = await session.get(ChannelMember, (membership.channel_id, new_uid))
+        if kept:
+            await session.delete(membership)
+        else:
+            await session.execute(
+                text(
+                    "UPDATE channel_members SET user_id = :new "
+                    "WHERE channel_id = :cid AND user_id = :old"
+                ),
+                {"new": new_uid, "cid": membership.channel_id, "old": old_uid},
+            )
+
+    # messages
+    await session.execute(
+        text("UPDATE messages SET sender_id = :new WHERE sender_id = :old"),
+        {"new": new_uid, "old": old_uid},
+    )
+
+    # channels.created_by
+    await session.execute(
+        text("UPDATE channels SET created_by = :new WHERE created_by = :old"),
+        {"new": new_uid, "old": old_uid},
+    )
+
+    # reactions: delete conflicting, then update
+    await session.execute(
+        text(
+            "DELETE FROM reactions WHERE user_id = :old "
+            "AND (message_id, emoji) IN ("
+            "  SELECT r2.message_id, r2.emoji FROM reactions r2 "
+            "  WHERE r2.user_id = :new"
+            ")"
+        ),
+        {"old": old_uid, "new": new_uid},
+    )
+    await session.execute(
+        text("UPDATE reactions SET user_id = :new WHERE user_id = :old"),
+        {"new": new_uid, "old": old_uid},
+    )
 
 
 @router.post("/onboard", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)

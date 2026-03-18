@@ -258,7 +258,14 @@ async def _seed_users_impl(session: AsyncSession) -> dict:
             continue
 
         # 2. Create or update UserProfile row
+        #    Check by UID first, then by email to avoid creating duplicates
         existing = await session.get(UserProfile, user_id)
+        if not existing:
+            # Check if a profile exists with same email but different UID
+            email_stmt = select(UserProfile).where(UserProfile.email == email)
+            email_result = await session.execute(email_stmt)
+            existing = email_result.scalars().first()
+
         if existing:
             existing.office_x = user_data["office_x"]
             existing.office_y = user_data["office_y"]
@@ -267,6 +274,8 @@ async def _seed_users_impl(session: AsyncSession) -> dict:
             session.add(existing)
             entry["profile"] = "updated"
             entry["status"] = "updated"
+            # Use the existing profile's UID for channel membership
+            user_id = existing.firebase_uid
         else:
             profile = UserProfile(
                 firebase_uid=user_id,
@@ -303,3 +312,180 @@ async def _seed_users_impl(session: AsyncSession) -> dict:
 
     await session.commit()
     return {"channels_created": channels_created, "seeded": results}
+
+
+@router.post("/cleanup-duplicates")
+async def cleanup_duplicate_profiles(
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Remove duplicate user_profiles rows for the same email.
+
+    For each email that appears more than once in user_profiles:
+    1. Query Supabase Auth admin API to find the canonical UID for that email.
+    2. Keep the profile whose firebase_uid matches the Supabase auth user.
+    3. Migrate all channel_members, messages, channels.created_by, and reactions
+       from the duplicate UID to the canonical UID.
+    4. Delete the duplicate profile row.
+
+    Idempotent — safe to call multiple times.
+    """
+    try:
+        return await _cleanup_duplicates_impl(session)
+    except Exception as exc:
+        logger.exception("cleanup_duplicate_profiles failed")
+        tb = traceback.format_exc()
+        return JSONResponse(
+            status_code=200,
+            content={"error": str(exc), "type": type(exc).__name__, "traceback": tb},
+        )
+
+
+async def _get_supabase_uid_for_email(email: str) -> str | None:
+    """Look up the Supabase Auth UID for a given email via the admin API."""
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
+        return None
+
+    headers = {
+        "apikey": settings.SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
+    }
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{settings.SUPABASE_URL}/auth/v1/admin/users",
+            headers=headers,
+            params={"page": 1, "per_page": 100},
+        )
+        if resp.status_code != 200:
+            return None
+        for u in resp.json().get("users", []):
+            if u.get("email") == email:
+                return u["id"]
+    return None
+
+
+async def _cleanup_duplicates_impl(session: AsyncSession) -> dict:
+    from sqlalchemy import text
+
+    # Collect all profiles to check for duplicates
+    all_profiles_result = await session.execute(select(UserProfile))
+    all_profiles = all_profiles_result.scalars().all()
+
+    # Build email → canonical Supabase UID map
+    all_emails = {p.email for p in all_profiles if p.email}
+    email_to_canonical_uid: dict[str, str | None] = {}
+    for email in all_emails:
+        email_to_canonical_uid[email] = await _get_supabase_uid_for_email(email)
+
+    removed: list[dict] = []
+    kept: list[dict] = []
+    migrated_refs: list[dict] = []
+
+    # Group profiles by email
+    email_to_profiles: dict[str, list[UserProfile]] = {}
+    for p in all_profiles:
+        email_key = p.email or p.firebase_uid
+        email_to_profiles.setdefault(email_key, []).append(p)
+
+    for email, profiles in email_to_profiles.items():
+        canonical_uid = email_to_canonical_uid.get(email)
+
+        if len(profiles) == 1 and profiles[0].firebase_uid == canonical_uid:
+            kept.append({"email": email, "uid": canonical_uid})
+            continue
+
+        if len(profiles) == 1 and canonical_uid and profiles[0].firebase_uid != canonical_uid:
+            # Single profile but wrong UID — unlikely but handle it
+            kept.append({"email": email, "uid": profiles[0].firebase_uid, "note": "no canonical match, kept only profile"})
+            continue
+
+        # Multiple profiles — keep the one matching canonical UID
+        keep_profile = None
+        delete_profiles = []
+
+        for p in profiles:
+            if canonical_uid and p.firebase_uid == canonical_uid:
+                keep_profile = p
+            else:
+                delete_profiles.append(p)
+
+        # If no profile matches the canonical UID, keep the most recent one
+        if not keep_profile:
+            profiles_sorted = sorted(profiles, key=lambda p: p.created_at, reverse=True)
+            keep_profile = profiles_sorted[0]
+            delete_profiles = profiles_sorted[1:]
+
+        kept.append({"email": email, "uid": keep_profile.firebase_uid})
+
+        # Migrate references from each duplicate to the kept profile
+        for dup in delete_profiles:
+            old_uid = dup.firebase_uid
+            new_uid = keep_profile.firebase_uid
+            ref_count = 0
+
+            # Migrate channel_members (delete if conflict, else update)
+            existing_memberships = await session.execute(
+                select(ChannelMember).where(ChannelMember.user_id == old_uid)
+            )
+            for membership in existing_memberships.scalars().all():
+                # Check if the kept user already has this membership
+                kept_membership = await session.get(
+                    ChannelMember, (membership.channel_id, new_uid)
+                )
+                if kept_membership:
+                    await session.delete(membership)
+                else:
+                    await session.execute(
+                        text("UPDATE channel_members SET user_id = :new WHERE channel_id = :cid AND user_id = :old"),
+                        {"new": new_uid, "cid": membership.channel_id, "old": old_uid},
+                    )
+                ref_count += 1
+
+            # Migrate messages.sender_id
+            msg_result = await session.execute(
+                text("UPDATE messages SET sender_id = :new WHERE sender_id = :old"),
+                {"new": new_uid, "old": old_uid},
+            )
+            ref_count += msg_result.rowcount
+
+            # Migrate channels.created_by
+            ch_result = await session.execute(
+                text("UPDATE channels SET created_by = :new WHERE created_by = :old"),
+                {"new": new_uid, "old": old_uid},
+            )
+            ref_count += ch_result.rowcount
+
+            # Migrate reactions.user_id (delete if conflict)
+            await session.execute(
+                text(
+                    "DELETE FROM reactions WHERE user_id = :old "
+                    "AND (message_id, emoji) IN ("
+                    "  SELECT r2.message_id, r2.emoji FROM reactions r2 WHERE r2.user_id = :new"
+                    ")"
+                ),
+                {"old": old_uid, "new": new_uid},
+            )
+            rxn_result = await session.execute(
+                text("UPDATE reactions SET user_id = :new WHERE user_id = :old"),
+                {"new": new_uid, "old": old_uid},
+            )
+            ref_count += rxn_result.rowcount
+
+            migrated_refs.append({
+                "from_uid": old_uid,
+                "to_uid": new_uid,
+                "email": email,
+                "refs_migrated": ref_count,
+            })
+
+            # Delete the duplicate profile
+            await session.delete(dup)
+            removed.append({"email": email, "uid": old_uid})
+
+    await session.commit()
+    return {
+        "kept": kept,
+        "removed": removed,
+        "migrated_refs": migrated_refs,
+        "summary": f"Removed {len(removed)} duplicate profiles, kept {len(kept)}",
+    }
