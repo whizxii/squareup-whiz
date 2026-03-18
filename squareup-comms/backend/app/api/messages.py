@@ -149,12 +149,17 @@ async def _fetch_sender_names(
     """Return a mapping of user_id -> display_name for the given sender IDs."""
     if not sender_ids:
         return {}
-    unique_ids = list(set(sender_ids))
-    stmt = select(UserProfile.firebase_uid, UserProfile.display_name).where(
-        UserProfile.firebase_uid.in_(unique_ids)
-    )
-    result = await session.execute(stmt)
-    return {row.firebase_uid: row.display_name for row in result.all()}
+    try:
+        unique_ids = list(set(sender_ids))
+        stmt = select(UserProfile).where(
+            UserProfile.firebase_uid.in_(unique_ids)
+        )
+        result = await session.execute(stmt)
+        profiles = result.scalars().all()
+        return {p.firebase_uid: p.display_name for p in profiles}
+    except Exception as exc:
+        logger.warning("Failed to fetch sender names: %s", exc)
+        return {}
 
 
 async def _fetch_reactions_for_messages(
