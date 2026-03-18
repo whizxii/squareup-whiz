@@ -146,6 +146,14 @@ async def seed_users(
 
     Idempotent: skips items that already exist.
     """
+    try:
+        return await _seed_users_impl(session)
+    except Exception as exc:
+        logger.exception("seed_users failed")
+        return {"error": str(exc), "type": type(exc).__name__}
+
+
+async def _seed_users_impl(session: AsyncSession) -> dict:
     results: list[dict] = []
     now = datetime.now(timezone.utc)
 
