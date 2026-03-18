@@ -116,13 +116,27 @@ async function handleSession(session: {
     }
   } catch (err) {
     console.error("Auth verification failed:", err);
-    document.cookie = "__session=; path=/; max-age=0; SameSite=Lax";
-    useAuthStore.setState({
-      user: null,
-      token: null,
-      profile: null,
-      needsOnboarding: false,
-    });
+
+    // Only clear session on explicit auth rejection (401).
+    // Transient errors (cold start, network timeout) should NOT wipe the session.
+    const is401 =
+      err instanceof Error && err.message.includes("401");
+
+    if (is401) {
+      document.cookie = "__session=; path=/; max-age=0; SameSite=Lax";
+      useAuthStore.setState({
+        user: null,
+        token: null,
+        profile: null,
+        needsOnboarding: false,
+      });
+    } else {
+      // Transient failure — keep user/token intact so the app can retry.
+      // Mark as needing onboarding only if we truly don't know yet.
+      console.warn(
+        "Auth verify failed (transient). Keeping session alive for retry.",
+      );
+    }
   } finally {
     useAuthStore.getState().setLoading(false);
   }

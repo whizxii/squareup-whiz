@@ -71,6 +71,8 @@ interface ChatState {
   setChannels: (channels: Channel[]) => void;
   setActiveChannel: (id: string) => void;
   addChannel: (channel: Channel) => void;
+  updateChannel: (channelId: string, data: Partial<Channel>) => void;
+  removeChannel: (channelId: string) => void;
   updateChannelUnread: (channelId: string, count: number) => void;
 
   // Messages
@@ -112,6 +114,16 @@ export const useChatStore = create<ChatState>((set) => ({
   setActiveChannel: (id) => set({ activeChannelId: id }),
   addChannel: (channel) =>
     set((s) => ({ channels: [...s.channels, channel] })),
+  updateChannel: (channelId, data) =>
+    set((s) => ({
+      channels: s.channels.map((c) =>
+        c.id === channelId ? { ...c, ...data } : c
+      ),
+    })),
+  removeChannel: (channelId) =>
+    set((s) => ({
+      channels: s.channels.filter((c) => c.id !== channelId),
+    })),
   updateChannelUnread: (channelId, count) =>
     set((s) => ({
       channels: s.channels.map((c) =>

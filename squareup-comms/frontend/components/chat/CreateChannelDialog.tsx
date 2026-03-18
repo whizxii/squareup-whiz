@@ -4,12 +4,7 @@ import { useState } from "react";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { api } from "@/lib/api";
 import { X, Search, Check } from "lucide-react";
-
-interface User {
-  id: string;
-  display_name: string;
-  email: string;
-}
+import { useUsers } from "@/lib/hooks/use-users";
 
 interface Props {
   open: boolean;
@@ -26,15 +21,8 @@ export function CreateChannelDialog({ open, onClose }: Props) {
   const [error, setError] = useState("");
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [users, setUsers] = useState<User[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-
-  // Auto-fetch users when dialog opens
-  if (open && users.length === 0 && !isSearching) {
-    setIsSearching(true);
-    api.getUsers().then(res => setUsers(res)).finally(() => setIsSearching(false));
-  }
+  const { users, loading: isSearching } = useUsers();
 
   if (!open) return null;
 
@@ -155,7 +143,7 @@ export function CreateChannelDialog({ open, onClose }: Props) {
               </div>
 
               <div className="max-h-48 overflow-y-auto space-y-1 mt-2 border border-border rounded-lg p-1 bg-background">
-                {users.filter(u => (u.display_name || "").toLowerCase().includes(searchQuery.toLowerCase()) || (u.email || "").toLowerCase().includes(searchQuery.toLowerCase())).map(u => {
+                {users.filter(u => (u.display_name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) || (u.email ?? "").toLowerCase().includes(searchQuery.toLowerCase())).map(u => {
                   const isSelected = selectedUserIds.includes(u.id);
                   return (
                     <button

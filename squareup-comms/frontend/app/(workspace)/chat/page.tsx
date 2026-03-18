@@ -178,7 +178,7 @@ export default function ChatPage() {
         reactions: [],
         attachments: [],
         mentions: [],
-        sender_name: senderId,
+        sender_name: (msg.sender_name as string) || senderId,
       });
     });
 
@@ -434,7 +434,7 @@ export default function ChatPage() {
           reactions: [],
           attachments: [],
           mentions: [],
-          sender_name: m.sender_id === currentUserId ? "You" : m.sender_id,
+          sender_name: m.sender_id === currentUserId ? "You" : (m.sender_name || m.sender_id),
         }));
         // Backend returns newest-first; reverse for oldest-first display
         setMessages(activeChannelId, [...messages].reverse());

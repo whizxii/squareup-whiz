@@ -3,8 +3,7 @@
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { useCRMStore, type Contact } from "@/lib/stores/crm-store";
-import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useCreateContact } from "@/lib/hooks/use-crm-queries";
 
 interface CreateContactDialogProps {
   open: boolean;
@@ -15,78 +14,37 @@ export function CreateContactDialog({
   open,
   onOpenChange,
 }: CreateContactDialogProps) {
-  const addContact = useCRMStore((s) => s.addContact);
+  const createContact = useCreateContact();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const resetForm = () => {
     setName("");
     setEmail("");
     setCompany("");
     setPhone("");
-    setSaving(false);
+    setError("");
   };
 
   const handleCreate = async () => {
     if (!name.trim()) return;
-    setSaving(true);
-
-    const newContact: Contact = {
-      id: `contact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      name: name.trim(),
-      email: email.trim() || undefined,
-      company: company.trim() || undefined,
-      phone: phone.trim() || undefined,
-      stage: "lead",
-      stage_changed_at: new Date().toISOString(),
-      currency: "INR",
-      tags: [],
-      created_by: getCurrentUserId(),
-      created_by_type: "user",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    setError("");
 
     try {
-      const res = await fetch(`${apiUrl}/api/crm/contacts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": getCurrentUserId(),
-        },
-        body: JSON.stringify({
-          name: newContact.name,
-          email: newContact.email,
-          company: newContact.company,
-          phone: newContact.phone,
-        }),
+      await createContact.mutateAsync({
+        name: name.trim(),
+        email: email.trim() || undefined,
+        company: company.trim() || undefined,
+        phone: phone.trim() || undefined,
       });
-      if (res.ok) {
-        const contact = await res.json();
-        addContact({
-          ...contact,
-          tags:
-            typeof contact.tags === "string"
-              ? JSON.parse(contact.tags)
-              : contact.tags || [],
-        });
-        resetForm();
-        onOpenChange(false);
-        return;
-      }
-    } catch {
-      // API not available — use local store
+      resetForm();
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create contact");
     }
-
-    addContact(newContact);
-    resetForm();
-    onOpenChange(false);
   };
 
   return (
@@ -124,6 +82,7 @@ export function CreateContactDialog({
               placeholder="Phone"
               className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20"
             />
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => onOpenChange(false)}
@@ -133,10 +92,10 @@ export function CreateContactDialog({
               </button>
               <button
                 onClick={handleCreate}
-                disabled={saving || !name.trim()}
+                disabled={createContact.isPending || !name.trim()}
                 className="px-4 py-2 rounded-lg text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 font-medium"
               >
-                {saving ? "Creating..." : "Add Contact"}
+                {createContact.isPending ? "Creating..." : "Add Contact"}
               </button>
             </div>
           </div>

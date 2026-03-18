@@ -21,6 +21,7 @@ import type { MentionSuggestion } from "./mentions/MentionList";
 import { EffectPicker } from "./effects/EffectPicker";
 import { detectEffect, type EffectType } from "./effects/MessageEffects";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useUsers } from "@/lib/hooks/use-users";
 
 // Web Speech API type declarations (not in default TS lib)
 type SpeechRecognitionType = typeof window extends { SpeechRecognition: infer T } ? T : never;
@@ -62,8 +63,9 @@ export function MessageComposer({ onTypingChange }: MessageComposerProps) {
   const activeChannelId = useChatStore((s) => s.activeChannelId);
   const addMessage = useChatStore((s) => s.addMessage);
   const agents = useAgentStore((s) => s.agents);
+  const { users } = useUsers();
 
-  // Build mention suggestions from agents + dev users
+  // Build mention suggestions from real users + agents
   const mentionSuggestions = useMemo<MentionSuggestion[]>(() => {
     const agentSuggestions: MentionSuggestion[] = agents
       .filter((a) => a.active)
@@ -75,12 +77,19 @@ export function MessageComposer({ onTypingChange }: MessageComposerProps) {
         description: a.description,
       }));
 
-    const userSuggestions: MentionSuggestion[] = [
-      { id: currentUserId, label: "You", type: "user" },
-    ];
+    const userSuggestions: MentionSuggestion[] = users.map((u) => ({
+      id: u.id,
+      label: u.id === currentUserId ? "You" : u.display_name,
+      type: "user" as const,
+    }));
+
+    // If users haven't loaded yet, at least show current user
+    if (userSuggestions.length === 0) {
+      userSuggestions.push({ id: currentUserId, label: "You", type: "user" });
+    }
 
     return [...userSuggestions, ...agentSuggestions];
-  }, [agents, currentUserId]);
+  }, [agents, currentUserId, users]);
 
   const [sending, setSending] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);

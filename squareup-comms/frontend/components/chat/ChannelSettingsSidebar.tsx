@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useChatStore, Channel } from "@/lib/stores/chat-store";
 import { api } from "@/lib/api";
-import { X, UserPlus, Trash2, Shield, User, Search, Check } from "lucide-react";
+import { X, UserPlus, Trash2, Shield, User, Search, Check, Pencil, Archive } from "lucide-react";
+import { useUsers } from "@/lib/hooks/use-users";
 
 interface Props {
     channel: Channel;
@@ -13,20 +14,28 @@ interface Member {
     role: string;
 }
 
-interface UserData {
-    id: string;
-    display_name: string;
-    email: string;
-}
-
 export function ChannelSettingsSidebar({ channel, onClose }: Props) {
+    const channels = useChatStore((s) => s.channels);
+    const removeChannel = useChatStore((s) => s.removeChannel);
+    const setActiveChannel = useChatStore((s) => s.setActiveChannel);
     const [members, setMembers] = useState<Member[]>([]);
-    const [users, setUsers] = useState<UserData[]>([]);
+    const { users } = useUsers();
     const [loading, setLoading] = useState(true);
     const [showAddPicker, setShowAddPicker] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
     const [adding, setAdding] = useState(false);
+
+    // Edit state
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState(channel.name);
+    const [editDescription, setEditDescription] = useState(channel.description || "");
+    const [saving, setSaving] = useState(false);
+    const [editError, setEditError] = useState("");
+
+    // Archive confirmation
+    const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+    const [archiving, setArchiving] = useState(false);
 
     const fetchMembers = async () => {
         try {
@@ -37,19 +46,60 @@ export function ChannelSettingsSidebar({ channel, onClose }: Props) {
         }
     };
 
-    const fetchUsers = async () => {
+    useEffect(() => {
+        setLoading(true);
+        fetchMembers().finally(() => setLoading(false));
+    }, [channel.id]);
+
+    // Reset edit state when channel changes
+    useEffect(() => {
+        setEditName(channel.name);
+        setEditDescription(channel.description || "");
+        setIsEditing(false);
+        setShowArchiveConfirm(false);
+    }, [channel.id, channel.name, channel.description]);
+
+    const handleSaveEdit = async () => {
+        if (!editName.trim()) {
+            setEditError("Channel name is required");
+            return;
+        }
+        setSaving(true);
+        setEditError("");
         try {
-            const res = await api.getUsers();
-            setUsers(res);
-        } catch (e) {
-            console.error("Failed to fetch users", e);
+            await api.updateChannel(channel.id, {
+                name: editName.trim().toLowerCase().replace(/\s+/g, "-"),
+                description: editDescription.trim() || undefined,
+            });
+            setIsEditing(false);
+            // Refresh channel list by closing and re-opening would be simplest,
+            // but let's update the store directly
+            const updated = await api.getChannel(channel.id);
+            useChatStore.getState().updateChannel(updated.id, updated);
+        } catch (err) {
+            setEditError(err instanceof Error ? err.message : "Failed to update channel");
+        } finally {
+            setSaving(false);
         }
     };
 
-    useEffect(() => {
-        setLoading(true);
-        Promise.all([fetchMembers(), fetchUsers()]).finally(() => setLoading(false));
-    }, [channel.id]);
+    const handleArchive = async () => {
+        setArchiving(true);
+        try {
+            await api.deleteChannel(channel.id);
+            removeChannel(channel.id);
+            // Switch to first remaining channel
+            const remaining = channels.filter((c) => c.id !== channel.id);
+            if (remaining.length > 0) {
+                setActiveChannel(remaining[0].id);
+            }
+            onClose();
+        } catch (err) {
+            console.error("Failed to archive channel:", err);
+        } finally {
+            setArchiving(false);
+        }
+    };
 
     const handleRemoveMember = async (userId: string) => {
         try {
@@ -97,14 +147,96 @@ export function ChannelSettingsSidebar({ channel, onClose }: Props) {
             </div>
 
             <div className="p-4 border-b border-border space-y-4">
-                <div>
-                    <h3 className="font-semibold text-lg">{channel.icon ? `${channel.icon} ` : ""}{channel.name}</h3>
-                    {channel.description && <p className="text-sm text-muted-foreground mt-1">{channel.description}</p>}
-                </div>
+                {isEditing ? (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Name</label>
+                            <input
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium mb-1">Description</label>
+                            <input
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.target.value)}
+                                placeholder="What's this channel about?"
+                                className="w-full px-2.5 py-1.5 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary/30 transition-colors"
+                            />
+                        </div>
+                        {editError && <p className="text-xs text-destructive">{editError}</p>}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleSaveEdit}
+                                disabled={saving}
+                                className="flex-1 py-1.5 rounded-md text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors font-medium"
+                            >
+                                {saving ? "Saving..." : "Save"}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsEditing(false);
+                                    setEditName(channel.name);
+                                    setEditDescription(channel.description || "");
+                                    setEditError("");
+                                }}
+                                className="flex-1 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-accent transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div>
+                        <div className="flex items-start justify-between">
+                            <h3 className="font-semibold text-lg">{channel.icon ? `${channel.icon} ` : ""}{channel.name}</h3>
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="p-1.5 rounded-md hover:bg-accent transition-colors text-muted-foreground"
+                                title="Edit channel"
+                            >
+                                <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                        {channel.description && <p className="text-sm text-muted-foreground mt-1">{channel.description}</p>}
+                    </div>
+                )}
                 <div className="flex items-center gap-2 text-xs text-muted-foreground bg-accent/50 p-2 rounded-md">
                     {channel.is_private ? <Shield className="w-3.5 h-3.5" /> : <Hash className="w-3.5 h-3.5" />}
                     <span>{channel.is_private ? "Private Group" : "Public Channel"}</span>
                 </div>
+
+                {/* Archive channel */}
+                {!showArchiveConfirm ? (
+                    <button
+                        onClick={() => setShowArchiveConfirm(true)}
+                        className="flex items-center gap-2 w-full py-2 px-3 rounded-md text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                        <Archive className="w-3.5 h-3.5" />
+                        Archive Channel
+                    </button>
+                ) : (
+                    <div className="p-3 border border-destructive/30 rounded-md bg-destructive/5 space-y-2">
+                        <p className="text-xs text-destructive font-medium">Are you sure? This will archive the channel.</p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleArchive}
+                                disabled={archiving}
+                                className="flex-1 py-1.5 rounded-md text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors font-medium"
+                            >
+                                {archiving ? "Archiving..." : "Yes, Archive"}
+                            </button>
+                            <button
+                                onClick={() => setShowArchiveConfirm(false)}
+                                className="flex-1 py-1.5 rounded-md text-xs text-muted-foreground hover:bg-accent transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">

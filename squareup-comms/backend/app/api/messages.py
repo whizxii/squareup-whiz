@@ -16,6 +16,7 @@ from sqlmodel import select
 from app.core.auth import get_current_user
 from app.core.db import get_session
 from app.models.chat import Message, Reaction
+from app.models.users import UserProfile
 from app.websocket.manager import hub_manager
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,7 @@ class MessageResponse(BaseModel):
     id: str
     channel_id: str
     sender_id: str
+    sender_name: Optional[str] = None
     sender_type: str
     content: Optional[str]
     content_html: Optional[str]
@@ -75,7 +77,12 @@ class MessageResponse(BaseModel):
     model_config = {"from_attributes": True}
 
     @classmethod
-    def from_message(cls, message: Message, reactions: list[Reaction] | None = None) -> "MessageResponse":
+    def from_message(
+        cls,
+        message: Message,
+        reactions: list[Reaction] | None = None,
+        sender_name: str | None = None,
+    ) -> "MessageResponse":
         """Build a response from a Message ORM instance, deserialising JSON fields."""
         attachments_list: list[str] = []
         if message.attachments:
@@ -99,6 +106,7 @@ class MessageResponse(BaseModel):
             id=message.id,
             channel_id=message.channel_id,
             sender_id=message.sender_id,
+            sender_name=sender_name,
             sender_type=message.sender_type,
             content=message.content,
             content_html=message.content_html,
@@ -133,6 +141,21 @@ class MessageListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
+
+async def _fetch_sender_names(
+    session: AsyncSession,
+    sender_ids: list[str],
+) -> dict[str, str]:
+    """Return a mapping of user_id -> display_name for the given sender IDs."""
+    if not sender_ids:
+        return {}
+    unique_ids = list(set(sender_ids))
+    stmt = select(UserProfile.firebase_uid, UserProfile.display_name).where(
+        UserProfile.firebase_uid.in_(unique_ids)
+    )
+    result = await session.execute(stmt)
+    return {row.firebase_uid: row.display_name for row in result.all()}
+
 
 async def _fetch_reactions_for_messages(
     session: AsyncSession,
@@ -209,6 +232,10 @@ async def send_message(
     await session.commit()
     await session.refresh(message)
 
+    # Look up sender display name
+    sender_names = await _fetch_sender_names(session, [user_id])
+    sender_display = sender_names.get(user_id)
+
     # Broadcast to other connected users via WebSocket (non-fatal)
     try:
         await hub_manager.broadcast_all({
@@ -216,6 +243,7 @@ async def send_message(
             "id": message.id,
             "channel_id": message.channel_id,
             "sender_id": message.sender_id,
+            "sender_name": sender_display,
             "sender_type": message.sender_type,
             "content": message.content,
             "content_html": message.content_html,
@@ -232,7 +260,7 @@ async def send_message(
     except Exception as exc:
         logger.warning("WS broadcast failed for message %s: %s", message.id, exc)
 
-    return MessageResponse.from_message(message)
+    return MessageResponse.from_message(message, sender_name=sender_display)
 
 
 @router.get("/", response_model=MessageListResponse)
@@ -274,13 +302,18 @@ async def list_messages(
     if has_more:
         messages = messages[:limit]
 
-    # Fetch reactions in bulk
+    # Fetch reactions and sender names in bulk
     message_ids = [m.id for m in messages]
     reactions_map = await _fetch_reactions_for_messages(session, message_ids)
+    sender_names = await _fetch_sender_names(session, [m.sender_id for m in messages])
 
     return MessageListResponse(
         messages=[
-            MessageResponse.from_message(m, reactions_map.get(m.id, []))
+            MessageResponse.from_message(
+                m,
+                reactions_map.get(m.id, []),
+                sender_name=sender_names.get(m.sender_id),
+            )
             for m in messages
         ],
         has_more=has_more,
@@ -318,10 +351,15 @@ async def get_thread_replies(
 
     message_ids = [m.id for m in messages]
     reactions_map = await _fetch_reactions_for_messages(session, message_ids)
+    sender_names = await _fetch_sender_names(session, [m.sender_id for m in messages])
 
     return MessageListResponse(
         messages=[
-            MessageResponse.from_message(m, reactions_map.get(m.id, []))
+            MessageResponse.from_message(
+                m,
+                reactions_map.get(m.id, []),
+                sender_name=sender_names.get(m.sender_id),
+            )
             for m in messages
         ],
         has_more=has_more,
@@ -346,7 +384,10 @@ async def get_message(
     result = await session.execute(stmt)
     reactions = list(result.scalars().all())
 
-    return MessageResponse.from_message(message, reactions)
+    sender_names = await _fetch_sender_names(session, [message.sender_id])
+    return MessageResponse.from_message(
+        message, reactions, sender_name=sender_names.get(message.sender_id)
+    )
 
 
 @router.put("/{message_id}", response_model=MessageResponse)
@@ -391,7 +432,7 @@ async def edit_message(
     except Exception as exc:
         logger.warning("WS broadcast failed for edit %s: %s", message.id, exc)
 
-    # Fetch reactions for response
+    # Fetch reactions and sender name for response
     stmt = (
         select(Reaction)
         .where(Reaction.message_id == message_id)
@@ -400,7 +441,10 @@ async def edit_message(
     result = await session.execute(stmt)
     reactions = list(result.scalars().all())
 
-    return MessageResponse.from_message(message, reactions)
+    sender_names = await _fetch_sender_names(session, [message.sender_id])
+    return MessageResponse.from_message(
+        message, reactions, sender_name=sender_names.get(message.sender_id)
+    )
 
 
 @router.delete("/{message_id}", status_code=status.HTTP_204_NO_CONTENT)

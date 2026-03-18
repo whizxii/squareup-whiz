@@ -31,8 +31,17 @@ async def list_users(
     _user_id: str = Depends(get_current_user),
 ) -> list[dict]:
     """List all user profiles (for @mentions, office floor, chat, etc.)."""
-    result = await session.execute(select(UserProfile))
+    result = await session.execute(
+        select(UserProfile).distinct(UserProfile.firebase_uid)
+    )
     users = result.scalars().all()
+    # Extra safety: deduplicate by firebase_uid in Python in case DB lacks constraint
+    seen: set[str] = set()
+    deduped = []
+    for u in users:
+        if u.firebase_uid not in seen:
+            seen.add(u.firebase_uid)
+            deduped.append(u)
     return [
         {
             "id": u.firebase_uid,
@@ -46,5 +55,5 @@ async def list_users(
             "office_x": u.office_x,
             "office_y": u.office_y,
         }
-        for u in users
+        for u in deduped
     ]

@@ -78,6 +78,26 @@ export default function OnboardingPage() {
         }),
       });
 
+      if (res.status === 409) {
+        // Profile already exists — re-fetch it and redirect
+        const verifyRes = await fetchWithRetry(`${API_URL}/api/auth/verify`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (verifyRes.ok) {
+          const verifyData = await verifyRes.json();
+          if (verifyData.profile) {
+            setProfile(verifyData.profile);
+          }
+        }
+        setNeedsOnboarding(false);
+        router.replace("/office");
+        return;
+      }
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({ detail: "Onboarding failed" }));
         throw new Error(data.detail || `Error: ${res.status}`);

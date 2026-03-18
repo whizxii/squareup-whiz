@@ -63,6 +63,13 @@ class ApiClient {
     return this.request<Channel>(`/api/channels/${id}`);
   }
 
+  async updateChannel(id: string, data: { name?: string; description?: string; icon?: string; is_archived?: boolean }) {
+    return this.request<Channel>(`/api/channels/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
   async deleteChannel(id: string) {
     return this.request<void>(`/api/channels/${id}`, {
       method: "DELETE",
@@ -160,6 +167,7 @@ interface Message {
   id: string;
   channel_id: string;
   sender_id: string;
+  sender_name?: string;
   sender_type: string;
   content?: string;
   content_html?: string;
