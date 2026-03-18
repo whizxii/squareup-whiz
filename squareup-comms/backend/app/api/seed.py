@@ -141,6 +141,17 @@ async def _get_or_create_supabase_user(email: str, password: str, display_name: 
         return None, f"error: {resp.status_code} {resp.text[:200]}"
 
 
+@router.get("/debug")
+async def seed_debug() -> dict:
+    """Temporary debug endpoint to check config."""
+    return {
+        "supabase_url_set": bool(settings.SUPABASE_URL),
+        "supabase_service_key_set": bool(settings.SUPABASE_SERVICE_KEY),
+        "supabase_jwt_secret_set": bool(settings.SUPABASE_JWT_SECRET),
+        "supabase_url_prefix": (settings.SUPABASE_URL or "")[:30],
+    }
+
+
 @router.post("/users")
 async def seed_users(
     session: AsyncSession = Depends(get_session),
