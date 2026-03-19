@@ -149,6 +149,9 @@ async def update_note(
     if note is None:
         raise ApiError(status_code=404, detail="Note not found")
 
+    if note.created_by and note.created_by != user_id:
+        raise ApiError(status_code=403, detail="Only the note creator can update this note.")
+
     updates = body.model_dump(exclude_unset=True)
     for field, value in updates.items():
         if field == "mentions":
@@ -173,6 +176,10 @@ async def delete_note(
     note = await session.get(CRMNote, note_id)
     if note is None:
         raise ApiError(status_code=404, detail="Note not found")
+
+    if note.created_by and note.created_by != user_id:
+        raise ApiError(status_code=403, detail="Only the note creator can delete this note.")
+
     await session.delete(note)
     await session.commit()
     return success_response({"deleted": True})
@@ -188,6 +195,10 @@ async def pin_note(
     note = await session.get(CRMNote, note_id)
     if note is None:
         raise ApiError(status_code=404, detail="Note not found")
+
+    if note.created_by and note.created_by != user_id:
+        raise ApiError(status_code=403, detail="Only the note creator can pin this note.")
+
     note.is_pinned = True
     note.updated_at = datetime.utcnow()
     session.add(note)
@@ -206,6 +217,10 @@ async def unpin_note(
     note = await session.get(CRMNote, note_id)
     if note is None:
         raise ApiError(status_code=404, detail="Note not found")
+
+    if note.created_by and note.created_by != user_id:
+        raise ApiError(status_code=403, detail="Only the note creator can unpin this note.")
+
     note.is_pinned = False
     note.updated_at = datetime.utcnow()
     session.add(note)

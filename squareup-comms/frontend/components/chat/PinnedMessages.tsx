@@ -6,6 +6,7 @@ import { Pin, X, Hash } from "lucide-react";
 import { useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
+import { parseUtcDate } from "@/lib/format";
 
 // Stable empty array
 const EMPTY_MESSAGES: Message[] = [];
@@ -84,7 +85,7 @@ export function PinnedMessages({ onClose }: PinnedMessagesProps) {
 }
 
 function PinnedMessageItem({ message }: { message: Message }) {
-  const timeAgo = formatDistanceToNow(new Date(message.created_at), {
+  const timeAgo = formatDistanceToNow(parseUtcDate(message.created_at), {
     addSuffix: true,
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAgentStore, Agent, AgentStatus } from "@/lib/stores/agent-store";
 import { AgentCard } from "@/components/agents/AgentCard";
 import { AgentChat } from "@/components/agents/AgentChat";
@@ -25,9 +25,14 @@ type ViewMode = "grid" | "list";
 type FilterStatus = "all" | AgentStatus;
 
 export default function AgentsPage() {
-  const { agents, selectedAgentId, setSelectedAgent, addAgent } =
+  const { agents, selectedAgentId, setSelectedAgent, addAgent, fetchAgents } =
     useAgentStore();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+
+  // Load agents from API on mount (prevents vanishing on refresh)
+  useEffect(() => {
+    fetchAgents();
+  }, [fetchAgents]);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);

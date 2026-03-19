@@ -6,6 +6,7 @@ Dual-mode auth:
 """
 
 import logging
+import os
 import threading
 
 import httpx
@@ -17,6 +18,29 @@ from typing import Optional
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Production safety guard for dev auth
+# ---------------------------------------------------------------------------
+_is_production = (
+    os.environ.get("ENVIRONMENT", "").lower() in ("production", "prod")
+    or os.environ.get("RAILWAY_ENVIRONMENT", "").lower() == "production"
+    or os.environ.get("VERCEL_ENV", "").lower() == "production"
+    or os.environ.get("FLY_APP_NAME") is not None
+    or os.environ.get("RENDER") is not None
+)
+
+if settings.ENABLE_DEV_AUTH and _is_production:
+    logger.critical(
+        "ENABLE_DEV_AUTH=true in a production environment! "
+        "Overriding to False for security. Set ENABLE_DEV_AUTH=false explicitly."
+    )
+    settings.ENABLE_DEV_AUTH = False
+elif settings.ENABLE_DEV_AUTH:
+    logger.warning(
+        "Dev auth is ENABLED — X-User-Id header bypass is active. "
+        "Set ENABLE_DEV_AUTH=false before deploying to production."
+    )
 
 # ---------------------------------------------------------------------------
 # Security scheme

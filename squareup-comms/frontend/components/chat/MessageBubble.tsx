@@ -3,7 +3,7 @@
 import { Message, useChatStore } from "@/lib/stores/chat-store";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, parseUtcDate } from "@/lib/format";
 import { Bot, MessageSquareReply, Pin as PinIcon, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useState, useCallback, useMemo, useRef } from "react";
@@ -81,7 +81,7 @@ export function MessageBubble({
 
   const timeAgo = useMemo(
     () =>
-      formatDistanceToNow(new Date(message.created_at), { addSuffix: true }),
+      formatDistanceToNow(parseUtcDate(message.created_at), { addSuffix: true }),
     [message.created_at]
   );
 

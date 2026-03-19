@@ -5,6 +5,7 @@ import { Bookmark, X, Hash, Trash2 } from "lucide-react";
 import { useCallback, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
+import { parseUtcDate } from "@/lib/format";
 
 // ─── Bookmark storage (localStorage-backed) ────────────────────────────
 export interface BookmarkedMessage {
@@ -131,7 +132,7 @@ export function BookmarkedMessages({ onClose }: BookmarkedMessagesProps) {
 }
 
 function BookmarkItem({ bookmark }: { bookmark: BookmarkedMessage }) {
-  const timeAgo = formatDistanceToNow(new Date(bookmark.bookmarkedAt), {
+  const timeAgo = formatDistanceToNow(parseUtcDate(bookmark.bookmarkedAt), {
     addSuffix: true,
   });
 

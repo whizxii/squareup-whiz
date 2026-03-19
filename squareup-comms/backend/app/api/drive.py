@@ -168,6 +168,13 @@ async def get_file(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found.",
         )
+
+    if record.uploaded_by != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this file.",
+        )
+
     return record
 
 
@@ -184,6 +191,12 @@ async def download_file(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found.",
+        )
+
+    if record.uploaded_by != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this file.",
         )
 
     if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:

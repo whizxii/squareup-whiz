@@ -164,6 +164,9 @@ async def update_task(
     if task is None:
         raise ApiError(status_code=404, detail="Task not found")
 
+    if task.created_by != user_id and task.assigned_to != user_id:
+        raise ApiError(status_code=403, detail="You can only update tasks you created or are assigned to.")
+
     updates = body.model_dump(exclude_unset=True)
     for field, value in updates.items():
         if field == "tags":
@@ -190,6 +193,10 @@ async def delete_task(
     task = await session.get(Task, task_id)
     if task is None:
         raise ApiError(status_code=404, detail="Task not found")
+
+    if task.created_by != user_id and task.assigned_to != user_id:
+        raise ApiError(status_code=403, detail="You can only delete tasks you created or are assigned to.")
+
     await session.delete(task)
     await session.commit()
     return success_response({"deleted": True})

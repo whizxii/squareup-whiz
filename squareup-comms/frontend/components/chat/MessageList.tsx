@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { MessageSquare, Sparkles, ArrowDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { parseUtcDate } from "@/lib/format";
 import { usePrefersReducedMotion } from "@/hooks/use-keyboard-shortcuts";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
@@ -119,8 +120,8 @@ export function MessageList({ loading = false, onConfirmationRespond }: MessageL
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
       const prev = i > 0 ? messages[i - 1] : null;
-      const msgDate = new Date(msg.created_at);
-      const prevDate = prev ? new Date(prev.created_at) : null;
+      const msgDate = parseUtcDate(msg.created_at);
+      const prevDate = prev ? parseUtcDate(prev.created_at) : null;
 
       const showDateSeparator = !prevDate || isDifferentDay(prevDate, msgDate);
 

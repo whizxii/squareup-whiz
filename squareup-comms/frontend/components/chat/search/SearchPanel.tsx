@@ -6,6 +6,7 @@ import { Search, X, Hash, ArrowRight } from "lucide-react";
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
+import { parseUtcDate } from "@/lib/format";
 
 // Stable empty array
 const EMPTY_MESSAGES: Message[] = [];
@@ -227,7 +228,7 @@ function SearchResultItem({
   onClick: () => void;
 }) {
   const content = result.message.content || "";
-  const timeAgo = formatDistanceToNow(new Date(result.message.created_at), {
+  const timeAgo = formatDistanceToNow(parseUtcDate(result.message.created_at), {
     addSuffix: true,
   });
 

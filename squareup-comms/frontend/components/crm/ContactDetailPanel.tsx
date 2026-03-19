@@ -27,6 +27,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
 import { formatDistanceToNow } from "date-fns";
+import { parseUtcDate } from "@/lib/format";
 
 // ─── Stage colors ────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ function ActivityItem({ activity }: { activity: Activity }) {
         )}
         <div className="flex items-center gap-2 mt-1">
           <span className="text-[10px] text-muted-foreground">
-            {formatDistanceToNow(new Date(activity.created_at), {
+            {formatDistanceToNow(parseUtcDate(activity.created_at), {
               addSuffix: true,
             })}
           </span>

@@ -160,9 +160,14 @@ async def provider_callback(
         )
 
     if resp.status_code != 200:
+        import logging
+        logging.getLogger(__name__).error(
+            "OAuth token exchange failed for %s: %s %s",
+            provider, resp.status_code, resp.text[:500],
+        )
         raise ApiError(
             status_code=400,
-            detail=f"Token exchange failed: {resp.text[:200]}",
+            detail=f"OAuth token exchange failed for {provider}. Please try again.",
         )
 
     tokens = resp.json()

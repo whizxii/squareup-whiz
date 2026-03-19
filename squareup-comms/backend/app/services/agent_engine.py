@@ -6,6 +6,7 @@ import json
 import logging
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlmodel import select
@@ -272,9 +273,11 @@ async def run_agent(
 
                 await _broadcast_tool_start(channel_id, agent.id, tu.name, tu.input)
 
+                tool_start = time.monotonic()
                 result = await tool_registry.execute(
                     tu.name, tu.input, tool_context, available_tools=tools,
                 )
+                tool_duration_ms = int((time.monotonic() - tool_start) * 1000)
 
                 output_str = json.dumps(result.output) if result.success else f"Error: {result.error}"
                 await _broadcast_tool_result(
@@ -292,6 +295,7 @@ async def run_agent(
                     "input": tu.input,
                     "output": result.output,
                     "success": result.success,
+                    "duration_ms": tool_duration_ms,
                     "error": result.error,
                 })
 
@@ -318,7 +322,7 @@ async def run_agent(
     # Claude pricing approximation (sonnet)
     total_cost = (total_input_tokens * 0.000003) + (total_output_tokens * 0.000015)
 
-    # 5. Save message + execution
+    # 5. Save message + execution + reset agent status atomically
     now = datetime.utcnow()
     agent_message = Message(
         id=stream_message_id,
@@ -329,45 +333,59 @@ async def run_agent(
         created_at=now,
     )
 
-    async with async_session() as session:
-        session.add(agent_message)
+    try:
+        async with async_session() as session:
+            session.add(agent_message)
 
-        execution = AgentExecution(
-            id=str(uuid.uuid4()),
-            agent_id=agent.id,
-            trigger_message_id=trigger_message_id,
-            trigger_channel_id=channel_id,
-            conversation_messages=json.dumps(messages, default=str)[:50000],
-            tools_called=json.dumps(tool_calls_log, default=str)[:50000],
-            response_text=final_text[:10000],
-            input_tokens=total_input_tokens,
-            output_tokens=total_output_tokens,
-            total_cost_usd=total_cost,
-            duration_ms=elapsed_ms,
-            num_tool_calls=len(tool_calls_log),
-            status=exec_status,
-            error_message=error_message,
-            created_at=now,
-        )
-        session.add(execution)
+            execution = AgentExecution(
+                id=str(uuid.uuid4()),
+                agent_id=agent.id,
+                trigger_message_id=trigger_message_id,
+                trigger_channel_id=channel_id,
+                conversation_messages=json.dumps(messages, default=str)[:50000],
+                tools_called=json.dumps(tool_calls_log, default=str)[:50000],
+                response_text=final_text[:10000],
+                input_tokens=total_input_tokens,
+                output_tokens=total_output_tokens,
+                total_cost_usd=total_cost,
+                duration_ms=elapsed_ms,
+                num_tool_calls=len(tool_calls_log),
+                status=exec_status,
+                error_message=error_message,
+                created_at=now,
+            )
+            session.add(execution)
 
-        # Update agent stats (including budget tracking)
-        db_agent = await session.get(Agent, agent.id)
-        if db_agent:
-            db_agent.status = "idle"
-            db_agent.current_task = None
-            db_agent.total_executions += 1
-            db_agent.total_cost_usd += total_cost
-            # Track monthly cost for budget enforcement
-            current_month = now.strftime("%Y-%m")
-            if db_agent.cost_month_key != current_month:
-                db_agent.cost_this_month = total_cost
-                db_agent.cost_month_key = current_month
-            else:
-                db_agent.cost_this_month += total_cost
-            session.add(db_agent)
+            # Update agent stats (including budget tracking)
+            db_agent = await session.get(Agent, agent.id)
+            if db_agent:
+                db_agent.status = "idle"
+                db_agent.current_task = None
+                db_agent.total_executions += 1
+                db_agent.total_cost_usd += total_cost
+                # Track monthly cost for budget enforcement
+                current_month = now.strftime("%Y-%m")
+                if db_agent.cost_month_key != current_month:
+                    db_agent.cost_this_month = total_cost
+                    db_agent.cost_month_key = current_month
+                else:
+                    db_agent.cost_this_month += total_cost
+                session.add(db_agent)
 
-        await session.commit()
+            await session.commit()
+    except Exception as save_exc:
+        logger.error("Failed to save agent execution: %s", save_exc)
+        # Even if save fails, ensure agent status is reset to idle in DB
+        try:
+            async with async_session() as session:
+                db_agent = await session.get(Agent, agent.id)
+                if db_agent:
+                    db_agent.status = "idle"
+                    db_agent.current_task = None
+                    session.add(db_agent)
+                    await session.commit()
+        except Exception:
+            logger.error("Failed to reset agent %s status to idle", agent.id)
 
     # Broadcast the final assembled message
     await _broadcast(channel_id, {
@@ -408,6 +426,226 @@ async def run_agent(
             )
         except Exception as exc:
             logger.warning("Memory extraction failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Synchronous invoke — used by REST endpoint (no WebSocket streaming)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class InvokeResult:
+    """Return value for the synchronous invoke path."""
+    response_text: str
+    tool_calls_log: list[dict]
+    input_tokens: int
+    output_tokens: int
+    total_cost_usd: float
+    duration_ms: int
+    status: str  # "success" | "error"
+    error_message: str | None
+
+
+async def invoke_agent_sync(
+    agent_id: str,
+    user_id: str,
+    content: str,
+) -> InvokeResult:
+    """Run the ReAct loop synchronously (no WS streaming) and return result.
+
+    Used by the REST ``POST /api/agents/{id}/invoke`` endpoint.
+    Shares the same tool execution & LLM logic as the WS-based ``run_agent``,
+    but collects the result in-memory and returns it instead of broadcasting.
+    """
+    start_time = time.monotonic()
+
+    # 1. Load agent
+    async with async_session() as session:
+        agent = await session.get(Agent, agent_id)
+        if not agent or not agent.active:
+            return InvokeResult(
+                response_text="Agent not found or inactive.",
+                tool_calls_log=[], input_tokens=0, output_tokens=0,
+                total_cost_usd=0, duration_ms=0, status="error",
+                error_message="Agent not found or inactive",
+            )
+
+        agent.status = "working"
+        agent.current_task = "Processing message"
+        session.add(agent)
+        await session.commit()
+
+    max_iterations = agent.max_iterations or 5
+    llm = get_llm_client(agent.model)
+
+    # 2. Build context — no channel context for direct invoke (chat panel)
+    memory_facts = await load_agent_memory(agent.id, user_id)
+    system_prompt = build_system_prompt(agent, memory_facts)
+    messages: list[dict] = [{"role": "user", "content": content}]
+
+    # 3. Build tools
+    tools = await tool_registry.get_tools_for_agent(
+        agent.tools or "[]",
+        user_id,
+        custom_tools_json=agent.custom_tools,
+        mcp_servers_json=agent.mcp_servers,
+    )
+    tool_schemas = [t.to_claude_schema() for t in tools]
+    tool_context = ToolContext(user_id=user_id, channel_id="direct", agent_id=agent.id)
+
+    tool_calls_log: list[dict] = []
+    total_input_tokens = 0
+    total_output_tokens = 0
+    iteration = 0
+    final_text = ""
+    exec_status = "success"
+    error_message: str | None = None
+
+    try:
+        while iteration < max_iterations:
+            text_parts: list[str] = []
+            tool_use_blocks: list[ToolUseComplete] = []
+
+            async for event in llm.stream_with_tools(
+                system=system_prompt,
+                messages=messages,
+                tools=tool_schemas if tool_schemas else None,
+                model=agent.model,
+                max_tokens=4096,
+                temperature=agent.temperature,
+            ):
+                if isinstance(event, TextDelta):
+                    text_parts.append(event.text)
+                elif isinstance(event, ToolUseComplete):
+                    tool_use_blocks.append(event)
+                elif isinstance(event, UsageUpdate):
+                    total_input_tokens += event.input_tokens
+                    total_output_tokens += event.output_tokens
+
+            full_text = "".join(text_parts)
+
+            if not tool_use_blocks:
+                final_text = full_text
+                break
+
+            # Execute tools
+            assistant_content: list[dict] = []
+            if full_text:
+                assistant_content.append({"type": "text", "text": full_text})
+
+            tool_results: list[dict] = []
+            for tu in tool_use_blocks:
+                assistant_content.append({
+                    "type": "tool_use",
+                    "id": tu.tool_use_id,
+                    "name": tu.name,
+                    "input": tu.input,
+                })
+
+                tool_start = time.monotonic()
+                result = await tool_registry.execute(
+                    tu.name, tu.input, tool_context, available_tools=tools,
+                )
+                tool_duration_ms = int((time.monotonic() - tool_start) * 1000)
+
+                output_str = json.dumps(result.output) if result.success else f"Error: {result.error}"
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tu.tool_use_id,
+                    "content": output_str[:10000],
+                    "is_error": not result.success,
+                })
+                tool_calls_log.append({
+                    "name": tu.name,
+                    "input": tu.input,
+                    "output": result.output,
+                    "success": result.success,
+                    "duration_ms": tool_duration_ms,
+                    "error": result.error,
+                })
+
+            messages.append({"role": "assistant", "content": assistant_content})
+            messages.append({"role": "user", "content": tool_results})
+            iteration += 1
+
+        if not final_text and iteration >= max_iterations:
+            final_text = "I've reached my maximum number of reasoning steps. Here's what I found so far."
+
+    except Exception as exc:
+        exec_status = "error"
+        error_message = str(exc)[:500]
+        final_text = final_text or "I encountered an error while processing your request."
+        logger.error("Agent %s sync invoke failed: %s", agent.id, exc)
+
+    elapsed_ms = int((time.monotonic() - start_time) * 1000)
+    total_cost = (total_input_tokens * 0.000003) + (total_output_tokens * 0.000015)
+
+    # Save execution record + update agent stats
+    now = datetime.utcnow()
+    try:
+        async with async_session() as session:
+            execution = AgentExecution(
+                id=str(uuid.uuid4()),
+                agent_id=agent.id,
+                conversation_messages=json.dumps(messages, default=str)[:50000],
+                tools_called=json.dumps(tool_calls_log, default=str)[:50000],
+                response_text=final_text[:10000],
+                input_tokens=total_input_tokens,
+                output_tokens=total_output_tokens,
+                total_cost_usd=total_cost,
+                duration_ms=elapsed_ms,
+                num_tool_calls=len(tool_calls_log),
+                status=exec_status,
+                error_message=error_message,
+                created_at=now,
+            )
+            session.add(execution)
+
+            db_agent = await session.get(Agent, agent.id)
+            if db_agent:
+                db_agent.status = "idle"
+                db_agent.current_task = None
+                db_agent.total_executions += 1
+                db_agent.total_cost_usd += total_cost
+                current_month = now.strftime("%Y-%m")
+                if db_agent.cost_month_key != current_month:
+                    db_agent.cost_this_month = total_cost
+                    db_agent.cost_month_key = current_month
+                else:
+                    db_agent.cost_this_month += total_cost
+                session.add(db_agent)
+
+            await session.commit()
+    except Exception as save_exc:
+        logger.error("Failed to save sync invoke execution: %s", save_exc)
+        # Ensure agent status is reset to idle even if save fails
+        try:
+            async with async_session() as session:
+                db_agent = await session.get(Agent, agent.id)
+                if db_agent:
+                    db_agent.status = "idle"
+                    db_agent.current_task = None
+                    session.add(db_agent)
+                    await session.commit()
+        except Exception:
+            logger.error("Failed to reset agent %s status to idle", agent.id)
+
+    # Best-effort memory extraction
+    if final_text and exec_status == "success":
+        try:
+            await extract_and_save_memory(agent.id, user_id, final_text, llm.chat)
+        except Exception as exc:
+            logger.warning("Memory extraction failed: %s", exc)
+
+    return InvokeResult(
+        response_text=final_text,
+        tool_calls_log=tool_calls_log,
+        input_tokens=total_input_tokens,
+        output_tokens=total_output_tokens,
+        total_cost_usd=total_cost,
+        duration_ms=elapsed_ms,
+        status=exec_status,
+        error_message=error_message,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -72,9 +72,10 @@ async def create_room(
 
 
 @router.get("/status")
-async def livekit_status() -> dict:
+async def livekit_status(
+    _user_id: str = Depends(get_current_user),
+) -> dict:
     """Health check — reports whether LiveKit credentials are configured."""
     return {
         "configured": livekit_service.is_configured,
-        "livekit_url": settings.LIVEKIT_URL if livekit_service.is_configured else None,
     }

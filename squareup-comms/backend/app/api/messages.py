@@ -630,8 +630,10 @@ async def ai_search_messages(
         )
         answer = response.choices[0].message.content or ""
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-        
+        import logging
+        logging.getLogger(__name__).error("AI search failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="AI search service temporarily unavailable.")
+
     # Extract cited IDs (very basic extraction)
     import re
     cited_ids = re.findall(r'\[ID:([a-f0-9\-]+)\]', answer)

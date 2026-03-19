@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import time
 from datetime import datetime
 from typing import List, Optional
 
@@ -14,10 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.core.auth import get_current_user
-from app.core.config import settings
 from app.core.db import get_session
 from app.models.agents import Agent, AgentExecution
-from app.services.llm_service import llm_service
+from app.services.agent_engine import invoke_agent_sync
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -389,6 +387,12 @@ async def update_agent(
 
     agent = await _get_active_agent(agent_id, session)
 
+    if agent.created_by and agent.created_by != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the agent creator can update this agent.",
+        )
+
     update_data = body.model_dump(exclude_unset=True)
 
     # Serialize list fields to JSON strings for storage
@@ -420,6 +424,12 @@ async def deactivate_agent(
 
     agent = await _get_active_agent(agent_id, session)
 
+    if agent.created_by and agent.created_by != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the agent creator can deactivate this agent.",
+        )
+
     agent.active = False
     agent.status = "offline"
     agent.updated_at = datetime.utcnow()
@@ -447,6 +457,12 @@ async def update_agent_status(
 
     agent = await _get_active_agent(agent_id, session)
 
+    if agent.created_by and agent.created_by != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the agent creator can update this agent's status.",
+        )
+
     agent.status = body.status
     agent.current_task = body.current_task
     agent.updated_at = datetime.utcnow()
@@ -461,130 +477,39 @@ async def update_agent_status(
 # Agent Execution Routes
 # ---------------------------------------------------------------------------
 
-@router.post("/{agent_id}/invoke", response_model=ExecutionResponse)
+@router.post("/{agent_id}/invoke")
 async def invoke_agent(
     agent_id: str,
     body: InvokeRequest,
     session: AsyncSession = Depends(get_session),
     user_id: str = Depends(get_current_user),
-) -> AgentExecution:
-    """Invoke an agent with a message.
+) -> dict:
+    """Invoke an agent with the full ReAct engine (tool execution + memory).
 
-    Sends the user message to the configured LLM (Groq) with the agent's
-    system_prompt and records the execution in the database.
+    Uses the same ReAct loop as the WebSocket path — real tool calls,
+    conversation memory, and proper Claude API integration.
     """
 
-    agent = await _get_active_agent(agent_id, session)
+    # Verify agent exists and is active
+    await _get_active_agent(agent_id, session)
 
-    # ── Guard: LLM must be configured ──────────────────────────────
-    if not llm_service.available:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "AI agents require a GROQ_API_KEY. "
-                "Get one free at https://console.groq.com"
-            ),
-        )
-
-    start_time = time.monotonic()
-
-    # 1. Set agent status to "thinking"
-    agent.status = "thinking"
-    agent.current_task = f"Processing message from {user_id}"
-    session.add(agent)
-    await session.flush()
-
-    # 2. Build messages and call the LLM
-    messages: list[dict] = [
-        {"role": "system", "content": agent.system_prompt},
-        {"role": "user", "content": body.message},
-    ]
-
-    exec_status = "success"
-    error_message: str | None = None
-    error_type: str | None = None
-    response_text = ""
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    total_cost: float | None = None
-
-    try:
-        response = await llm_service.client.chat.completions.create(
-            model=settings.LLM_MODEL,
-            messages=messages,
-            max_tokens=1024,
-            temperature=0.7,
-        )
-        response_text = response.choices[0].message.content or ""
-        input_tokens = getattr(response.usage, "prompt_tokens", None)
-        output_tokens = getattr(response.usage, "completion_tokens", None)
-
-        # Rough cost estimate for Groq (adjust rates as needed)
-        if input_tokens is not None and output_tokens is not None:
-            total_cost = (input_tokens * 0.000003) + (output_tokens * 0.000015)
-
-    except Exception as exc:
-        exec_status = "error"
-        error_type = type(exc).__name__
-        error_message = str(exc)[:500]
-        response_text = "Sorry, I encountered an error processing your request."
-
-    elapsed_ms = int((time.monotonic() - start_time) * 1000)
-
-    # 3. Create execution record
-    execution = AgentExecution(
-        agent_id=agent.id,
-        conversation_messages=json.dumps([
-            {"role": "system", "content": agent.system_prompt},
-            {"role": "user", "content": body.message},
-            {"role": "assistant", "content": response_text},
-        ]),
-        tools_called=json.dumps([]),
-        response_text=response_text,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        total_cost_usd=total_cost,
-        duration_ms=elapsed_ms,
-        num_tool_calls=0,
-        status=exec_status,
-        error_message=error_message,
-        error_type=error_type,
+    result = await invoke_agent_sync(
+        agent_id=agent_id,
+        user_id=user_id,
+        content=body.message,
     )
-    session.add(execution)
 
-    # 4. Update agent stats
-    agent.total_executions += 1
-    if total_cost is not None:
-        agent.total_cost_usd += total_cost
-
-    # Recalculate success_rate
-    if agent.total_executions > 0:
-        success_count_stmt = (
-            select(func.count())
-            .select_from(AgentExecution)
-            .where(
-                AgentExecution.agent_id == agent.id,
-                AgentExecution.status == "success",
-            )
-        )
-        # Include the current execution (not yet committed) in the count
-        pending_success = 1 if exec_status == "success" else 0
-        result = await session.execute(success_count_stmt)
-        prior_successes = result.scalar_one()
-        agent.success_rate = round(
-            ((prior_successes + pending_success) / (agent.total_executions)) * 100,
-            2,
-        )
-
-    # 5. Set agent status back to "idle"
-    agent.status = "idle"
-    agent.current_task = None
-    agent.updated_at = datetime.utcnow()
-
-    session.add(agent)
-    await session.commit()
-    await session.refresh(execution)
-    return execution
+    return {
+        "response_text": result.response_text,
+        "tools_called": json.dumps(result.tool_calls_log, default=str),
+        "input_tokens": result.input_tokens,
+        "output_tokens": result.output_tokens,
+        "total_cost_usd": result.total_cost_usd,
+        "duration_ms": result.duration_ms,
+        "status": result.status,
+        "error_message": result.error_message,
+        "num_tool_calls": len(result.tool_calls_log),
+    }
 
 
 @router.get("/{agent_id}/executions", response_model=PaginatedExecutions)

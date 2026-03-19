@@ -4,6 +4,7 @@ import { Message } from "@/lib/stores/chat-store";
 import { cn } from "@/lib/utils";
 import { Bot } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { parseUtcDate } from "@/lib/format";
 import { useMemo } from "react";
 import DOMPurify from "dompurify";
 
@@ -17,7 +18,7 @@ export function ThreadMessage({ message, isOwn }: ThreadMessageProps) {
 
   const timeAgo = useMemo(
     () =>
-      formatDistanceToNow(new Date(message.created_at), { addSuffix: true }),
+      formatDistanceToNow(parseUtcDate(message.created_at), { addSuffix: true }),
     [message.created_at]
   );
 

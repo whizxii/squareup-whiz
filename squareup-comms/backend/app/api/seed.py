@@ -1,4 +1,9 @@
-"""One-time seed endpoint to bootstrap channels and the 3 team member accounts."""
+"""One-time seed endpoint to bootstrap channels and the 3 team member accounts.
+
+All seed endpoints require either:
+- Dev mode (ENABLE_DEV_AUTH=true) — for local development
+- A valid authenticated user — for staging/production initial setup
+"""
 
 from __future__ import annotations
 
@@ -6,10 +11,8 @@ import json
 import logging
 from datetime import datetime
 
-import traceback
-
 import httpx
-from fastapi import APIRouter, Depends, Security
+from fastapi import APIRouter, Depends, HTTPException, Security, status
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
@@ -19,6 +22,7 @@ from sqlmodel import select
 
 from app.core.config import settings
 from app.core.db import get_session
+from app.core.auth import get_current_user
 from app.models.users import UserProfile
 from app.models.chat import Channel, ChannelMember
 
@@ -146,15 +150,22 @@ async def _get_or_create_supabase_user(email: str, password: str, display_name: 
 
 
 @router.get("/debug")
-async def seed_debug() -> dict:
-    """Temporary debug endpoint to check config."""
+async def seed_debug(
+    _user_id: str = Depends(get_current_user),
+) -> dict:
+    """Debug endpoint to check config — requires authentication.
+
+    Never exposes secret values or prefixes.
+    """
+    if not settings.ENABLE_DEV_AUTH:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Debug endpoint is only available in dev mode.",
+        )
     return {
         "supabase_url_set": bool(settings.SUPABASE_URL),
         "supabase_service_key_set": bool(settings.SUPABASE_SERVICE_KEY),
         "supabase_jwt_secret_set": bool(settings.SUPABASE_JWT_SECRET),
-        "supabase_url_prefix": (settings.SUPABASE_URL or "")[:30],
-        "jwt_secret_length": len(settings.SUPABASE_JWT_SECRET or ""),
-        "jwt_secret_prefix": (settings.SUPABASE_JWT_SECRET or "")[:4],
     }
 
 
@@ -162,7 +173,17 @@ async def seed_debug() -> dict:
 async def debug_token(
     credentials: Optional[HTTPAuthorizationCredentials] = Security(_bearer_scheme),
 ) -> dict:
-    """Temporary debug endpoint to diagnose JWT verification failures."""
+    """Debug endpoint to diagnose JWT verification — dev mode only.
+
+    Does NOT require get_current_user since the whole point is to debug
+    broken tokens. Instead, gated behind ENABLE_DEV_AUTH.
+    """
+    if not settings.ENABLE_DEV_AUTH:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token debug endpoint is only available in dev mode.",
+        )
+
     if not credentials or not credentials.credentials:
         return {"error": "No Bearer token provided"}
 
@@ -172,45 +193,52 @@ async def debug_token(
     # Decode header without verification
     try:
         header = jwt.get_unverified_header(token)
-        result["header"] = header
+        result["header"] = {"alg": header.get("alg"), "typ": header.get("typ")}
     except Exception as e:
         result["header_error"] = str(e)
 
-    # Decode claims without verification
+    # Decode claims without verification — redact sensitive fields
     try:
         claims = jwt.get_unverified_claims(token)
-        result["claims"] = {k: v for k, v in claims.items() if k != "session_id"}
+        safe_keys = {"sub", "aud", "exp", "iat", "iss", "role"}
+        result["claims"] = {k: v for k, v in claims.items() if k in safe_keys}
     except Exception as e:
         result["claims_error"] = str(e)
 
-    # Try to verify with HS256
+    # Try to verify with HS256 — only report success/failure, no secret details
     secret = settings.SUPABASE_JWT_SECRET or ""
     try:
         payload = jwt.decode(token, secret, algorithms=["HS256"], options={"verify_aud": False})
         result["verify_hs256"] = "SUCCESS"
         result["sub"] = payload.get("sub")
     except Exception as e:
-        result["verify_hs256"] = f"FAILED: {e}"
+        result["verify_hs256"] = f"FAILED: {type(e).__name__}"
 
     return result
 
 
 @router.post("/users")
 async def seed_users(
+    _user_id: str = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Create default channels + Supabase auth accounts + UserProfile rows.
 
+    Requires authentication. Only available in dev mode.
     Idempotent: skips items that already exist.
     """
+    if not settings.ENABLE_DEV_AUTH:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seed endpoint is only available in dev mode.",
+        )
     try:
         return await _seed_users_impl(session)
     except Exception as exc:
         logger.exception("seed_users failed")
-        tb = traceback.format_exc()
         return JSONResponse(
-            status_code=200,
-            content={"error": str(exc), "type": type(exc).__name__, "traceback": tb},
+            status_code=500,
+            content={"error": str(exc), "type": type(exc).__name__},
         )
 
 
@@ -316,9 +344,12 @@ async def _seed_users_impl(session: AsyncSession) -> dict:
 
 @router.post("/cleanup-duplicates")
 async def cleanup_duplicate_profiles(
+    _user_id: str = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Remove duplicate user_profiles rows for the same email.
+
+    Requires authentication. Only available in dev mode.
 
     For each email that appears more than once in user_profiles:
     1. Query Supabase Auth admin API to find the canonical UID for that email.
@@ -329,14 +360,18 @@ async def cleanup_duplicate_profiles(
 
     Idempotent — safe to call multiple times.
     """
+    if not settings.ENABLE_DEV_AUTH:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cleanup endpoint is only available in dev mode.",
+        )
     try:
         return await _cleanup_duplicates_impl(session)
     except Exception as exc:
         logger.exception("cleanup_duplicate_profiles failed")
-        tb = traceback.format_exc()
         return JSONResponse(
-            status_code=200,
-            content={"error": str(exc), "type": type(exc).__name__, "traceback": tb},
+            status_code=500,
+            content={"error": str(exc), "type": type(exc).__name__},
         )
 
 
@@ -494,9 +529,18 @@ async def _cleanup_duplicates_impl(session: AsyncSession) -> dict:
 @router.delete("/orphan/{uid}")
 async def delete_orphan_profile(
     uid: str,
+    _user_id: str = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Delete an orphan user profile by UID and clean up all FK references."""
+    """Delete an orphan user profile by UID and clean up all FK references.
+
+    Requires authentication. Only available in dev mode.
+    """
+    if not settings.ENABLE_DEV_AUTH:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Orphan cleanup endpoint is only available in dev mode.",
+        )
     from sqlalchemy import text
 
     profile = await session.get(UserProfile, uid)

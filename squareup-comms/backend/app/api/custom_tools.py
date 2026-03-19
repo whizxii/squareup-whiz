@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
+import logging
 from datetime import datetime
 from typing import Optional
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
@@ -17,7 +20,41 @@ from app.core.responses import ApiError, success_response
 from app.models.custom_tools import CustomTool
 from app.services.integrations.google_auth import encrypt_tokens, decrypt_tokens
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/custom-tools", tags=["custom-tools"])
+
+
+# ---------------------------------------------------------------------------
+# SSRF protection
+# ---------------------------------------------------------------------------
+
+def _validate_url_not_private(url: str) -> None:
+    """Block URLs targeting private/loopback/link-local addresses (SSRF prevention)."""
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if not hostname:
+        raise ApiError(status_code=400, detail="Invalid URL: no hostname found.")
+    if parsed.scheme not in ("http", "https"):
+        raise ApiError(status_code=400, detail="Only http and https URLs are allowed.")
+    # Block obvious private hostnames
+    blocked_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"}
+    if hostname.lower() in blocked_hosts:
+        raise ApiError(status_code=400, detail="URLs targeting localhost or loopback addresses are not allowed.")
+    # Resolve and check IP ranges
+    try:
+        addr = ipaddress.ip_address(hostname)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            raise ApiError(
+                status_code=400,
+                detail="URLs targeting private, loopback, or link-local IP addresses are not allowed.",
+            )
+    except ValueError:
+        # hostname is a domain name, not a raw IP — allowed
+        # Additional check: block common internal domains
+        if hostname.endswith(".internal") or hostname.endswith(".local"):
+            raise ApiError(status_code=400, detail="URLs targeting internal network domains are not allowed.")
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -214,6 +251,13 @@ async def test_custom_tool(
     """Test a custom tool config without saving it."""
     from app.services.tools.registry import ToolDefinition, ToolResult, ToolContext, tool_registry
 
+    # SSRF protection: validate URLs in the config
+    if body.config:
+        for url_key in ("url", "url_template", "webhook_url", "base_url"):
+            target_url = body.config.get(url_key)
+            if target_url and isinstance(target_url, str):
+                _validate_url_not_private(target_url)
+
     # Build a temporary ToolDefinition
     _SRC = {"http": "custom_http", "openapi": "custom_http", "webhook": "custom_webhook"}
     source = _SRC.get(body.tool_type, "custom_webhook")
@@ -273,11 +317,18 @@ async def import_openapi(
     if not body.url and not body.spec:
         raise ApiError(status_code=400, detail="Provide either 'url' or 'spec'")
 
+    # SSRF protection: validate the OpenAPI spec URL
+    if body.url:
+        _validate_url_not_private(body.url)
+    if body.base_url_override:
+        _validate_url_not_private(body.base_url_override)
+
     # Fetch spec if URL provided
     try:
         spec = body.spec if body.spec else await fetch_openapi_spec(body.url)  # type: ignore[arg-type]
     except Exception as exc:
-        raise ApiError(status_code=400, detail=f"Failed to fetch OpenAPI spec: {exc}")
+        logger.error("Failed to fetch OpenAPI spec from %s: %s", body.url, exc)
+        raise ApiError(status_code=400, detail="Failed to fetch OpenAPI spec from the provided URL.")
 
     # Parse
     result = parse_openapi_spec(
