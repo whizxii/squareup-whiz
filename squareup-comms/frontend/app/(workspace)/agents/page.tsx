@@ -2,13 +2,14 @@
 
 import { useState, useCallback } from "react";
 import { useAgentStore, Agent, AgentStatus } from "@/lib/stores/agent-store";
-import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { AgentCard } from "@/components/agents/AgentCard";
 import { AgentChat } from "@/components/agents/AgentChat";
+import CreateAgentDialog from "@/components/agents/CreateAgentDialog";
+import AgentTemplates from "@/components/agents/AgentTemplates";
 import {
   Bot,
   Plus,
-  X,
+  Sparkles,
   Search,
   LayoutGrid,
   List,
@@ -17,7 +18,6 @@ import {
   DollarSign,
   Clock,
   CheckCircle2,
-  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +31,7 @@ export default function AgentsPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const filteredAgents = agents.filter((a) => {
     if (!a.active) return false;
@@ -62,6 +63,14 @@ export default function AgentsPage() {
     [addAgent]
   );
 
+  const handleDeployTemplate = useCallback(
+    (agent: Agent) => {
+      addAgent(agent);
+      setShowTemplates(false);
+    },
+    [addAgent]
+  );
+
   // Show agent chat if an agent is selected
   if (selectedAgentId) {
     return <AgentChat onBack={() => setSelectedAgent(null)} />;
@@ -77,13 +86,22 @@ export default function AgentsPage() {
             {agents.filter((a) => a.active).length}
           </span>
         </div>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sq-agent text-white text-sm font-medium hover:bg-sq-agent/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Create Agent</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowTemplates(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-sq-agent/30 text-sq-agent text-sm font-medium hover:bg-sq-agent/10 transition-colors"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span className="hidden sm:inline">Templates</span>
+          </button>
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sq-agent text-white text-sm font-medium hover:bg-sq-agent/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Create Agent</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats bar */}
@@ -230,6 +248,14 @@ export default function AgentsPage() {
           onCreate={handleCreateAgent}
         />
       )}
+
+      {/* Agent Templates Gallery */}
+      {showTemplates && (
+        <AgentTemplates
+          onDeploy={handleDeployTemplate}
+          onClose={() => setShowTemplates(false)}
+        />
+      )}
     </div>
   );
 }
@@ -307,262 +333,3 @@ function AgentListRow({ agent, onClick }: { agent: Agent; onClick: () => void })
   );
 }
 
-// ─── Create Agent Dialog ───────────────────────────────────────────
-const TRIGGER_MODES = [
-  { id: "mention", label: "When @mentioned" },
-  { id: "auto", label: "Auto-respond in channel" },
-  { id: "scheduled", label: "On a schedule" },
-] as const;
-
-const AVAILABLE_TOOLS = [
-  { id: "crm_search", label: "CRM Search", category: "CRM" },
-  { id: "crm_create_contact", label: "Create Contact", category: "CRM" },
-  { id: "crm_update_contact", label: "Update Contact", category: "CRM" },
-  { id: "crm_log_activity", label: "Log Activity", category: "CRM" },
-  { id: "calendar_list_events", label: "List Events", category: "Calendar" },
-  { id: "calendar_create_event", label: "Create Event", category: "Calendar" },
-  { id: "calendar_find_free_time", label: "Find Free Time", category: "Calendar" },
-  { id: "github_list_prs", label: "List PRs", category: "GitHub" },
-  { id: "github_create_issue", label: "Create Issue", category: "GitHub" },
-  { id: "reminder_create", label: "Create Reminder", category: "Scheduling" },
-  { id: "team_availability", label: "Team Availability", category: "Scheduling" },
-];
-
-const ICON_OPTIONS = ["📊", "📅", "🐙", "⏰", "🔍", "📝", "🤖", "💬", "📧", "🎯"];
-
-function CreateAgentDialog({
-  onClose,
-  onCreate,
-}: {
-  onClose: () => void;
-  onCreate: (agent: Agent) => void;
-}) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [icon, setIcon] = useState("🤖");
-  const [selectedTools, setSelectedTools] = useState<string[]>([]);
-  const [triggerMode, setTriggerMode] = useState<"mention" | "auto" | "scheduled">("mention");
-  const [error, setError] = useState("");
-
-  const toggleTool = (toolId: string) => {
-    setSelectedTools((prev) =>
-      prev.includes(toolId)
-        ? prev.filter((t) => t !== toolId)
-        : [...prev, toolId]
-    );
-  };
-
-  const handleCreate = () => {
-    if (!name.trim()) {
-      setError("Agent name is required");
-      return;
-    }
-    if (!instructions.trim()) {
-      setError("Instructions are required");
-      return;
-    }
-
-    const newAgent: Agent = {
-      id: `agent-${Date.now()}`,
-      name: name.trim(),
-      description: description.trim() || undefined,
-      system_prompt: instructions.trim(),
-      model: "claude-sonnet-4-6",
-      tools: selectedTools,
-      mcp_servers: [],
-      trigger_mode: triggerMode,
-      personality: "",
-      office_station_icon: icon,
-      status: "idle",
-      active: true,
-      total_executions: 0,
-      total_cost_usd: 0,
-      success_rate: 100,
-      created_by: getCurrentUserId(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    onCreate(newAgent);
-  };
-
-  // Group tools by category
-  const toolsByCategory = AVAILABLE_TOOLS.reduce(
-    (acc, tool) => {
-      const cat = tool.category;
-      return { ...acc, [cat]: [...(acc[cat] || []), tool] };
-    },
-    {} as Record<string, typeof AVAILABLE_TOOLS>
-  );
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-card border border-border rounded-2xl shadow-lg w-full max-w-lg max-h-[85vh] overflow-y-auto mx-4 scrollbar-thin">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-card rounded-t-2xl z-10">
-          <h3 className="font-display font-bold text-base">Create Agent</h3>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg hover:bg-accent transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-5">
-          {/* Error */}
-          {error && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-600 dark:text-red-400">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {error}
-            </div>
-          )}
-
-          {/* Icon picker */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-2 block">
-              Icon
-            </label>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {ICON_OPTIONS.map((ic) => (
-                <button
-                  key={ic}
-                  onClick={() => setIcon(ic)}
-                  className={cn(
-                    "w-9 h-9 rounded-lg flex items-center justify-center text-lg transition-all",
-                    icon === ic
-                      ? "bg-sq-agent/10 ring-2 ring-sq-agent/40 scale-110"
-                      : "bg-muted hover:bg-accent"
-                  )}
-                >
-                  {ic}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Name */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              Name *
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setError("");
-              }}
-              placeholder="e.g. Research Agent"
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-sq-agent/20 focus:border-sq-agent/30"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              Description
-            </label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What does this agent do?"
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-sq-agent/20 focus:border-sq-agent/30"
-            />
-          </div>
-
-          {/* Instructions */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              Instructions *
-            </label>
-            <textarea
-              value={instructions}
-              onChange={(e) => {
-                setInstructions(e.target.value);
-                setError("");
-              }}
-              placeholder="Tell the agent how to behave, what it should do, and any important context..."
-              rows={4}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-sq-agent/20 focus:border-sq-agent/30"
-            />
-          </div>
-
-          {/* Trigger mode */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-2 block">
-              Trigger
-            </label>
-            <div className="flex items-center gap-2">
-              {TRIGGER_MODES.map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => setTriggerMode(mode.id)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                    triggerMode === mode.id
-                      ? "bg-sq-agent/10 text-sq-agent border border-sq-agent/30"
-                      : "border border-border text-muted-foreground hover:bg-accent"
-                  )}
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Tools */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-2 block">
-              Tools ({selectedTools.length} selected)
-            </label>
-            <div className="space-y-3">
-              {Object.entries(toolsByCategory).map(([category, tools]) => (
-                <div key={category}>
-                  <p className="text-[11px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
-                    {category}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {tools.map((tool) => (
-                      <button
-                        key={tool.id}
-                        onClick={() => toggleTool(tool.id)}
-                        className={cn(
-                          "px-2 py-1 rounded-md text-xs transition-colors",
-                          selectedTools.includes(tool.id)
-                            ? "bg-sq-agent/10 text-sq-agent border border-sq-agent/30"
-                            : "bg-muted text-muted-foreground hover:bg-accent"
-                        )}
-                      >
-                        {tool.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border sticky bottom-0 bg-card rounded-b-2xl">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-accent transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            className="px-4 py-2 rounded-lg bg-sq-agent text-white text-sm font-medium hover:bg-sq-agent/90 transition-colors"
-          >
-            Create Agent
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}

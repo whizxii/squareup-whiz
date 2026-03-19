@@ -1,0 +1,441 @@
+"""ReAct execution engine — streaming LLM + tool loop with WebSocket broadcast."""
+
+from __future__ import annotations
+
+import json
+import logging
+import time
+import uuid
+from datetime import datetime
+
+from sqlmodel import select
+from sqlalchemy import func
+
+from app.core.db import async_session
+from app.models.agents import Agent, AgentExecution
+from app.models.chat import Message
+from app.services.conversation_memory import (
+    build_system_prompt,
+    extract_and_save_memory,
+    load_agent_memory,
+    load_conversation_context,
+)
+from app.services.llm_service import (
+    MessageComplete,
+    TextDelta,
+    ToolUseComplete,
+    UsageUpdate,
+    get_llm_client,
+)
+from app.services.tools import tool_registry
+from app.services.tools.registry import ToolContext
+from app.websocket.manager import hub_manager
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# WebSocket broadcast helpers
+# ---------------------------------------------------------------------------
+
+async def _broadcast(channel_id: str, event: dict) -> None:
+    """Broadcast an event to all WebSocket clients."""
+    await hub_manager.broadcast_all(event)
+
+
+async def _broadcast_status(channel_id: str, agent_id: str, status: str) -> None:
+    await _broadcast(channel_id, {
+        "type": "agent.status",
+        "agent_id": agent_id,
+        "channel_id": channel_id,
+        "status": status,
+    })
+
+
+async def _broadcast_text_delta(
+    channel_id: str, agent_id: str, message_id: str, delta: str,
+) -> None:
+    await _broadcast(channel_id, {
+        "type": "agent.text_delta",
+        "agent_id": agent_id,
+        "channel_id": channel_id,
+        "message_id": message_id,
+        "delta": delta,
+    })
+
+
+async def _broadcast_tool_start(
+    channel_id: str, agent_id: str, tool_name: str, tool_input: dict,
+) -> None:
+    await _broadcast(channel_id, {
+        "type": "agent.tool_start",
+        "agent_id": agent_id,
+        "channel_id": channel_id,
+        "tool_name": tool_name,
+        "tool_input_preview": json.dumps(tool_input)[:300],
+    })
+
+
+async def _broadcast_tool_result(
+    channel_id: str, agent_id: str, tool_name: str, success: bool, output_preview: str,
+) -> None:
+    await _broadcast(channel_id, {
+        "type": "agent.tool_result",
+        "agent_id": agent_id,
+        "channel_id": channel_id,
+        "tool_name": tool_name,
+        "success": success,
+        "output_preview": output_preview[:500],
+    })
+
+
+async def _broadcast_complete(
+    channel_id: str, agent_id: str, message_id: str,
+) -> None:
+    await _broadcast(channel_id, {
+        "type": "agent.complete",
+        "agent_id": agent_id,
+        "channel_id": channel_id,
+        "message_id": message_id,
+    })
+
+
+async def _broadcast_error(
+    channel_id: str, agent_id: str, error_message: str,
+) -> None:
+    await _broadcast(channel_id, {
+        "type": "agent.error",
+        "agent_id": agent_id,
+        "channel_id": channel_id,
+        "error_message": error_message[:500],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Main engine
+# ---------------------------------------------------------------------------
+
+async def run_agent(
+    agent_id: str,
+    trigger_message_id: str,
+    channel_id: str,
+    user_id: str,
+    content: str,
+) -> None:
+    """Full ReAct loop with streaming, tool execution, and memory.
+
+    1. Load agent from DB, set status to working
+    2. Build context (channel history + persistent memory)
+    3. Build tool list from registry
+    4. Loop: LLM stream → text deltas → tool_use blocks → execute → feed back
+    5. Save final message + execution record
+    6. Extract and persist memory facts
+    """
+    start_time = time.monotonic()
+
+    # 1. Load agent
+    async with async_session() as session:
+        agent = await session.get(Agent, agent_id)
+        if not agent or not agent.active:
+            logger.warning("Agent %s not found or inactive", agent_id)
+            return
+
+        # --- Budget enforcement ---
+        current_month = datetime.utcnow().strftime("%Y-%m")
+
+        # Reset monthly cost if month changed
+        if agent.cost_month_key != current_month:
+            agent.cost_this_month = 0.0
+            agent.cost_month_key = current_month
+
+        # Check monthly budget
+        if agent.monthly_budget_usd is not None and agent.cost_this_month >= agent.monthly_budget_usd:
+            logger.info("Agent %s exceeded monthly budget ($%.2f/$%.2f)",
+                        agent_id, agent.cost_this_month, agent.monthly_budget_usd)
+            session.add(agent)
+            await session.commit()
+            await _broadcast_error(
+                channel_id, agent_id,
+                f"I've hit my monthly budget limit (${agent.monthly_budget_usd:.2f}). "
+                "Ask an admin to increase it.",
+            )
+            return
+
+        # Check daily execution limit
+        if agent.daily_execution_limit is not None:
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            count_result = await session.execute(
+                select(func.count(AgentExecution.id)).where(
+                    AgentExecution.agent_id == agent_id,
+                    AgentExecution.created_at >= today_start,
+                )
+            )
+            today_count = count_result.scalar() or 0
+            if today_count >= agent.daily_execution_limit:
+                logger.info("Agent %s hit daily limit (%d/%d)",
+                            agent_id, today_count, agent.daily_execution_limit)
+                await _broadcast_error(
+                    channel_id, agent_id,
+                    f"I've reached my daily execution limit ({agent.daily_execution_limit} runs/day). "
+                    "Try again tomorrow or ask an admin to increase the limit.",
+                )
+                return
+
+        agent.status = "working"
+        agent.current_task = "Processing message"
+        session.add(agent)
+        await session.commit()
+
+    await _broadcast_status(channel_id, agent.id, "thinking")
+
+    max_iterations = agent.max_iterations or 5
+    llm = get_llm_client(agent.model)
+    stream_message_id = str(uuid.uuid4())
+
+    # 2. Build context
+    history = await load_conversation_context(channel_id, agent.id, limit=20)
+    memory_facts = await load_agent_memory(agent.id, user_id)
+    system_prompt = build_system_prompt(agent, memory_facts)
+
+    # Start with history + trigger message
+    messages: list[dict] = [*history, {"role": "user", "content": content}]
+
+    # Ensure messages alternate roles (Claude API requirement)
+    messages = _ensure_alternating_roles(messages)
+
+    # 3. Build tools (built-in + custom + MCP)
+    tools = await tool_registry.get_tools_for_agent(
+        agent.tools or "[]",
+        user_id,
+        custom_tools_json=agent.custom_tools,
+        mcp_servers_json=agent.mcp_servers,
+    )
+    tool_schemas = [t.to_claude_schema() for t in tools]
+    tool_context = ToolContext(user_id=user_id, channel_id=channel_id, agent_id=agent.id)
+
+    tool_calls_log: list[dict] = []
+    total_input_tokens = 0
+    total_output_tokens = 0
+    iteration = 0
+    final_text = ""
+    exec_status = "success"
+    error_message: str | None = None
+
+    try:
+        while iteration < max_iterations:
+            text_parts: list[str] = []
+            tool_use_blocks: list[ToolUseComplete] = []
+
+            # Stream LLM response
+            async for event in llm.stream_with_tools(
+                system=system_prompt,
+                messages=messages,
+                tools=tool_schemas if tool_schemas else None,
+                model=agent.model,
+                max_tokens=4096,
+                temperature=agent.temperature,
+            ):
+                if isinstance(event, TextDelta):
+                    text_parts.append(event.text)
+                    await _broadcast_text_delta(
+                        channel_id, agent.id, stream_message_id, event.text,
+                    )
+                elif isinstance(event, ToolUseComplete):
+                    tool_use_blocks.append(event)
+                elif isinstance(event, UsageUpdate):
+                    total_input_tokens += event.input_tokens
+                    total_output_tokens += event.output_tokens
+
+            full_text = "".join(text_parts)
+
+            # No tool calls → done
+            if not tool_use_blocks:
+                final_text = full_text
+                break
+
+            # 4. Execute tools
+            await _broadcast_status(channel_id, agent.id, "tool_calling")
+
+            # Build assistant content block for next loop
+            assistant_content: list[dict] = []
+            if full_text:
+                assistant_content.append({"type": "text", "text": full_text})
+
+            tool_results: list[dict] = []
+            for tu in tool_use_blocks:
+                assistant_content.append({
+                    "type": "tool_use",
+                    "id": tu.tool_use_id,
+                    "name": tu.name,
+                    "input": tu.input,
+                })
+
+                await _broadcast_tool_start(channel_id, agent.id, tu.name, tu.input)
+
+                result = await tool_registry.execute(
+                    tu.name, tu.input, tool_context, available_tools=tools,
+                )
+
+                output_str = json.dumps(result.output) if result.success else f"Error: {result.error}"
+                await _broadcast_tool_result(
+                    channel_id, agent.id, tu.name, result.success, output_str,
+                )
+
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tu.tool_use_id,
+                    "content": output_str[:10000],
+                    "is_error": not result.success,
+                })
+                tool_calls_log.append({
+                    "name": tu.name,
+                    "input": tu.input,
+                    "output": result.output,
+                    "success": result.success,
+                    "error": result.error,
+                })
+
+            # Feed tool results back into conversation
+            messages.append({"role": "assistant", "content": assistant_content})
+            messages.append({"role": "user", "content": tool_results})
+
+            # Continue to thinking for next iteration
+            await _broadcast_status(channel_id, agent.id, "thinking")
+            iteration += 1
+
+        # If we exhausted iterations without a clean finish, use last text
+        if not final_text and iteration >= max_iterations:
+            final_text = "I've reached my maximum number of reasoning steps. Here's what I found so far."
+
+    except Exception as exc:
+        exec_status = "error"
+        error_message = str(exc)[:500]
+        final_text = final_text or "I encountered an error while processing your request."
+        logger.error("Agent %s execution failed: %s", agent.id, exc)
+        await _broadcast_error(channel_id, agent.id, str(exc)[:200])
+
+    elapsed_ms = int((time.monotonic() - start_time) * 1000)
+    # Claude pricing approximation (sonnet)
+    total_cost = (total_input_tokens * 0.000003) + (total_output_tokens * 0.000015)
+
+    # 5. Save message + execution
+    now = datetime.utcnow()
+    agent_message = Message(
+        id=stream_message_id,
+        channel_id=channel_id,
+        sender_id=agent.id,
+        sender_type="agent",
+        content=final_text,
+        created_at=now,
+    )
+
+    async with async_session() as session:
+        session.add(agent_message)
+
+        execution = AgentExecution(
+            id=str(uuid.uuid4()),
+            agent_id=agent.id,
+            trigger_message_id=trigger_message_id,
+            trigger_channel_id=channel_id,
+            conversation_messages=json.dumps(messages, default=str)[:50000],
+            tools_called=json.dumps(tool_calls_log, default=str)[:50000],
+            response_text=final_text[:10000],
+            input_tokens=total_input_tokens,
+            output_tokens=total_output_tokens,
+            total_cost_usd=total_cost,
+            duration_ms=elapsed_ms,
+            num_tool_calls=len(tool_calls_log),
+            status=exec_status,
+            error_message=error_message,
+            created_at=now,
+        )
+        session.add(execution)
+
+        # Update agent stats (including budget tracking)
+        db_agent = await session.get(Agent, agent.id)
+        if db_agent:
+            db_agent.status = "idle"
+            db_agent.current_task = None
+            db_agent.total_executions += 1
+            db_agent.total_cost_usd += total_cost
+            # Track monthly cost for budget enforcement
+            current_month = now.strftime("%Y-%m")
+            if db_agent.cost_month_key != current_month:
+                db_agent.cost_this_month = total_cost
+                db_agent.cost_month_key = current_month
+            else:
+                db_agent.cost_this_month += total_cost
+            session.add(db_agent)
+
+        await session.commit()
+
+    # Broadcast the final assembled message
+    await _broadcast(channel_id, {
+        "type": "chat.message",
+        "message": {
+            "id": agent_message.id,
+            "channel_id": agent_message.channel_id,
+            "sender_id": agent_message.sender_id,
+            "sender_type": "agent",
+            "content": agent_message.content,
+            "thread_id": None,
+            "reply_count": 0,
+            "edited": False,
+            "pinned": False,
+            "created_at": now.isoformat(),
+            "attachments": [],
+            "mentions": [],
+            "reactions": [],
+            "sender_name": agent.name,
+            "tool_calls": [
+                {"name": tc["name"], "success": tc.get("success", True)}
+                for tc in tool_calls_log
+            ],
+        },
+    })
+
+    await _broadcast_complete(channel_id, agent.id, stream_message_id)
+    await _broadcast_status(channel_id, agent.id, "idle")
+
+    # 6. Best-effort memory extraction (non-blocking for the user)
+    if final_text and exec_status == "success":
+        try:
+            await extract_and_save_memory(
+                agent.id,
+                user_id,
+                final_text,
+                llm.chat,
+            )
+        except Exception as exc:
+            logger.warning("Memory extraction failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _ensure_alternating_roles(messages: list[dict]) -> list[dict]:
+    """Merge consecutive same-role messages to satisfy Claude API requirement."""
+    if not messages:
+        return messages
+
+    merged: list[dict] = [messages[0]]
+    for msg in messages[1:]:
+        if msg["role"] == merged[-1]["role"]:
+            # Merge content
+            prev_content = merged[-1]["content"]
+            new_content = msg["content"]
+            if isinstance(prev_content, str) and isinstance(new_content, str):
+                merged[-1] = {**merged[-1], "content": f"{prev_content}\n{new_content}"}
+            else:
+                # Can't merge complex content blocks; insert a separator
+                merged.append({"role": "user" if msg["role"] == "assistant" else "assistant", "content": "(continued)"})
+                merged.append(msg)
+        else:
+            merged.append(msg)
+
+    # Ensure first message is "user" (required by Claude)
+    if merged and merged[0]["role"] != "user":
+        merged.insert(0, {"role": "user", "content": "(conversation context follows)"})
+
+    return merged

@@ -21,6 +21,8 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { CallOverlay } from "@/components/calls/CallOverlay";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useSeedData } from "@/hooks/use-seed-data";
+import InsightsBellButton from "@/components/insights/InsightsBellButton";
+import ProactiveInsightsPanel from "@/components/insights/ProactiveInsightsPanel";
 
 const navItems = [
   { href: "/office", icon: Building2, label: "Office" },
@@ -126,6 +128,7 @@ export default function WorkspaceLayout({
             </button>
           </div>
           <div className="flex items-center gap-3">
+            <InsightsBellButton />
             <NotificationDropdown />
             <div className="w-8 h-8 rounded-full bg-gradient-brand flex items-center justify-center">
               <span className="text-white text-xs font-bold">{displayName.charAt(0).toUpperCase()}</span>
@@ -158,6 +161,9 @@ export default function WorkspaceLayout({
           );
         })}
       </nav>
+
+      {/* Proactive Insights Panel */}
+      <ProactiveInsightsPanel />
 
       {/* Command Palette */}
       <CommandPalette />

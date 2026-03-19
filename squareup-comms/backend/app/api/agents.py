@@ -33,11 +33,18 @@ class AgentCreate(BaseModel):
     model: str = Field(default="claude-sonnet-4-6", max_length=50)
     tools: Optional[List[str]] = Field(default_factory=list)
     mcp_servers: Optional[List[str]] = Field(default_factory=list)
+    custom_tools: Optional[List[str]] = Field(default_factory=list)
     trigger_mode: str = Field(default="mention", max_length=20)
+    schedule_cron: Optional[str] = Field(default=None, max_length=100)
+    max_iterations: int = Field(default=5, ge=1, le=20)
+    autonomy_level: int = Field(default=2, ge=1, le=4)
+    temperature: float = Field(default=0.7, ge=0.0, le=1.0)
     office_x: Optional[int] = None
     office_y: Optional[int] = None
     office_station_icon: Optional[str] = Field(default=None, max_length=10)
     personality: Optional[str] = None
+    monthly_budget_usd: Optional[float] = Field(default=None, ge=0.0)
+    daily_execution_limit: Optional[int] = Field(default=None, ge=1)
 
 
 class AgentUpdate(BaseModel):
@@ -47,11 +54,18 @@ class AgentUpdate(BaseModel):
     model: Optional[str] = Field(default=None, max_length=50)
     tools: Optional[List[str]] = None
     mcp_servers: Optional[List[str]] = None
+    custom_tools: Optional[List[str]] = None
     trigger_mode: Optional[str] = Field(default=None, max_length=20)
+    schedule_cron: Optional[str] = Field(default=None, max_length=100)
+    max_iterations: Optional[int] = Field(default=None, ge=1, le=20)
+    autonomy_level: Optional[int] = Field(default=None, ge=1, le=4)
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     office_x: Optional[int] = None
     office_y: Optional[int] = None
     office_station_icon: Optional[str] = Field(default=None, max_length=10)
     personality: Optional[str] = None
+    monthly_budget_usd: Optional[float] = Field(default=None, ge=0.0)
+    daily_execution_limit: Optional[int] = Field(default=None, ge=1)
 
 
 class AgentStatusUpdate(BaseModel):
@@ -69,9 +83,13 @@ class AgentResponse(BaseModel):
     model: str
     tools: Optional[str]
     mcp_servers: Optional[str]
+    custom_tools: Optional[str]
     trigger_mode: str
     schedule_cron: Optional[str]
     personality: Optional[str]
+    max_iterations: int
+    autonomy_level: int
+    temperature: float
     office_x: Optional[int]
     office_y: Optional[int]
     office_station_icon: Optional[str]
@@ -81,6 +99,9 @@ class AgentResponse(BaseModel):
     total_executions: int
     total_cost_usd: float
     success_rate: float
+    monthly_budget_usd: Optional[float]
+    daily_execution_limit: Optional[int]
+    cost_this_month: float
     created_by: Optional[str]
     created_at: datetime
     updated_at: datetime
@@ -161,11 +182,18 @@ async def create_agent(
         model=body.model,
         tools=json.dumps(body.tools or []),
         mcp_servers=json.dumps(body.mcp_servers or []),
+        custom_tools=json.dumps(body.custom_tools or []),
         trigger_mode=body.trigger_mode,
+        schedule_cron=body.schedule_cron,
+        max_iterations=body.max_iterations,
+        autonomy_level=body.autonomy_level,
+        temperature=body.temperature,
         office_x=body.office_x,
         office_y=body.office_y,
         office_station_icon=body.office_station_icon,
         personality=body.personality,
+        monthly_budget_usd=body.monthly_budget_usd,
+        daily_execution_limit=body.daily_execution_limit,
         created_by=user_id,
     )
     session.add(agent)
@@ -188,6 +216,155 @@ async def list_agents(
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+class ToolDefinitionResponse(BaseModel):
+    name: str
+    display_name: str
+    description: str
+    category: str
+    input_schema: dict
+    source: str
+    requires_confirmation: bool
+
+
+class ToolsListResponse(BaseModel):
+    tools: List[ToolDefinitionResponse]
+    categories: List[str]
+    total: int
+
+
+@router.get("/tools", response_model=ToolsListResponse)
+async def list_available_tools(
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    """List all available built-in tools with schemas, grouped by category."""
+    from app.services.tools import tool_registry
+
+    builtins = tool_registry.list_builtins()
+    tools = [
+        ToolDefinitionResponse(
+            name=t.name,
+            display_name=t.display_name,
+            description=t.description,
+            category=t.category,
+            input_schema=t.input_schema,
+            source=t.source,
+            requires_confirmation=t.requires_confirmation,
+        )
+        for t in builtins
+    ]
+    categories = sorted({t.category for t in tools})
+    return {"tools": tools, "categories": categories, "total": len(tools)}
+
+
+class AgentTemplateResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    icon: str
+    category: str
+    system_prompt: str
+    model: str
+    tools: List[str]
+    trigger_mode: str
+    personality: str
+    max_iterations: int
+    autonomy_level: int
+    temperature: float
+
+
+class TemplatesListResponse(BaseModel):
+    templates: List[AgentTemplateResponse]
+    categories: List[str]
+    total: int
+
+
+@router.get("/templates", response_model=TemplatesListResponse)
+async def list_agent_templates(
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    """List all pre-defined agent templates for one-click deployment."""
+    from app.services.agent_templates import list_templates
+
+    templates = list_templates()
+    categories = sorted({t["category"] for t in templates})
+    return {"templates": templates, "categories": categories, "total": len(templates)}
+
+
+# ---------------------------------------------------------------------------
+# Natural language agent generation
+# ---------------------------------------------------------------------------
+
+class GenerateAgentRequest(BaseModel):
+    description: str = Field(
+        ..., min_length=5, max_length=1000,
+        description="Natural language description of the agent to create",
+    )
+
+
+class GeneratedAgentResponse(BaseModel):
+    name: str
+    description: str
+    system_prompt: str
+    model: str
+    tools: List[str]
+    trigger_mode: str
+    personality: str
+    max_iterations: int
+    autonomy_level: int
+    temperature: float
+
+
+@router.post("/generate", response_model=GeneratedAgentResponse)
+async def generate_agent_config(
+    body: GenerateAgentRequest,
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    """Generate an agent configuration from a natural language description.
+
+    Uses AI to suggest name, tools, system prompt, and settings based on what
+    the user describes. The generated config can be reviewed and edited before
+    actually creating the agent via POST /api/agents/.
+    """
+    from app.services.nl_agent_generator import generate_agent_from_description
+    from app.services.tools import tool_registry
+
+    builtins = tool_registry.list_builtins()
+    available_tools = [
+        {
+            "name": t.name,
+            "display_name": t.display_name,
+            "description": t.description,
+            "category": t.category,
+        }
+        for t in builtins
+    ]
+
+    try:
+        config = await generate_agent_from_description(
+            description=body.description,
+            available_tools=available_tools,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc),
+        )
+
+    return {
+        "name": config.name,
+        "description": config.description,
+        "system_prompt": config.system_prompt,
+        "model": config.model,
+        "tools": config.tools,
+        "trigger_mode": config.trigger_mode,
+        "personality": config.personality,
+        "max_iterations": config.max_iterations,
+        "autonomy_level": config.autonomy_level,
+        "temperature": config.temperature,
+    }
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)
@@ -219,6 +396,8 @@ async def update_agent(
         update_data["tools"] = json.dumps(update_data["tools"])
     if "mcp_servers" in update_data and update_data["mcp_servers"] is not None:
         update_data["mcp_servers"] = json.dumps(update_data["mcp_servers"])
+    if "custom_tools" in update_data and update_data["custom_tools"] is not None:
+        update_data["custom_tools"] = json.dumps(update_data["custom_tools"])
 
     for field, value in update_data.items():
         setattr(agent, field, value)

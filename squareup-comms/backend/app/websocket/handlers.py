@@ -115,22 +115,52 @@ async def handle_chat_send(user_id: str, data: dict):
     # Send confirmation back to sender
     await hub_manager.send_to_user(user_id, broadcast_data)
 
-    # If agents were mentioned, route to them in the background
+    # If agents were mentioned, route to ReAct engine in the background
+    triggered_agent_ids: set[str] = set()
     if agent_mentions:
         import asyncio
-        from app.services.agent_execution_service import execute_agent_for_message
-        
+        from app.services.agent_engine import run_agent
+
         for agent in agent_mentions:
-             # Run in background to not block WebSocket loop
-             asyncio.create_task(
-                 execute_agent_for_message(
-                     agent_id=agent.id,
-                     trigger_message_id=message.id,
-                     channel_id=channel_id,
-                     user_id=user_id,
-                     content=content
-                 )
-             )
+            triggered_agent_ids.add(agent.id)
+            asyncio.create_task(
+                run_agent(
+                    agent_id=agent.id,
+                    trigger_message_id=message.id,
+                    channel_id=channel_id,
+                    user_id=user_id,
+                    content=content,
+                )
+            )
+
+    # Auto-respond agents: trigger agents assigned to this channel with trigger_mode="auto"
+    async with async_session() as session:
+        from app.models.agents import Agent
+        from app.models.chat import Channel
+        from sqlmodel import select
+
+        channel = await session.get(Channel, channel_id)
+        if channel and channel.agent_id and channel.agent_id not in triggered_agent_ids:
+            agent_stmt = select(Agent).where(
+                Agent.id == channel.agent_id,
+                Agent.active == True,  # noqa: E712
+                Agent.trigger_mode == "auto",
+            )
+            result = await session.execute(agent_stmt)
+            auto_agent = result.scalar_one_or_none()
+            if auto_agent:
+                import asyncio
+                from app.services.agent_engine import run_agent
+
+                asyncio.create_task(
+                    run_agent(
+                        agent_id=auto_agent.id,
+                        trigger_message_id=message.id,
+                        channel_id=channel_id,
+                        user_id=user_id,
+                        content=content,
+                    )
+                )
 
 
 async def handle_chat_typing(user_id: str, data: dict):

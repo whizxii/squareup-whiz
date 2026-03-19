@@ -4,6 +4,8 @@ import { useChatStore, Message, TypingUser } from "@/lib/stores/chat-store";
 import { useAgentStore } from "@/lib/stores/agent-store";
 import { MessageBubble } from "./MessageBubble";
 import { AgentThinkingIndicator } from "./agents/AgentThinkingIndicator";
+import { StreamingAgentMessages } from "./agents/StreamingAgentMessage";
+import { AgentConfirmationCards } from "./agents/AgentConfirmationCard";
 import { ConversationSummary } from "./ConversationSummary";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { MessageSquare, Sparkles, ArrowDown } from "lucide-react";
@@ -19,6 +21,11 @@ const EMPTY_TYPING: TypingUser[] = [];
 
 interface MessageListProps {
   loading?: boolean;
+  onConfirmationRespond?: (
+    requestId: string,
+    approved: boolean,
+    editedInput?: Record<string, unknown>
+  ) => void;
 }
 
 /** Format a date into a human-readable day label */
@@ -63,7 +70,7 @@ const ROW_HEIGHT_ESTIMATES: Record<VirtualRow["type"], number> = {
   message: 52,
 };
 
-export function MessageList({ loading = false }: MessageListProps) {
+export function MessageList({ loading = false, onConfirmationRespond }: MessageListProps) {
   const activeChannelId = useChatStore((s) => s.activeChannelId);
   const messages = useChatStore(
     (s) => (activeChannelId ? s.messages[activeChannelId] : null) ?? EMPTY_MESSAGES
@@ -83,6 +90,13 @@ export function MessageList({ loading = false }: MessageListProps) {
     () => allAgents.filter((a) => a.status === "thinking" || a.status === "working"),
     [allAgents]
   );
+
+  // Track streaming messages to auto-scroll during agent responses
+  const streamingMessages = useAgentStore((s) => s.streamingMessages);
+  const hasActiveStreams = useMemo(() => {
+    if (!activeChannelId) return false;
+    return Object.keys(streamingMessages).some((k) => k.startsWith(`${activeChannelId}:`));
+  }, [streamingMessages, activeChannelId]);
 
   const prefersReducedMotion = usePrefersReducedMotion();
 
@@ -168,6 +182,14 @@ export function MessageList({ loading = false }: MessageListProps) {
       setUnreadCount((prev) => prev + 1);
     }
   }, [messages.length, rows.length, virtualizer]);
+
+  // Auto-scroll during streaming agent responses (keep chat pinned to bottom)
+  useEffect(() => {
+    if (hasActiveStreams && isNearBottomRef.current && scrollRef.current) {
+      const el = scrollRef.current;
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [hasActiveStreams, streamingMessages]);
 
   // Scroll to bottom on channel switch
   useEffect(() => {
@@ -279,6 +301,19 @@ export function MessageList({ loading = false }: MessageListProps) {
               );
             })}
           </div>
+        )}
+
+        {/* Streaming agent responses (live text + tool cards) */}
+        {activeChannelId && (
+          <StreamingAgentMessages channelId={activeChannelId} />
+        )}
+
+        {/* Agent confirmation cards (destructive action approval) */}
+        {activeChannelId && onConfirmationRespond && (
+          <AgentConfirmationCards
+            channelId={activeChannelId}
+            onRespond={onConfirmationRespond}
+          />
         )}
 
         {/* Agent thinking indicators */}

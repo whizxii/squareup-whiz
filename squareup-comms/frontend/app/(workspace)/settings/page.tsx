@@ -17,10 +17,14 @@ import {
   VolumeX,
   ChevronDown,
   Loader2,
+  Wrench,
+  Server,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useIntegrationStore } from "@/lib/stores/integration-store";
+import CustomToolBuilder from "@/components/settings/CustomToolBuilder";
+import MCPServerManager from "@/components/settings/MCPServerManager";
 
 /* ------------------------------------------------------------------ */
 /*  Toggle Switch                                                      */
@@ -548,8 +552,18 @@ export default function SettingsPage() {
             </div>
           </Section>
 
+          {/* ========== CUSTOM TOOLS ========== */}
+          <Section icon={Wrench} title="Custom Tools" delay={0.2}>
+            <CustomToolBuilder />
+          </Section>
+
+          {/* ========== MCP SERVERS ========== */}
+          <Section icon={Server} title="MCP Servers" delay={0.25}>
+            <MCPServerManager />
+          </Section>
+
           {/* ========== ABOUT ========== */}
-          <Section icon={Info} title="About" delay={0.2}>
+          <Section icon={Info} title="About" delay={0.3}>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">App</span>

@@ -22,6 +22,8 @@ import { KeyboardShortcutsDialog } from "@/components/chat/KeyboardShortcutsDial
 import { ChannelSettingsSidebar } from "@/components/chat/ChannelSettingsSidebar";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { useAgentStore } from "@/lib/stores/agent-store";
+import { useInsightsStore } from "@/lib/stores/insights-store";
 import { Settings } from "lucide-react";
 
 export default function ChatPage() {
@@ -263,14 +265,135 @@ export default function ChatPage() {
       removeMessage(channelId, messageId);
     });
 
+    // ─── Agent streaming events ────────────────────────────────────
+    const agentActions = useAgentStore.getState();
+
+    // agent.status — agent thinking/tool_calling/idle/error
+    const offAgentStatus = wsOn("agent.status", (data) => {
+      const agentId = data.agent_id as string;
+      const status = data.status as string;
+      if (!agentId) return;
+      agentActions.updateAgent(agentId, {
+        status: status as import("@/lib/stores/agent-store").AgentStatus,
+      });
+    });
+
+    // agent.text_delta — streaming text token from agent
+    const offAgentTextDelta = wsOn("agent.text_delta", (data) => {
+      const channelId = data.channel_id as string;
+      const agentId = data.agent_id as string;
+      const messageId = data.message_id as string;
+      const delta = data.delta as string;
+      if (!channelId || !agentId || !delta) return;
+      useAgentStore.getState().upsertStreamingDelta(channelId, agentId, messageId, delta);
+    });
+
+    // agent.tool_start — agent started executing a tool
+    const offAgentToolStart = wsOn("agent.tool_start", (data) => {
+      const channelId = data.channel_id as string;
+      const agentId = data.agent_id as string;
+      const toolName = data.tool_name as string;
+      const inputPreview = (data.tool_input_preview as string) || "";
+      if (!channelId || !agentId || !toolName) return;
+      useAgentStore.getState().addActiveToolCall(channelId, agentId, toolName, inputPreview);
+    });
+
+    // agent.tool_result — tool execution completed
+    const offAgentToolResult = wsOn("agent.tool_result", (data) => {
+      const channelId = data.channel_id as string;
+      const agentId = data.agent_id as string;
+      const toolName = data.tool_name as string;
+      const success = data.success as boolean;
+      const outputPreview = (data.output_preview as string) || "";
+      if (!channelId || !agentId || !toolName) return;
+      useAgentStore.getState().resolveToolCall(channelId, agentId, toolName, success, outputPreview);
+    });
+
+    // agent.complete — agent finished responding
+    const offAgentComplete = wsOn("agent.complete", (data) => {
+      const channelId = data.channel_id as string;
+      const agentId = data.agent_id as string;
+      if (!channelId || !agentId) return;
+      useAgentStore.getState().finalizeStreamingMessage(channelId, agentId);
+    });
+
+    // agent.error — agent execution error
+    const offAgentError = wsOn("agent.error", (data) => {
+      const channelId = data.channel_id as string;
+      const agentId = data.agent_id as string;
+      if (!channelId || !agentId) return;
+      useAgentStore.getState().clearStreamingMessage(channelId, agentId);
+    });
+
+    // agent.confirmation — agent needs user approval for a destructive action
+    const offAgentConfirmation = wsOn("agent.confirmation", (data) => {
+      const requestId = data.request_id as string;
+      const channelId = data.channel_id as string;
+      const agentId = data.agent_id as string;
+      const agentName = (data.agent_name as string) || "Agent";
+      const toolName = data.tool_name as string;
+      const toolInput = (data.tool_input as Record<string, unknown>) || {};
+      if (!requestId || !channelId || !agentId || !toolName) return;
+      useAgentStore.getState().addConfirmation({
+        requestId,
+        channelId,
+        agentId,
+        agentName,
+        toolName,
+        toolInput,
+        receivedAt: new Date().toISOString(),
+      });
+    });
+
+    // proactive.insights — proactive suggestions from the insights engine
+    const offProactiveInsights = wsOn("proactive.insights", (data) => {
+      const rawInsights = data.insights as Array<Record<string, unknown>>;
+      if (!Array.isArray(rawInsights) || rawInsights.length === 0) return;
+      const { addInsights } = useInsightsStore.getState();
+      addInsights(
+        rawInsights.map((item) => ({
+          type: item.type as string,
+          severity: item.severity as "info" | "warning" | "critical",
+          title: item.title as string,
+          description: item.description as string,
+          entity_type: item.entity_type as string,
+          entity_id: item.entity_id as string,
+          entity_name: item.entity_name as string,
+          metadata: (item.metadata as Record<string, unknown>) || {},
+        }))
+      );
+    });
+
     return () => {
       offMessage();
       offTyping();
       offReaction();
       offEdited();
       offDeleted();
+      offAgentStatus();
+      offAgentTextDelta();
+      offAgentToolStart();
+      offAgentToolResult();
+      offAgentComplete();
+      offAgentError();
+      offAgentConfirmation();
+      offProactiveInsights();
     };
   }, [wsOn, addMessage, updateMessage, removeMessage, setTyping, clearTyping, currentUserId]);
+
+  // ─── Agent confirmation response ──────────────────────────────────
+  const handleConfirmationRespond = useCallback(
+    (requestId: string, approved: boolean, editedInput?: Record<string, unknown>) => {
+      wsSend({
+        type: "agent.confirmation_response",
+        request_id: requestId,
+        approved,
+        ...(editedInput ? { edited_input: editedInput } : {}),
+      });
+      useAgentStore.getState().removeConfirmation(requestId);
+    },
+    [wsSend]
+  );
 
   // ─── Typing indicator broadcasting (debounced) ─────────────────────
   const typingTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -573,7 +696,7 @@ export default function ChatPage() {
         </div>
 
         {/* Messages */}
-        <MessageList loading={messagesLoading} />
+        <MessageList loading={messagesLoading} onConfirmationRespond={handleConfirmationRespond} />
 
         {/* Composer */}
         <MessageComposer onTypingChange={handleTypingChange} />

@@ -54,6 +54,11 @@ from app.api.crm_bulk import router as crm_bulk_router
 from app.api.crm_dedup import router as crm_dedup_router
 from app.api.users import router as users_router
 from app.api.seed import router as seed_router  # noqa: F401 — seed upsert endpoint
+from app.api.tasks import router as tasks_router
+from app.api.reminders import router as reminders_router
+from app.api.custom_tools import router as custom_tools_router
+from app.api.mcp import router as mcp_router
+from app.api.integrations import router as integrations_router
 
 # Initialize structured logging before anything else
 setup_logging()
@@ -73,6 +78,10 @@ async def lifespan(app: FastAPI):
 
     await init_db()
     logger.info("Database initialized.")
+
+    # Register all built-in agent tools at startup
+    import app.services.tools  # noqa: F401 — triggers auto-registration
+    logger.info("Agent tool registry initialized.")
 
     # Initialize shared infrastructure on app.state
     app.state.event_bus = EventBus()
@@ -118,7 +127,16 @@ async def lifespan(app: FastAPI):
         )
         logger.info("Gmail periodic sync scheduled (every %ds).", settings.GMAIL_SYNC_INTERVAL_SECONDS)
 
+    # Start background scheduler for reminders
+    import asyncio
+    from app.services.scheduler import scheduler_loop
+    _scheduler_task = asyncio.create_task(scheduler_loop())
+    logger.info("Background scheduler started (reminders).")
+
     yield
+
+    # Cancel scheduler on shutdown
+    _scheduler_task.cancel()
 
     logger.info("Shutting down...")
     await app.state.background.shutdown()
@@ -181,6 +199,11 @@ app.include_router(crm_bulk_router)
 app.include_router(crm_dedup_router)
 app.include_router(users_router)
 app.include_router(seed_router)
+app.include_router(tasks_router)
+app.include_router(reminders_router)
+app.include_router(custom_tools_router)
+app.include_router(mcp_router)
+app.include_router(integrations_router)
 
 
 @app.get("/health")

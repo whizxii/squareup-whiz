@@ -17,8 +17,10 @@ import {
   AlertCircle,
   Trash2,
   RotateCcw,
+  History,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
+import AgentExecutionHistory from "@/components/agents/AgentExecutionHistory";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -39,6 +41,7 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
   const agent = agents.find((a) => a.id === selectedAgentId);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -174,6 +177,20 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
           </p>
         </div>
 
+        {/* Execution history toggle */}
+        <button
+          onClick={() => setShowHistory((p) => !p)}
+          className={cn(
+            "p-1.5 rounded-lg transition-colors",
+            showHistory
+              ? "bg-sq-agent/10 text-sq-agent"
+              : "hover:bg-accent text-muted-foreground hover:text-foreground"
+          )}
+          title="Execution history"
+        >
+          <History className="w-4 h-4" />
+        </button>
+
         {/* Clear chat */}
         {chatMessages.length > 0 && (
           <button
@@ -186,48 +203,54 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
         )}
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
-        {chatMessages.length === 0 && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-3 max-w-sm">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-sq-agent/10 flex items-center justify-center ring-1 ring-sq-agent/20">
-                {agent.office_station_icon ? (
-                  <span className="text-2xl">{agent.office_station_icon}</span>
-                ) : (
-                  <Bot className="w-7 h-7 text-sq-agent" />
+      {/* Content area: Messages or Execution History */}
+      {showHistory ? (
+        <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
+          <AgentExecutionHistory agentId={agent.id} />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+          {chatMessages.length === 0 && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center space-y-3 max-w-sm">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-sq-agent/10 flex items-center justify-center ring-1 ring-sq-agent/20">
+                  {agent.office_station_icon ? (
+                    <span className="text-2xl">{agent.office_station_icon}</span>
+                  ) : (
+                    <Bot className="w-7 h-7 text-sq-agent" />
+                  )}
+                </div>
+                <h3 className="text-sm font-display font-bold">{agent.name}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {agent.description || "Send a message to get started."}
+                </p>
+                {agent.tools.length > 0 && (
+                  <div className="flex flex-wrap gap-1 justify-center pt-1">
+                    {agent.tools.slice(0, 6).map((tool) => (
+                      <span
+                        key={tool}
+                        className="text-[10px] px-2 py-0.5 rounded-full bg-sq-agent/5 text-sq-agent border border-sq-agent/10"
+                      >
+                        {tool}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
-              <h3 className="text-sm font-display font-bold">{agent.name}</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {agent.description || "Send a message to get started."}
-              </p>
-              {agent.tools.length > 0 && (
-                <div className="flex flex-wrap gap-1 justify-center pt-1">
-                  {agent.tools.slice(0, 6).map((tool) => (
-                    <span
-                      key={tool}
-                      className="text-[10px] px-2 py-0.5 rounded-full bg-sq-agent/5 text-sq-agent border border-sq-agent/10"
-                    >
-                      {tool}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {chatMessages.map((msg) => (
-          <ChatBubble
-            key={msg.id}
-            message={msg}
-            agentIcon={agent.office_station_icon}
-            agentName={agent.name}
-          />
-        ))}
-        <div ref={bottomRef} />
-      </div>
+          {chatMessages.map((msg) => (
+            <ChatBubble
+              key={msg.id}
+              message={msg}
+              agentIcon={agent.office_station_icon}
+              agentName={agent.name}
+            />
+          ))}
+          <div ref={bottomRef} />
+        </div>
+      )}
 
       {/* Composer */}
       <div className="border-t border-border bg-card px-4 py-3">

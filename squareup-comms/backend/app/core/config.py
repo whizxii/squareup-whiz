@@ -33,6 +33,18 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: Optional[str] = None
     DEFAULT_MODEL: str = "claude-sonnet-4-6"
 
+    # Microsoft OAuth
+    MICROSOFT_CLIENT_ID: Optional[str] = None
+    MICROSOFT_CLIENT_SECRET: Optional[str] = None
+
+    # Slack OAuth
+    SLACK_CLIENT_ID: Optional[str] = None
+    SLACK_CLIENT_SECRET: Optional[str] = None
+
+    # GitHub OAuth
+    GITHUB_CLIENT_ID: Optional[str] = None
+    GITHUB_CLIENT_SECRET: Optional[str] = None
+
     # LLM Provider (Groq via OpenAI-compatible API)
     GROQ_API_KEY: Optional[str] = None
     LLM_BASE_URL: str = "https://api.groq.com/openai/v1"

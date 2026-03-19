@@ -1,7 +1,7 @@
 "use client";
 
 import { Command } from "cmdk";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -17,11 +17,13 @@ import {
   User,
   FileText,
   ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import { useChatStore } from "@/lib/stores/chat-store";
 import { useCRMStore } from "@/lib/stores/crm-store";
 import { useAgentStore } from "@/lib/stores/agent-store";
 import { useDriveStore } from "@/lib/stores/drive-store";
+import { NLAgentCreationDialog } from "@/components/agents/NLAgentCreationDialog";
 
 const GROUP_HEADING_CLASSES =
   "[&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5";
@@ -35,6 +37,7 @@ export function openCommandPalette() {
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [nlAgentOpen, setNlAgentOpen] = useState(false);
   const router = useRouter();
 
   const channels = useChatStore((s) => s.channels);
@@ -118,7 +121,19 @@ export function CommandPalette() {
     setOpen(false);
   };
 
+  const openNlAgentCreator = useCallback(() => {
+    setOpen(false);
+    // Small delay so the palette closes before the dialog opens
+    setTimeout(() => setNlAgentOpen(true), 150);
+  }, []);
+
   return (
+    <>
+    <NLAgentCreationDialog
+      open={nlAgentOpen}
+      onClose={() => setNlAgentOpen(false)}
+      initialDescription={search}
+    />
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-[100]" role="dialog" aria-label="Command palette" aria-modal="true">
@@ -330,6 +345,12 @@ export function CommandPalette() {
                   >
                     New Contact
                   </CommandItem>
+                  <CommandItem
+                    icon={<Sparkles className="w-4 h-4" />}
+                    onSelect={openNlAgentCreator}
+                  >
+                    Create Agent with AI
+                  </CommandItem>
                 </Command.Group>
               </Command.List>
 
@@ -353,6 +374,7 @@ export function CommandPalette() {
         </div>
       )}
     </AnimatePresence>
+    </>
   );
 }
 

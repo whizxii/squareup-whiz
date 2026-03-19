@@ -28,6 +28,15 @@ class Agent(SQLModel, table=True):
     total_executions: int = Field(default=0)
     total_cost_usd: float = Field(default=0.0)
     success_rate: float = Field(default=100.0)
+    max_iterations: int = Field(default=5)
+    autonomy_level: int = Field(default=2)  # 1=ask all, 2=ask writes, 3=auto, 4=full auto
+    temperature: float = Field(default=0.7)
+    custom_tools: Optional[str] = Field(default="[]")  # JSON array of custom tool IDs
+    monthly_budget_usd: Optional[float] = Field(default=None)  # Max spend per month (None = unlimited)
+    daily_execution_limit: Optional[int] = Field(default=None)  # Max runs per day (None = unlimited)
+    cost_this_month: float = Field(default=0.0)  # Running total reset monthly
+    cost_month_key: Optional[str] = Field(default=None, max_length=7)  # "YYYY-MM" for reset tracking
+    last_scheduled_run: Optional[datetime] = Field(default=None)  # Tracks last cron execution
     created_by: Optional[str] = Field(default=None, max_length=128)
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
@@ -52,3 +61,15 @@ class AgentExecution(SQLModel, table=True):
     error_message: Optional[str] = None
     error_type: Optional[str] = Field(default=None, max_length=50)
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+
+
+class AgentMemory(SQLModel, table=True):
+    __tablename__ = "agent_memories"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    agent_id: str = Field(foreign_key="agents.id", index=True)
+    user_id: str = Field(max_length=128, index=True)
+    key: str = Field(max_length=200)
+    value: str
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+    updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())

@@ -14,9 +14,13 @@ interface AgentResponse {
   model: string;
   tools: string;
   mcp_servers: string;
+  custom_tools: string | null;
   trigger_mode: "mention" | "auto" | "scheduled" | "webhook";
   schedule_cron: string | null;
   personality: string | null;
+  max_iterations: number;
+  autonomy_level: number;
+  temperature: number;
   office_x: number | null;
   office_y: number | null;
   office_station_icon: string | null;
@@ -26,6 +30,9 @@ interface AgentResponse {
   total_executions: number;
   total_cost_usd: number;
   success_rate: number;
+  monthly_budget_usd: number | null;
+  daily_execution_limit: number | null;
+  cost_this_month: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -43,9 +50,13 @@ export interface Agent {
   model: string;
   tools: string[];
   mcp_servers: string[];
+  custom_tools: string[];
   trigger_mode: "mention" | "auto" | "scheduled" | "webhook";
   schedule_cron?: string;
   personality?: string;
+  max_iterations: number;
+  autonomy_level: number;
+  temperature: number;
   office_x?: number;
   office_y?: number;
   office_station_icon?: string;
@@ -55,6 +66,9 @@ export interface Agent {
   total_executions: number;
   total_cost_usd: number;
   success_rate: number;
+  monthly_budget_usd?: number;
+  daily_execution_limit?: number;
+  cost_this_month: number;
   created_by?: string;
   created_at: string;
   updated_at: string;
@@ -94,6 +108,39 @@ export interface AgentChatMessage {
   status?: "sending" | "thinking" | "done" | "error";
 }
 
+// ─── Streaming Types ──────────────────────────────────────────────
+
+export type ActiveToolCallStatus = "running" | "success" | "error";
+
+export interface ActiveToolCall {
+  readonly toolName: string;
+  readonly inputPreview: string;
+  readonly status: ActiveToolCallStatus;
+  readonly outputPreview?: string;
+  readonly startedAt: string;
+}
+
+export interface StreamingMessage {
+  readonly messageId: string;
+  readonly agentId: string;
+  readonly channelId: string;
+  readonly text: string;
+  readonly toolCalls: readonly ActiveToolCall[];
+  readonly startedAt: string;
+}
+
+// ─── Confirmation Types ──────────────────────────────────────────
+
+export interface ConfirmationRequest {
+  readonly requestId: string;
+  readonly channelId: string;
+  readonly agentId: string;
+  readonly agentName: string;
+  readonly toolName: string;
+  readonly toolInput: Record<string, unknown>;
+  readonly receivedAt: string;
+}
+
 // ─── Store ─────────────────────────────────────────────────────────
 interface AgentState {
   agents: Agent[];
@@ -101,6 +148,12 @@ interface AgentState {
   chatMessages: Record<string, AgentChatMessage[]>;
   loading: boolean;
   error: string | null;
+
+  // Streaming state — keyed by "channelId:agentId"
+  streamingMessages: Record<string, StreamingMessage>;
+
+  // Confirmation state — keyed by requestId
+  pendingConfirmations: Record<string, ConfirmationRequest>;
 
   fetchAgents: () => Promise<void>;
   setAgents: (agents: Agent[]) => void;
@@ -111,6 +164,22 @@ interface AgentState {
   addChatMessage: (agentId: string, message: AgentChatMessage) => void;
   setChatMessages: (agentId: string, messages: AgentChatMessage[]) => void;
   updateChatMessage: (agentId: string, messageId: string, updates: Partial<AgentChatMessage>) => void;
+
+  // Streaming actions
+  upsertStreamingDelta: (channelId: string, agentId: string, messageId: string, delta: string) => void;
+  addActiveToolCall: (channelId: string, agentId: string, toolName: string, inputPreview: string) => void;
+  resolveToolCall: (channelId: string, agentId: string, toolName: string, success: boolean, outputPreview: string) => void;
+  finalizeStreamingMessage: (channelId: string, agentId: string) => void;
+  clearStreamingMessage: (channelId: string, agentId: string) => void;
+
+  // Confirmation actions
+  addConfirmation: (confirmation: ConfirmationRequest) => void;
+  removeConfirmation: (requestId: string) => void;
+  clearConfirmationsForAgent: (agentId: string) => void;
+}
+
+function streamKey(channelId: string, agentId: string): string {
+  return `${channelId}:${agentId}`;
 }
 
 function parseJsonArray(raw: string | null | undefined): string[] {
@@ -134,9 +203,13 @@ function mapAgentResponse(r: AgentResponse): Agent {
     model: r.model,
     tools: parseJsonArray(r.tools),
     mcp_servers: parseJsonArray(r.mcp_servers),
+    custom_tools: parseJsonArray(r.custom_tools),
     trigger_mode: r.trigger_mode,
     schedule_cron: r.schedule_cron ?? undefined,
     personality: r.personality ?? undefined,
+    max_iterations: r.max_iterations ?? 5,
+    autonomy_level: r.autonomy_level ?? 2,
+    temperature: r.temperature ?? 0.7,
     office_x: r.office_x ?? undefined,
     office_y: r.office_y ?? undefined,
     office_station_icon: r.office_station_icon ?? undefined,
@@ -146,6 +219,9 @@ function mapAgentResponse(r: AgentResponse): Agent {
     total_executions: r.total_executions,
     total_cost_usd: r.total_cost_usd,
     success_rate: r.success_rate,
+    monthly_budget_usd: r.monthly_budget_usd ?? undefined,
+    daily_execution_limit: r.daily_execution_limit ?? undefined,
+    cost_this_month: r.cost_this_month ?? 0,
     created_by: r.created_by ?? undefined,
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -156,6 +232,8 @@ export const useAgentStore = create<AgentState>((set) => ({
   agents: [],
   selectedAgentId: null,
   chatMessages: {},
+  streamingMessages: {},
+  pendingConfirmations: {},
   loading: false,
   error: null,
 
@@ -202,11 +280,18 @@ export const useAgentStore = create<AgentState>((set) => ({
           model: agent.model,
           tools: agent.tools,
           mcp_servers: agent.mcp_servers,
+          custom_tools: agent.custom_tools,
           trigger_mode: agent.trigger_mode,
+          schedule_cron: agent.schedule_cron ?? null,
+          max_iterations: agent.max_iterations,
+          autonomy_level: agent.autonomy_level,
+          temperature: agent.temperature,
           personality: agent.personality,
           office_x: agent.office_x,
           office_y: agent.office_y,
           office_station_icon: agent.office_station_icon,
+          monthly_budget_usd: agent.monthly_budget_usd ?? null,
+          daily_execution_limit: agent.daily_execution_limit ?? null,
         }),
       });
 
@@ -254,5 +339,117 @@ export const useAgentStore = create<AgentState>((set) => ({
           ),
         },
       };
+    }),
+
+  // ─── Streaming Actions ────────────────────────────────────────
+
+  upsertStreamingDelta: (channelId, agentId, messageId, delta) =>
+    set((s) => {
+      const key = streamKey(channelId, agentId);
+      const existing = s.streamingMessages[key];
+      const updated: StreamingMessage = existing
+        ? { ...existing, text: existing.text + delta, messageId }
+        : {
+            messageId,
+            agentId,
+            channelId,
+            text: delta,
+            toolCalls: [],
+            startedAt: new Date().toISOString(),
+          };
+      return {
+        streamingMessages: { ...s.streamingMessages, [key]: updated },
+      };
+    }),
+
+  addActiveToolCall: (channelId, agentId, toolName, inputPreview) =>
+    set((s) => {
+      const key = streamKey(channelId, agentId);
+      const existing = s.streamingMessages[key];
+      if (!existing) return s;
+
+      const newCall: ActiveToolCall = {
+        toolName,
+        inputPreview,
+        status: "running",
+        startedAt: new Date().toISOString(),
+      };
+      return {
+        streamingMessages: {
+          ...s.streamingMessages,
+          [key]: {
+            ...existing,
+            toolCalls: [...existing.toolCalls, newCall],
+          },
+        },
+      };
+    }),
+
+  resolveToolCall: (channelId, agentId, toolName, success, outputPreview) =>
+    set((s) => {
+      const key = streamKey(channelId, agentId);
+      const existing = s.streamingMessages[key];
+      if (!existing) return s;
+
+      // Find the last running call with this name and resolve it
+      let resolved = false;
+      const updatedCalls = [...existing.toolCalls].reverse().map((tc) => {
+        if (!resolved && tc.toolName === toolName && tc.status === "running") {
+          resolved = true;
+          return {
+            ...tc,
+            status: (success ? "success" : "error") as ActiveToolCallStatus,
+            outputPreview,
+          };
+        }
+        return tc;
+      }).reverse();
+
+      return {
+        streamingMessages: {
+          ...s.streamingMessages,
+          [key]: { ...existing, toolCalls: updatedCalls },
+        },
+      };
+    }),
+
+  finalizeStreamingMessage: (channelId, agentId) =>
+    set((s) => {
+      const key = streamKey(channelId, agentId);
+      const { [key]: _removed, ...rest } = s.streamingMessages;
+      return { streamingMessages: rest };
+    }),
+
+  clearStreamingMessage: (channelId, agentId) =>
+    set((s) => {
+      const key = streamKey(channelId, agentId);
+      const { [key]: _removed, ...rest } = s.streamingMessages;
+      return { streamingMessages: rest };
+    }),
+
+  // ─── Confirmation Actions ──────────────────────────────────────
+
+  addConfirmation: (confirmation) =>
+    set((s) => ({
+      pendingConfirmations: {
+        ...s.pendingConfirmations,
+        [confirmation.requestId]: confirmation,
+      },
+    })),
+
+  removeConfirmation: (requestId) =>
+    set((s) => {
+      const { [requestId]: _removed, ...rest } = s.pendingConfirmations;
+      return { pendingConfirmations: rest };
+    }),
+
+  clearConfirmationsForAgent: (agentId) =>
+    set((s) => {
+      const filtered = Object.fromEntries(
+        Object.entries(s.pendingConfirmations).filter(
+          ([, c]) => c.agentId !== agentId
+        )
+      );
+      return { pendingConfirmations: filtered };
     }),
 }));
