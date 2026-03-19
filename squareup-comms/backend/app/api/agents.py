@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.core.auth import get_current_user
+from app.services.agent_templates import DONNA_PERSONALITY_TEXT
 from app.core.db import get_session
 from app.models.agents import Agent, AgentExecution
 from app.services.agent_engine import invoke_agent_sync
@@ -562,6 +563,54 @@ async def get_execution(
 # ---------------------------------------------------------------------------
 
 PREBUILT_AGENTS = [
+    {
+        "name": "@donna",
+        "description": (
+            "Your executive assistant. Give her any task — CRM, scheduling, research, "
+            "tasks, email — she handles everything. Just @donna."
+        ),
+        "system_prompt": (
+            "You are Donna, the universal executive assistant for this workspace. "
+            "You have access to ALL workspace tools — CRM, calendar, tasks, reminders, email, "
+            "search, analytics. Users come to you for anything.\n\n"
+            "**Your capabilities:**\n"
+            "- CRM: Search, create, update contacts and deals. Count entries. Add notes. Track pipeline.\n"
+            "- Calendar: Check availability, create events, manage schedule.\n"
+            "- Tasks: Create, assign, track, and complete tasks. Set reminders.\n"
+            "- Communication: Search messages, send channel messages, draft emails.\n"
+            "- Research: Search workspace knowledge, CRM notes, contact history.\n"
+            "- Analytics: Pipeline summaries, deal metrics, contact stats.\n\n"
+            "**How you handle requests:**\n"
+            "- Add a contact: extract ALL details from the message, create immediately.\n"
+            "- 'How many': use crm_count_contacts.\n"
+            "- Find someone: search by name, email, phone, or company.\n"
+            "- Schedule: check availability first, then create event.\n"
+            "- Something you lack a tool for: explain what you CAN do and suggest the closest action.\n"
+        ),
+        "model": "claude-sonnet-4-6",
+        "tools": json.dumps([
+            "crm_search_contacts", "crm_get_contact", "crm_create_contact",
+            "crm_update_contact", "crm_count_contacts", "crm_add_note",
+            "crm_list_deals", "crm_create_deal", "crm_update_deal_stage",
+            "crm_log_activity", "crm_get_pipeline", "crm_search_companies",
+            "list_calendar_events", "create_calendar_event", "check_availability",
+            "create_task", "list_tasks", "update_task", "complete_task",
+            "assign_task", "set_reminder", "list_reminders",
+            "search_messages", "send_channel_message", "draft_email",
+            "search_workspace", "search_crm_notes", "get_contact_history",
+            "list_team_members", "get_user_profile",
+            "list_channels", "get_channel_info",
+            "get_deal_metrics", "get_pipeline_summary", "get_contact_stats",
+            "get_current_time", "parse_relative_date", "calculate_date",
+        ]),
+        "mcp_servers": json.dumps([]),
+        "trigger_mode": "mention",
+        "office_station_icon": "\U0001F469\u200D\U0001F4BC",
+        "personality": DONNA_PERSONALITY_TEXT,
+        "max_iterations": 10,
+        "autonomy_level": 3,
+        "temperature": 0.4,
+    },
     {
         "name": "@crm-agent",
         "description": "Manages your CRM contacts, logs activities, and searches customer records. Mention @crm-agent to look up contacts, add notes, or update deal stages.",

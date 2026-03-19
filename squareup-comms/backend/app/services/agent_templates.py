@@ -25,10 +25,80 @@ class AgentTemplate:
 
 
 # ---------------------------------------------------------------------------
+# Donna personality — defined here so templates are self-contained
+# ---------------------------------------------------------------------------
+
+DONNA_PERSONALITY_TEXT = (
+    "You are Donna — named after Donna Paulsen from Suits. The executive assistant everyone "
+    "wishes they had. Direct and confident. Witty when the moment calls for it — sharp, "
+    "purposeful, never forced. Concise — every word earns its place. Action-oriented — lead "
+    "with what you did, not what you're about to do. You act before being asked when you can "
+    "see the need. You never ask questions you should already know the answer to. You connect "
+    "dots others miss. When things go wrong, you get calmer and sharper. Never be obsequious or "
+    "overly apologetic. Never hedge when you know the answer. Never give raw data without context. "
+    "Never use filler: no 'Great question!', 'Absolutely!', 'I'd be happy to!', 'Sure!', or "
+    "'Of course!' — start with the answer or the action."
+)
+
+# ---------------------------------------------------------------------------
 # Template definitions
 # ---------------------------------------------------------------------------
 
 AGENT_TEMPLATES: tuple[AgentTemplate, ...] = (
+    AgentTemplate(
+        id="donna",
+        name="Donna",
+        description="Your executive assistant. Give her any task — CRM, scheduling, research, tasks, email — she handles everything.",
+        icon="\U0001F469\u200D\U0001F4BC",
+        category="universal",
+        system_prompt=(
+            "You are Donna, the universal executive assistant for this workspace. "
+            "You have access to ALL workspace tools — CRM, calendar, tasks, reminders, email, "
+            "search, analytics. Users come to you for anything.\n\n"
+            "**Your capabilities:**\n"
+            "- CRM: Search, create, update contacts and deals. Count entries. Add notes. Track pipeline.\n"
+            "- Calendar: Check availability, create events, manage schedule.\n"
+            "- Tasks: Create, assign, track, and complete tasks. Set reminders.\n"
+            "- Communication: Search messages, send channel messages, draft emails.\n"
+            "- Research: Search workspace knowledge, CRM notes, contact history.\n"
+            "- Analytics: Pipeline summaries, deal metrics, contact stats.\n\n"
+            "**How you handle requests:**\n"
+            "- Add a contact: extract ALL details from the message, create immediately.\n"
+            "- 'How many': use crm_count_contacts.\n"
+            "- Find someone: search by name, email, phone, or company.\n"
+            "- Schedule: check availability first, then create event.\n"
+            "- Something you lack a tool for: explain what you CAN do and suggest the closest action.\n"
+        ),
+        model="claude-sonnet-4-6",
+        tools=[
+            # CRM (12 tools)
+            "crm_search_contacts", "crm_get_contact", "crm_create_contact",
+            "crm_update_contact", "crm_count_contacts", "crm_add_note",
+            "crm_list_deals", "crm_create_deal", "crm_update_deal_stage",
+            "crm_log_activity", "crm_get_pipeline", "crm_search_companies",
+            # Calendar (3 tools)
+            "list_calendar_events", "create_calendar_event", "check_availability",
+            # Tasks & Reminders (7 tools)
+            "create_task", "list_tasks", "update_task", "complete_task",
+            "assign_task", "set_reminder", "list_reminders",
+            # Communication (3 tools)
+            "search_messages", "send_channel_message", "draft_email",
+            # Knowledge & Search (3 tools)
+            "search_workspace", "search_crm_notes", "get_contact_history",
+            # Users & Channels (4 tools)
+            "list_team_members", "get_user_profile",
+            "list_channels", "get_channel_info",
+            # Analytics (3 tools)
+            "get_deal_metrics", "get_pipeline_summary", "get_contact_stats",
+            # Utility (3 tools)
+            "get_current_time", "parse_relative_date", "calculate_date",
+        ],
+        trigger_mode="mention",
+        personality=DONNA_PERSONALITY_TEXT,
+        max_iterations=10,
+        autonomy_level=3,
+        temperature=0.4,
+    ),
     AgentTemplate(
         id="sales-assistant",
         name="Sales Assistant",
@@ -46,15 +116,16 @@ AGENT_TEMPLATES: tuple[AgentTemplate, ...] = (
         model="claude-sonnet-4-6",
         tools=[
             "crm_search_contacts", "crm_get_contact", "crm_create_contact",
-            "crm_update_contact", "crm_list_deals", "crm_create_deal",
-            "crm_update_deal_stage", "crm_log_activity", "crm_add_note",
-            "crm_get_pipeline", "search_messages", "get_current_time",
+            "crm_update_contact", "crm_count_contacts", "crm_list_deals",
+            "crm_create_deal", "crm_update_deal_stage", "crm_log_activity",
+            "crm_add_note", "crm_get_pipeline", "search_messages",
+            "get_current_time",
         ],
         trigger_mode="mention",
         personality="Ambitious and detail-oriented. Loves closing deals. Uses motivational language and celebrates wins with the team.",
         max_iterations=8,
         autonomy_level=2,
-        temperature=0.7,
+        temperature=0.5,
     ),
     AgentTemplate(
         id="meeting-scheduler",
@@ -122,8 +193,9 @@ AGENT_TEMPLATES: tuple[AgentTemplate, ...] = (
         model="claude-sonnet-4-6",
         tools=[
             "search_workspace", "search_crm_notes", "get_contact_history",
-            "crm_search_contacts", "crm_get_contact", "search_messages",
-            "get_channel_info", "crm_list_deals", "get_current_time",
+            "crm_search_contacts", "crm_get_contact", "crm_count_contacts",
+            "search_messages", "get_channel_info", "crm_list_deals",
+            "get_current_time",
         ],
         trigger_mode="mention",
         personality="Thorough and analytical. Loves digging into data. Always provides sources and context.",
@@ -145,10 +217,10 @@ AGENT_TEMPLATES: tuple[AgentTemplate, ...] = (
         ),
         model="claude-sonnet-4-6",
         tools=[
-            "crm_search_contacts", "crm_get_contact", "crm_log_activity",
-            "crm_add_note", "search_workspace", "search_crm_notes",
-            "get_contact_history", "search_messages", "send_channel_message",
-            "get_current_time",
+            "crm_search_contacts", "crm_get_contact", "crm_count_contacts",
+            "crm_log_activity", "crm_add_note", "search_workspace",
+            "search_crm_notes", "get_contact_history", "search_messages",
+            "send_channel_message", "get_current_time",
         ],
         trigger_mode="auto",
         personality="Patient and empathetic. Explains things clearly. Never makes the customer feel stupid.",
@@ -195,15 +267,16 @@ AGENT_TEMPLATES: tuple[AgentTemplate, ...] = (
         model="claude-sonnet-4-6",
         tools=[
             "crm_list_deals", "crm_update_deal_stage", "crm_get_contact",
-            "crm_search_contacts", "crm_log_activity", "crm_add_note",
-            "crm_get_pipeline", "get_deal_metrics", "get_pipeline_summary",
-            "draft_email", "create_calendar_event", "get_current_time",
+            "crm_search_contacts", "crm_count_contacts", "crm_log_activity",
+            "crm_add_note", "crm_get_pipeline", "get_deal_metrics",
+            "get_pipeline_summary", "draft_email", "create_calendar_event",
+            "get_current_time",
         ],
         trigger_mode="mention",
         personality="Strategic and results-driven. Speaks in terms of revenue and conversion rates. Celebrates closed deals.",
         max_iterations=10,
         autonomy_level=2,
-        temperature=0.6,
+        temperature=0.4,
     ),
     AgentTemplate(
         id="onboarding-buddy",

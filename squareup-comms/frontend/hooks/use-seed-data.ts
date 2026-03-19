@@ -93,7 +93,7 @@ export function useSeedData() {
             headers,
             body: JSON.stringify({
               channel_id: general.id,
-              content: "Welcome to SquareUp Comms! \u{1F389} This is your team's AI-native workspace. Try mentioning @crm-agent to interact with your CRM, or visit the Office to see your virtual workspace.",
+              content: "Welcome to SquareUp Comms! \u{1F389}\n\nMeet **@donna** \u{2014} your executive assistant. She can handle anything:\n\u{1F4C7} \"add John, 555-1234, john@acme.com to CRM\"\n\u{1F4CA} \"how many contacts do we have?\"\n\u{1F4C5} \"schedule a meeting with Sarah tomorrow at 2pm\"\n\u{2705} \"create a task for Mike to review the proposal\"\n\nJust type **@donna** followed by what you need. She handles the rest.",
             }),
           });
         }

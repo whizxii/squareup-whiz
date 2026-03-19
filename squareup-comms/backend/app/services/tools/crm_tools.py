@@ -317,6 +317,81 @@ async def crm_get_pipeline(inp: dict, ctx: ToolContext) -> ToolResult:
         return ToolResult(success=True, output={"pipelines": pipelines})
 
 
+async def crm_count_contacts(inp: dict, ctx: ToolContext) -> ToolResult:
+    """Count CRM contacts with optional filters."""
+    from sqlalchemy import func as sa_func
+
+    stage_filter = inp.get("stage")
+    company_filter = inp.get("company")
+
+    async with async_session() as session:
+        base_where = [CRMContact.is_archived == False]  # noqa: E712
+        if stage_filter:
+            base_where.append(CRMContact.stage == stage_filter)
+        if company_filter:
+            base_where.append(col(CRMContact.company).ilike(f"%{company_filter}%"))
+
+        total_stmt = select(sa_func.count()).select_from(CRMContact).where(*base_where)
+        total = (await session.execute(total_stmt)).scalar() or 0
+
+        breakdown: dict[str, int] = {}
+        if not stage_filter and not company_filter:
+            breakdown_stmt = (
+                select(CRMContact.stage, sa_func.count())
+                .select_from(CRMContact)
+                .where(CRMContact.is_archived == False)  # noqa: E712
+                .group_by(CRMContact.stage)
+            )
+            rows = (await session.execute(breakdown_stmt)).all()
+            breakdown = {row[0] or "unknown": row[1] for row in rows}
+
+    return ToolResult(
+        success=True,
+        output={
+            "total_contacts": total,
+            "breakdown_by_stage": breakdown,
+            "filters_applied": {k: v for k, v in inp.items() if v},
+        },
+    )
+
+
+async def crm_add_note(inp: dict, ctx: ToolContext) -> ToolResult:
+    """Add a text note to a CRM contact."""
+    contact_id = inp.get("contact_id", "")
+    content = inp.get("content", "")
+    if not contact_id or not content:
+        return ToolResult(success=False, output=None, error="contact_id and content are required")
+
+    async with async_session() as session:
+        contact = await session.get(CRMContact, contact_id)
+        if not contact:
+            return ToolResult(success=False, output=None, error=f"Contact {contact_id} not found")
+
+        contact_name = contact.name  # capture before session closes
+
+        note = CRMNote(
+            id=str(uuid.uuid4()),
+            contact_id=contact_id,
+            content=content,
+            created_by=ctx.user_id,
+            created_at=datetime.utcnow(),
+        )
+        session.add(note)
+        await session.commit()
+        await session.refresh(note)
+        note_id = note.id  # capture after refresh
+
+    return ToolResult(
+        success=True,
+        output={
+            "note_id": note_id,
+            "contact_id": contact_id,
+            "contact_name": contact_name,
+            "content": content[:200],
+        },
+    )
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
@@ -327,15 +402,17 @@ def register(registry: ToolRegistry) -> None:
     registry.register_builtin(ToolDefinition(
         name="crm_search_contacts",
         display_name="Search CRM Contacts",
-        description="Search for contacts in the CRM by name, email, or company. Returns matching contacts with their details.",
+        description=(
+            "Search CRM contacts by name, email, phone, or company. "
+            "Omit query to list all contacts. Use when user asks to find, list, look up, or show contacts."
+        ),
         category="crm",
         input_schema={
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Search term — matches name, email, or company"},
+                "query": {"type": "string", "description": "Search term — matches name, email, or company. Omit to list all."},
                 "limit": {"type": "integer", "description": "Max results (default 10, max 25)", "default": 10},
             },
-            "required": ["query"],
         },
         handler=crm_search_contacts,
     ))
@@ -343,7 +420,7 @@ def register(registry: ToolRegistry) -> None:
     registry.register_builtin(ToolDefinition(
         name="crm_get_contact",
         display_name="Get CRM Contact",
-        description="Get full details for a single CRM contact by their ID.",
+        description="Get full details for a single CRM contact by their UUID. Use when you already have a contact_id from a previous search.",
         category="crm",
         input_schema={
             "type": "object",
@@ -358,7 +435,7 @@ def register(registry: ToolRegistry) -> None:
     registry.register_builtin(ToolDefinition(
         name="crm_create_contact",
         display_name="Create CRM Contact",
-        description="Create a new contact in the CRM. Name is required; email, phone, company, title, and stage are optional.",
+        description="Create a new CRM contact. Only name is required — extract name, email, phone, company from the user's message. Parse comma-separated, labeled, or prose formats.",
         category="crm",
         requires_confirmation=True,
         input_schema={
@@ -379,7 +456,7 @@ def register(registry: ToolRegistry) -> None:
     registry.register_builtin(ToolDefinition(
         name="crm_update_contact",
         display_name="Update CRM Contact",
-        description="Update fields on an existing CRM contact. Provide contact_id and any fields to change.",
+        description="Update fields on an existing CRM contact. Provide contact_id and any fields to change. Use after searching to find the right contact.",
         category="crm",
         requires_confirmation=True,
         input_schema={
@@ -404,7 +481,7 @@ def register(registry: ToolRegistry) -> None:
     registry.register_builtin(ToolDefinition(
         name="crm_list_deals",
         display_name="List CRM Deals",
-        description="List deals in the CRM with optional filters by status (open/won/lost) or contact_id.",
+        description="List deals in the CRM pipeline. Filter by status (open/won/lost) or contact_id. Use when user asks about deals, pipeline, revenue, or opportunities.",
         category="crm",
         input_schema={
             "type": "object",
@@ -420,7 +497,7 @@ def register(registry: ToolRegistry) -> None:
     registry.register_builtin(ToolDefinition(
         name="crm_create_deal",
         display_name="Create CRM Deal",
-        description="Create a new deal in the CRM. Requires title, contact_id, and pipeline_id. Value and stage are optional.",
+        description="Create a new CRM deal. Requires title, contact_id, and pipeline_id. Use when user wants to track a new opportunity.",
         category="crm",
         requires_confirmation=True,
         input_schema={
@@ -441,7 +518,7 @@ def register(registry: ToolRegistry) -> None:
     registry.register_builtin(ToolDefinition(
         name="crm_update_deal_stage",
         display_name="Update Deal Stage",
-        description="Move a CRM deal to a new pipeline stage.",
+        description="Move a CRM deal to a new pipeline stage. Use when user wants to advance or change a deal's status.",
         category="crm",
         requires_confirmation=True,
         input_schema={
@@ -458,15 +535,14 @@ def register(registry: ToolRegistry) -> None:
     registry.register_builtin(ToolDefinition(
         name="crm_search_companies",
         display_name="Search CRM Companies",
-        description="Search companies in the CRM by name, domain, or industry.",
+        description="Search companies in the CRM by name, domain, or industry. Omit query to list all companies.",
         category="crm",
         input_schema={
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Search term — matches name, domain, or industry"},
+                "query": {"type": "string", "description": "Search term — matches name, domain, or industry. Omit to list all."},
                 "limit": {"type": "integer", "description": "Max results", "default": 10},
             },
-            "required": ["query"],
         },
         handler=crm_search_companies,
     ))
@@ -474,7 +550,7 @@ def register(registry: ToolRegistry) -> None:
     registry.register_builtin(ToolDefinition(
         name="crm_log_activity",
         display_name="Log CRM Activity",
-        description="Log a sales activity (call, email, meeting, note, task) against a CRM contact.",
+        description="Log a sales activity (call, email, meeting, note, task) against a CRM contact. Use to record interactions.",
         category="crm",
         input_schema={
             "type": "object",
@@ -492,7 +568,7 @@ def register(registry: ToolRegistry) -> None:
     registry.register_builtin(ToolDefinition(
         name="crm_get_pipeline",
         display_name="Get CRM Pipeline",
-        description="Get a pipeline's stages by ID, or list all pipelines if no ID is provided.",
+        description="Get a pipeline's stages by ID, or list all pipelines if no ID given. Use when user asks about deal stages or pipeline structure.",
         category="crm",
         input_schema={
             "type": "object",
@@ -501,4 +577,45 @@ def register(registry: ToolRegistry) -> None:
             },
         },
         handler=crm_get_pipeline,
+    ))
+
+    registry.register_builtin(ToolDefinition(
+        name="crm_count_contacts",
+        display_name="Count CRM Contacts",
+        description=(
+            "Count total CRM contacts, optionally filtered by stage or company. "
+            "Returns total and per-stage breakdown. Use when user asks 'how many' contacts, leads, or entries."
+        ),
+        category="crm",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "stage": {
+                    "type": "string",
+                    "description": "Filter by pipeline stage",
+                    "enum": ["lead", "contacted", "qualified", "proposal", "negotiation", "won", "lost"],
+                },
+                "company": {"type": "string", "description": "Filter by company name (partial match)"},
+            },
+        },
+        handler=crm_count_contacts,
+    ))
+
+    registry.register_builtin(ToolDefinition(
+        name="crm_add_note",
+        display_name="Add CRM Note",
+        description=(
+            "Add a text note to a CRM contact's record. "
+            "Use when user wants to record information, observations, or follow-up notes about a contact."
+        ),
+        category="crm",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "contact_id": {"type": "string", "description": "UUID of the contact"},
+                "content": {"type": "string", "description": "Note text content"},
+            },
+            "required": ["contact_id", "content"],
+        },
+        handler=crm_add_note,
     ))

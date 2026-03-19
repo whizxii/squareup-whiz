@@ -234,9 +234,22 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
                   )}
                 </div>
                 <h3 className="text-sm font-display font-bold">{agent.name}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {agent.description || "Send a message to get started."}
-                </p>
+                {agent.name?.trim().toLowerCase() === "donna" ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      I'm Donna. What do you need?
+                    </p>
+                    <div className="text-[10px] text-muted-foreground/70 space-y-1">
+                      <p>&quot;add Sarah, 555-1234, sarah@acme.com to CRM&quot;</p>
+                      <p>&quot;how many contacts do we have?&quot;</p>
+                      <p>&quot;schedule a meeting with Mike tomorrow at 3pm&quot;</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {agent.description || "Send a message to get started."}
+                  </p>
+                )}
                 {agent.tools.length > 0 && (
                   <div className="flex flex-wrap gap-1 justify-center pt-1">
                     {agent.tools.slice(0, 6).map((tool) => (
