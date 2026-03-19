@@ -24,11 +24,16 @@ import { ExportDialog } from "@/components/crm/dialogs/ExportDialog";
 import { MergeContactsDialog } from "@/components/crm/dialogs/MergeContactsDialog";
 import AutomationFeed from "@/components/crm/AutomationFeed";
 import WeeklyDigestView from "@/components/crm/WeeklyDigestView";
+import { CompaniesView } from "@/components/crm/CompaniesView";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useContacts } from "@/lib/hooks/use-crm-queries";
+import { useQueryClient } from "@tanstack/react-query";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import {
-  Building2,
   Bot,
+  Sparkles,
 } from "lucide-react";
 import type { CRMView } from "@/lib/types/crm";
 
@@ -67,13 +72,7 @@ function ActiveView({ view }: { view: CRMView }) {
     case "leads":
       return <LeadScoringView />;
     case "companies":
-      return (
-        <PlaceholderView
-          icon={<Building2 className="w-6 h-6" />}
-          title="Companies coming soon"
-          description="Company management and association with contacts will appear here."
-        />
-      );
+      return <CompaniesView />;
     case "sequences":
       return <SequencesView />;
     case "workflows":
@@ -106,11 +105,28 @@ export default function CRMPage() {
   const openDialog = useCRMUIStore((s) => s.openDialog);
   const searchQuery = useCRMUIStore((s) => s.searchQuery);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const queryClient = useQueryClient();
 
   // React Query for contacts — drives empty state check
   const { data: contactsData } = useContacts(undefined, { limit: 1 });
   const hasContacts = (contactsData?.items?.length ?? 0) > 0;
   const showEmptyState = !hasContacts && !searchQuery;
+
+  async function loadDemoData() {
+    setSeeding(true);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      else headers["X-User-Id"] = getCurrentUserId();
+      await fetchWithRetry(`${baseUrl}/api/seed/crm-demo`, { method: "POST", headers });
+      await queryClient.invalidateQueries();
+    } finally {
+      setSeeding(false);
+    }
+  }
 
   // Dialog data helpers
   const editContactId = dialog.type === "edit-contact"
@@ -144,7 +160,7 @@ export default function CRMPage() {
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-hidden flex flex-col">
           {showEmptyState ? (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex flex-col items-center justify-center gap-6">
               <EmptyState
                 icon={<span className="text-3xl">&#x1F465;</span>}
                 title="Your CRM starts here"
@@ -154,6 +170,14 @@ export default function CRMPage() {
                   onClick: () => openDialog("create-contact"),
                 }}
               />
+              <button
+                onClick={loadDemoData}
+                disabled={seeding}
+                className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+              >
+                <Sparkles className="w-4 h-4" />
+                {seeding ? "Loading demo data…" : "Load demo data to see what SquareUp CRM can do"}
+              </button>
             </div>
           ) : (
             <ActiveView view={activeView} />

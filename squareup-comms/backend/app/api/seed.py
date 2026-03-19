@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Security, status
@@ -25,6 +26,12 @@ from app.core.db import get_session
 from app.core.auth import get_current_user
 from app.models.users import UserProfile
 from app.models.chat import Channel, ChannelMember
+from app.models.crm import CRMContact, CRMActivity
+from app.models.crm_deal import CRMDeal
+from app.models.crm_pipeline import CRMPipeline
+from app.models.crm_company import CRMCompany
+from app.models.automation_log import AutomationLog
+from app.models.ai_insight import AIInsight
 
 logger = logging.getLogger(__name__)
 
@@ -523,6 +530,332 @@ async def _cleanup_duplicates_impl(session: AsyncSession) -> dict:
         "removed": removed,
         "migrated_refs": migrated_refs,
         "summary": f"Removed {len(removed)} duplicate profiles, kept {len(kept)}",
+    }
+
+
+@router.post("/crm-demo")
+async def seed_crm_demo(
+    user_id: str = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Seed the CRM with realistic demo data (contacts, deals, activities, etc.).
+
+    Idempotent: returns {already_seeded: true} if a pipeline named 'Sales Pipeline' exists.
+    Requires normal authentication (no dev-auth gate).
+    """
+    try:
+        return await _seed_crm_demo_impl(session, user_id)
+    except Exception as exc:
+        logger.exception("seed_crm_demo failed")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(exc), "type": type(exc).__name__},
+        )
+
+
+async def _seed_crm_demo_impl(session: AsyncSession, seeded_by: str) -> dict:
+    now = datetime.utcnow()
+
+    # Idempotency check
+    existing_pipeline = await session.execute(
+        select(CRMPipeline).where(CRMPipeline.name == "Sales Pipeline")
+    )
+    if existing_pipeline.scalars().first():
+        return {"already_seeded": True}
+
+    # ── 1. Pipeline ──────────────────────────────────────────────────────────
+    pipeline_stages = json.dumps([
+        {"id": "lead", "label": "Lead", "order": 0, "color": "#6B7280", "probability": 10, "sla_days": 7},
+        {"id": "qualified", "label": "Qualified", "order": 1, "color": "#3B82F6", "probability": 30, "sla_days": 14},
+        {"id": "proposal", "label": "Proposal", "order": 2, "color": "#F59E0B", "probability": 60, "sla_days": 10},
+        {"id": "negotiation", "label": "Negotiation", "order": 3, "color": "#8B5CF6", "probability": 80, "sla_days": 7},
+        {"id": "won", "label": "Won", "order": 4, "color": "#10B981", "probability": 100, "sla_days": 0},
+    ])
+    pipeline = CRMPipeline(
+        id=str(uuid.uuid4()),
+        name="Sales Pipeline",
+        description="Default B2B sales pipeline",
+        stages=pipeline_stages,
+        is_default=True,
+        is_archived=False,
+        created_by=seeded_by,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(pipeline)
+    await session.flush()
+
+    # ── 2. Companies ─────────────────────────────────────────────────────────
+    companies_data = [
+        {"name": "Acme Corp", "domain": "acmecorp.com", "industry": "SaaS", "size": "51-200", "website": "https://acmecorp.com", "employee_count": 120, "annual_revenue": 8500000.0},
+        {"name": "Bluewave Technologies", "domain": "bluewave.io", "industry": "FinTech", "size": "11-50", "website": "https://bluewave.io", "employee_count": 38, "annual_revenue": 3200000.0},
+        {"name": "Greenfield Labs", "domain": "greenfield.ai", "industry": "HealthTech", "size": "1-10", "website": "https://greenfield.ai", "employee_count": 9, "annual_revenue": 750000.0},
+    ]
+    companies: dict[str, CRMCompany] = {}
+    for cd in companies_data:
+        company = CRMCompany(
+            id=str(uuid.uuid4()),
+            name=cd["name"],
+            domain=cd["domain"],
+            industry=cd["industry"],
+            size=cd["size"],
+            website=cd["website"],
+            employee_count=cd["employee_count"],
+            annual_revenue=cd["annual_revenue"],
+            is_archived=False,
+            created_by=seeded_by,
+            created_at=now - timedelta(days=90),
+            updated_at=now,
+        )
+        session.add(company)
+        companies[cd["name"]] = company
+    await session.flush()
+
+    # ── 3. Contacts ──────────────────────────────────────────────────────────
+    contacts_data = [
+        {"name": "Priya Sharma", "email": "priya@acmecorp.com", "phone": "+91 98765 43210", "company": "Acme Corp", "title": "Chief Technology Officer", "stage": "qualified", "lead_score": 78, "value": 450000.0, "source": "LinkedIn", "notes": "Interested in enterprise license. Follow up after Q2 budget review."},
+        {"name": "Rohit Verma", "email": "rohit@bluewave.io", "phone": "+91 99887 12345", "company": "Bluewave Technologies", "title": "VP of Sales", "stage": "proposal", "lead_score": 85, "value": 280000.0, "source": "Referral", "notes": "Evaluating us vs Salesforce. Strong relationship — met at SaaS India conference."},
+        {"name": "Sarah Chen", "email": "sarah@greenfield.ai", "phone": "+1 415 555 0192", "company": "Greenfield Labs", "title": "Chief Executive Officer", "stage": "lead", "lead_score": 42, "value": 85000.0, "source": "Cold outreach", "notes": "Seed-stage startup. Budget tight but high growth potential."},
+        {"name": "Marcus Johnson", "email": "marcus@acmecorp.com", "phone": "+91 98900 11223", "company": "Acme Corp", "title": "Head of Product", "stage": "negotiation", "lead_score": 91, "value": 320000.0, "source": "Inbound", "notes": "Decision maker for product suite upgrade. Final legal review in progress."},
+        {"name": "Ananya Patel", "email": "ananya@bluewave.io", "phone": "+91 97766 55443", "company": "Bluewave Technologies", "title": "Procurement Manager", "stage": "lead", "lead_score": 35, "value": 150000.0, "source": "Website", "notes": "Initial inquiry via website. Needs technical evaluation."},
+        {"name": "David Kim", "email": "david@greenfield.ai", "phone": "+1 650 555 0134", "company": "Greenfield Labs", "title": "Chief Operating Officer", "stage": "qualified", "lead_score": 62, "value": 95000.0, "source": "Conference", "notes": "Met at HealthTech Summit. Interested in pilot program scope."},
+        {"name": "Emma Wilson", "email": "emma@acmecorp.com", "phone": "+91 93344 22110", "company": "Acme Corp", "title": "Director of Engineering", "stage": "won", "lead_score": 95, "value": 320000.0, "source": "Referral", "notes": "Closed deal. Excellent champion. Ask for case study."},
+        {"name": "Ravi Gupta", "email": "ravi@bluewave.io", "phone": "+91 96655 78901", "company": "Bluewave Technologies", "title": "Chief Financial Officer", "stage": "qualified", "lead_score": 71, "value": 195000.0, "source": "LinkedIn", "notes": "Budget holder. Q3 planning cycle starts next month."},
+        {"name": "Neha Joshi", "email": "neha@greenfield.ai", "phone": "+1 415 555 0289", "company": "Greenfield Labs", "title": "VP Marketing", "stage": "proposal", "lead_score": 58, "value": 110000.0, "source": "Email campaign", "notes": "Responded to nurture sequence. Proposal sent — awaiting response."},
+        {"name": "Tom Bradley", "email": "tom.bradley@outlook.com", "phone": "+1 312 555 0173", "company": None, "title": "CTO (Freelance Consultant)", "stage": "lead", "lead_score": 29, "value": 45000.0, "source": "Cold outreach", "notes": "Independent consultant. Exploring options for a client project."},
+    ]
+
+    stage_lifecycle_map = {
+        "lead": "lead",
+        "qualified": "mql",
+        "proposal": "sql",
+        "negotiation": "opportunity",
+        "won": "customer",
+    }
+
+    contacts: list[CRMContact] = []
+    for i, cd in enumerate(contacts_data):
+        company_obj = companies.get(cd["company"]) if cd["company"] else None
+        contact = CRMContact(
+            id=str(uuid.uuid4()),
+            name=cd["name"],
+            email=cd["email"],
+            phone=cd["phone"],
+            company=cd["company"],
+            company_id=company_obj.id if company_obj else None,
+            title=cd["title"],
+            stage=cd["stage"],
+            stage_changed_at=now - timedelta(days=30 - i * 2),
+            lifecycle_stage=stage_lifecycle_map.get(cd["stage"], "lead"),
+            value=cd["value"],
+            currency="INR",
+            source=cd["source"],
+            notes=cd["notes"],
+            lead_score=cd["lead_score"],
+            relationship_strength=max(1, min(10, cd["lead_score"] // 10)),
+            activity_count=0,
+            is_archived=False,
+            created_by=seeded_by,
+            created_by_type="user",
+            created_at=now - timedelta(days=60 - i * 5),
+            updated_at=now - timedelta(days=i),
+            last_contacted_at=now - timedelta(days=i * 2 + 1),
+            last_activity_at=now - timedelta(days=i * 2 + 1),
+        )
+        session.add(contact)
+        contacts.append(contact)
+    await session.flush()
+
+    # ── 4. Deals ─────────────────────────────────────────────────────────────
+    deals_data = [
+        {"title": "Acme Corp — Enterprise License", "contact_idx": 0, "stage": "proposal", "value": 450000.0, "health": "yellow", "status": "open", "probability": 60, "days_to_close": 30},
+        {"title": "Bluewave Q2 Expansion", "contact_idx": 1, "stage": "negotiation", "value": 280000.0, "health": "green", "status": "open", "probability": 80, "days_to_close": 14},
+        {"title": "Greenfield Pilot Program", "contact_idx": 2, "stage": "lead", "value": 85000.0, "health": "red", "status": "open", "probability": 10, "days_to_close": 60},
+        {"title": "Acme — Product Suite Upgrade", "contact_idx": 3, "stage": "won", "value": 320000.0, "health": "green", "status": "won", "probability": 100, "days_to_close": -7},
+        {"title": "Bluewave — API Integration", "contact_idx": 4, "stage": "qualified", "value": 150000.0, "health": "green", "status": "open", "probability": 30, "days_to_close": 45},
+    ]
+
+    deals: list[CRMDeal] = []
+    for dd in deals_data:
+        contact = contacts[dd["contact_idx"]]
+        deal = CRMDeal(
+            id=str(uuid.uuid4()),
+            title=dd["title"],
+            contact_id=contact.id,
+            company_id=contact.company_id,
+            pipeline_id=pipeline.id,
+            stage=dd["stage"],
+            value=dd["value"],
+            currency="INR",
+            probability=dd["probability"],
+            status=dd["status"],
+            deal_health=dd["health"],
+            stage_entered_at=now - timedelta(days=20),
+            expected_close_date=now + timedelta(days=dd["days_to_close"]),
+            actual_close_date=now - timedelta(days=7) if dd["status"] == "won" else None,
+            owner_id=seeded_by,
+            created_by=seeded_by,
+            created_at=now - timedelta(days=45),
+            updated_at=now - timedelta(days=1),
+        )
+        session.add(deal)
+        deals.append(deal)
+    await session.flush()
+
+    # ── 5. Activities ─────────────────────────────────────────────────────────
+    activities_raw = [
+        (0, "email", "Initial outreach email sent", "Sent introduction email highlighting enterprise features and ROI case studies."),
+        (0, "call", "Discovery call — Priya Sharma", "45-min call. Discussed integration needs, team size, and Q3 timeline. Very engaged."),
+        (1, "meeting", "Product demo — Rohit Verma", "Live demo of the platform. Compared feature-by-feature against their current Salesforce setup."),
+        (1, "email", "Proposal sent to Bluewave", "Sent detailed proposal with pricing tiers and implementation timeline."),
+        (2, "call", "Intro call — Sarah Chen", "Brief 20-min call. Explained pilot program structure. Sarah interested but waiting for Series A close."),
+        (3, "meeting", "Contract review with legal — Acme", "3-way call with Marcus, their legal team, and us. Addressed IP concerns."),
+        (3, "note", "Deal won — Acme Product Suite", "Marcus signed the agreement. Kickoff call scheduled for next week. Great outcome!"),
+        (4, "email", "Follow-up after website inquiry", "Sent technical specs and API documentation as requested by Ananya."),
+        (5, "call", "Qualification call — David Kim", "Confirmed budget range and decision timeline. Strong fit for pilot."),
+        (6, "meeting", "Kickoff call — Emma Wilson", "Post-close kickoff. Introduced implementation team. Emma very enthusiastic."),
+        (7, "email", "Budget planning email to Ravi", "Shared pricing options and flexible payment terms to help with Q3 budget planning."),
+        (8, "note", "Proposal follow-up needed", "Neha went quiet after proposal. Ping scheduled for Thursday with value-add content."),
+        (9, "email", "Cold outreach — Tom Bradley", "Personalized email referencing his consulting background and client use case."),
+        (0, "meeting", "Technical deep-dive — Acme", "2-hour session with Priya and her engineering team on integration architecture."),
+        (2, "email", "Nurture email — Greenfield", "Sent HealthTech case study and ROI calculator to keep Sarah engaged."),
+    ]
+
+    for contact_idx, act_type, act_title, act_content in activities_raw:
+        contact = contacts[contact_idx]
+        activity = CRMActivity(
+            id=str(uuid.uuid4()),
+            contact_id=contact.id,
+            type=act_type,
+            title=act_title,
+            content=act_content,
+            performed_by=seeded_by,
+            performer_type="user",
+            performer_name="Team",
+            created_at=now - timedelta(days=len(activities_raw) - activities_raw.index((contact_idx, act_type, act_title, act_content))),
+        )
+        session.add(activity)
+        contact.activity_count = (contact.activity_count or 0) + 1
+        session.add(contact)
+    await session.flush()
+
+    # ── 6. Automation Logs ────────────────────────────────────────────────────
+    auto_logs = [
+        {
+            "action_type": "create_contact",
+            "entity_type": "contact",
+            "entity_id": contacts[0].id,
+            "entity_name": "Priya Sharma",
+            "confidence": 0.92,
+            "status": "auto_executed",
+            "ai_reasoning": "Chat message from Kunj mentioned 'meeting with Priya from Acme' — extracted contact name, company, and context with high confidence.",
+            "source_event": "chat.message_analyzed",
+            "result": json.dumps({"contact_id": contacts[0].id, "fields_set": ["name", "company", "title"]}),
+        },
+        {
+            "action_type": "progress_deal",
+            "entity_type": "deal",
+            "entity_id": deals[1].id,
+            "entity_name": "Bluewave Q2 Expansion",
+            "confidence": 0.71,
+            "status": "pending_review",
+            "ai_reasoning": "Detected strong buying signal in last email ('ready to move forward') — suggesting advancing deal from Proposal to Negotiation stage. Confidence below threshold, flagged for review.",
+            "source_event": "chat.message_analyzed",
+            "result": None,
+        },
+        {
+            "action_type": "schedule_followup",
+            "entity_type": "contact",
+            "entity_id": contacts[2].id,
+            "entity_name": "Sarah Chen",
+            "confidence": 0.83,
+            "status": "approved",
+            "ai_reasoning": "No activity on Greenfield Pilot for 12 days — auto-scheduled a follow-up reminder for the assigned owner.",
+            "source_event": "schedule.stale_deal_check",
+            "result": json.dumps({"follow_up_at": (now + timedelta(days=2)).isoformat(), "note": "Check in on Series A status"}),
+            "reviewed_at": now - timedelta(hours=3),
+            "reviewed_by": seeded_by,
+        },
+    ]
+
+    for log_data in auto_logs:
+        log = AutomationLog(
+            id=str(uuid.uuid4()),
+            action_type=log_data["action_type"],
+            entity_type=log_data["entity_type"],
+            entity_id=log_data["entity_id"],
+            entity_name=log_data["entity_name"],
+            confidence=log_data["confidence"],
+            status=log_data["status"],
+            performed_by="system",
+            result=log_data.get("result"),
+            ai_reasoning=log_data.get("ai_reasoning"),
+            source_event=log_data.get("source_event"),
+            review_notes=None,
+            created_at=now - timedelta(hours=6),
+            reviewed_at=log_data.get("reviewed_at"),
+            reviewed_by=log_data.get("reviewed_by"),
+        )
+        session.add(log)
+
+    # ── 7. AI Insights ────────────────────────────────────────────────────────
+    insights = [
+        AIInsight(
+            id=str(uuid.uuid4()),
+            type="daily_brief",
+            severity="warning",
+            title="3 deals need your attention today",
+            description="Acme Enterprise License has been in Proposal stage for 18 days with no activity. Greenfield Pilot is at risk — no response in 12 days. Bluewave negotiation is hot and should be prioritized.",
+            ai_reasoning="Analyzed deal pipeline health, last activity timestamps, and engagement patterns. Identified stalled deals based on stage SLA thresholds and contact silence periods.",
+            suggested_actions=json.dumps([
+                "Call Priya Sharma about the Acme deal — she mentioned Q2 budget deadline",
+                "Send Neha Joshi a value-add follow-up for the Greenfield proposal",
+                "Close Bluewave Q2 Expansion — Rohit is ready to sign",
+            ]),
+            target_user_id=seeded_by,
+            entity_type=None,
+            entity_id=None,
+            entity_name=None,
+            is_read=False,
+            is_dismissed=False,
+            is_acted_on=False,
+            created_at=now - timedelta(hours=2),
+        ),
+        AIInsight(
+            id=str(uuid.uuid4()),
+            type="deal_coaching",
+            severity="critical",
+            title="Acme Enterprise License: High risk of stalling",
+            description="This deal has been in the Proposal stage for 18 days without advancement. Priya Sharma's last response was 8 days ago — unusual given her typical 2-day response time. Risk score: 72/100.",
+            ai_reasoning="Combined deal stage SLA breach (SLA: 10 days, current: 18 days), contact silence (8 days), and historical response pattern analysis. Similar deals that stalled at this stage had 65% loss rate.",
+            suggested_actions=json.dumps([
+                "Schedule a check-in call to uncover blockers",
+                "Send a competitive comparison document — they may be evaluating alternatives",
+                "Offer a phased pricing option to reduce commitment hesitation",
+            ]),
+            target_user_id=seeded_by,
+            entity_type="deal",
+            entity_id=deals[0].id,
+            entity_name="Acme Corp — Enterprise License",
+            is_read=False,
+            is_dismissed=False,
+            is_acted_on=False,
+            created_at=now - timedelta(hours=1),
+        ),
+    ]
+    for insight in insights:
+        session.add(insight)
+
+    await session.commit()
+
+    return {
+        "pipeline": 1,
+        "companies": len(companies),
+        "contacts": len(contacts),
+        "deals": len(deals),
+        "activities": len(activities_raw),
+        "automation_logs": len(auto_logs),
+        "insights": len(insights),
     }
 
 

@@ -65,6 +65,7 @@ from app.api.chat_intelligence import router as chat_intelligence_router
 from app.api.office import router as office_router
 from app.api.ai_insights import router as ai_insights_router
 from app.api.automation import router as automation_router
+from app.api.digests import router as digests_router
 
 # Initialize structured logging before anything else
 setup_logging()
@@ -229,6 +230,7 @@ app.include_router(chat_intelligence_router)
 app.include_router(office_router)
 app.include_router(ai_insights_router)
 app.include_router(automation_router)
+app.include_router(digests_router)
 
 
 @app.get("/health")
