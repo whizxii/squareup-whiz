@@ -311,12 +311,25 @@ async def run_agent(
         if not final_text and iteration >= max_iterations:
             final_text = "I've reached my maximum number of reasoning steps. Here's what I found so far."
 
+    except RuntimeError as exc:
+        exec_status = "error"
+        error_message = str(exc)[:500]
+        # Surface the actual error so users know what to fix
+        if "No LLM API key configured" in str(exc):
+            final_text = (
+                "No LLM API key is configured on the server. "
+                "Please set ANTHROPIC_API_KEY or GROQ_API_KEY in the backend environment variables."
+            )
+        else:
+            final_text = final_text or f"Agent error: {str(exc)[:300]}"
+        logger.error("Agent %s execution failed: %s", agent.id, exc)
+        await _broadcast_error(channel_id, agent.id, final_text[:500])
     except Exception as exc:
         exec_status = "error"
         error_message = str(exc)[:500]
-        final_text = final_text or "I encountered an error while processing your request."
-        logger.error("Agent %s execution failed: %s", agent.id, exc)
-        await _broadcast_error(channel_id, agent.id, str(exc)[:200])
+        final_text = final_text or f"Agent error: {str(exc)[:300]}"
+        logger.error("Agent %s execution failed: %s", agent.id, exc, exc_info=True)
+        await _broadcast_error(channel_id, agent.id, final_text[:500])
 
     elapsed_ms = int((time.monotonic() - start_time) * 1000)
     # Claude pricing approximation (sonnet)
@@ -570,11 +583,22 @@ async def invoke_agent_sync(
         if not final_text and iteration >= max_iterations:
             final_text = "I've reached my maximum number of reasoning steps. Here's what I found so far."
 
+    except RuntimeError as exc:
+        exec_status = "error"
+        error_message = str(exc)[:500]
+        if "No LLM API key configured" in str(exc):
+            final_text = (
+                "No LLM API key is configured on the server. "
+                "Please set ANTHROPIC_API_KEY or GROQ_API_KEY in the backend environment variables."
+            )
+        else:
+            final_text = final_text or f"Agent error: {str(exc)[:300]}"
+        logger.error("Agent %s sync invoke failed: %s", agent.id, exc)
     except Exception as exc:
         exec_status = "error"
         error_message = str(exc)[:500]
-        final_text = final_text or "I encountered an error while processing your request."
-        logger.error("Agent %s sync invoke failed: %s", agent.id, exc)
+        final_text = final_text or f"Agent error: {str(exc)[:300]}"
+        logger.error("Agent %s sync invoke failed: %s", agent.id, exc, exc_info=True)
 
     elapsed_ms = int((time.monotonic() - start_time) * 1000)
     total_cost = (total_input_tokens * 0.000003) + (total_output_tokens * 0.000015)

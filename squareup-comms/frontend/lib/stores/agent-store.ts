@@ -159,7 +159,8 @@ interface AgentState {
   setAgents: (agents: Agent[]) => void;
   addAgent: (agent: Agent) => Promise<void>;
   updateAgent: (id: string, updates: Partial<Agent>) => void;
-  removeAgent: (id: string) => void;
+  persistAgentUpdate: (id: string, updates: Partial<Agent>) => Promise<void>;
+  removeAgent: (id: string) => Promise<void>;
   setSelectedAgent: (id: string | null) => void;
   addChatMessage: (agentId: string, message: AgentChatMessage) => void;
   setChatMessages: (agentId: string, messages: AgentChatMessage[]) => void;
@@ -311,11 +312,53 @@ export const useAgentStore = create<AgentState>((set) => ({
     set((s) => ({
       agents: s.agents.map((a) => (a.id === id ? { ...a, ...updates } : a)),
     })),
-  removeAgent: (id) =>
+  persistAgentUpdate: async (id, updates) => {
+    // Optimistic local update, then persist to backend
+    set((s) => ({
+      agents: s.agents.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+    }));
+    try {
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = token
+        ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+        : { "X-User-Id": getCurrentUserId(), "Content-Type": "application/json" };
+
+      const res = await fetch(`${API_URL}/api/agents/${id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        const saved: AgentResponse = await res.json();
+        set((s) => ({
+          agents: s.agents.map((a) => (a.id === id ? mapAgentResponse(saved) : a)),
+        }));
+      }
+    } catch {
+      // Optimistic update already applied; backend sync will catch up on next fetch
+    }
+  },
+  removeAgent: async (id) => {
+    // Optimistic local removal, then persist to backend
     set((s) => ({
       agents: s.agents.filter((a) => a.id !== id),
       selectedAgentId: s.selectedAgentId === id ? null : s.selectedAgentId,
-    })),
+    }));
+    try {
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = token
+        ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+        : { "X-User-Id": getCurrentUserId(), "Content-Type": "application/json" };
+
+      await fetch(`${API_URL}/api/agents/${id}`, {
+        method: "DELETE",
+        headers,
+      });
+    } catch {
+      // If delete fails, re-fetch to restore accurate state
+      useAgentStore.getState().fetchAgents();
+    }
+  },
   setSelectedAgent: (id) => set({ selectedAgentId: id }),
   addChatMessage: (agentId, message) =>
     set((s) => ({

@@ -2,11 +2,14 @@
 
 import { Agent } from "@/lib/stores/agent-store";
 import { cn } from "@/lib/utils";
-import { Bot, MessageSquare, Zap, Clock, DollarSign } from "lucide-react";
+import { Bot, MessageSquare, Zap, Clock, DollarSign, Pencil, Trash2 } from "lucide-react";
+import { useCallback, useState } from "react";
 
 interface AgentCardProps {
   agent: Agent;
   onClick: () => void;
+  onEdit?: (agent: Agent) => void;
+  onDelete?: (agent: Agent) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -17,12 +20,70 @@ const statusColors: Record<string, string> = {
   offline: "bg-gray-400",
 };
 
-export function AgentCard({ agent, onClick }: AgentCardProps) {
+export function AgentCard({ agent, onClick, onEdit, onDelete }: AgentCardProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleEdit = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onEdit?.(agent);
+    },
+    [agent, onEdit]
+  );
+
+  const handleDeleteClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (confirmDelete) {
+        onDelete?.(agent);
+        setConfirmDelete(false);
+      } else {
+        setConfirmDelete(true);
+        // Auto-reset after 3 seconds
+        setTimeout(() => setConfirmDelete(false), 3000);
+      }
+    },
+    [agent, confirmDelete, onDelete]
+  );
+
   return (
     <button
       onClick={onClick}
-      className="w-full text-left p-4 rounded-2xl border border-border bg-card hover:shadow-md hover:border-sq-agent/30 transition-all duration-200 space-y-3 group"
+      className="w-full text-left p-4 rounded-2xl border border-border bg-card hover:shadow-md hover:border-sq-agent/30 transition-all duration-200 space-y-3 group relative"
     >
+      {/* Action buttons — visible on hover */}
+      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {onEdit && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={handleEdit}
+            onKeyDown={(e) => { if (e.key === "Enter") handleEdit(e as unknown as React.MouseEvent); }}
+            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            title="Edit agent"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </span>
+        )}
+        {onDelete && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={handleDeleteClick}
+            onKeyDown={(e) => { if (e.key === "Enter") handleDeleteClick(e as unknown as React.MouseEvent); }}
+            className={cn(
+              "p-1.5 rounded-lg transition-colors",
+              confirmDelete
+                ? "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                : "hover:bg-accent text-muted-foreground hover:text-red-500"
+            )}
+            title={confirmDelete ? "Click again to confirm" : "Delete agent"}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </span>
+        )}
+      </div>
+
       {/* Header */}
       <div className="flex items-start gap-3">
         <div className="relative">
@@ -42,7 +103,7 @@ export function AgentCard({ agent, onClick }: AgentCardProps) {
           />
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pr-14">
           <h3 className="font-semibold text-sm truncate">{agent.name}</h3>
           <p className="text-xs text-muted-foreground truncate">
             {agent.description || "No description"}

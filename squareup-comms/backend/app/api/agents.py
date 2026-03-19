@@ -387,12 +387,7 @@ async def update_agent(
 
     agent = await _get_active_agent(agent_id, session)
 
-    if agent.created_by and agent.created_by != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the agent creator can update this agent.",
-        )
-
+    # Allow any team member to update agents (small team workspace)
     update_data = body.model_dump(exclude_unset=True)
 
     # Serialize list fields to JSON strings for storage
@@ -424,12 +419,7 @@ async def deactivate_agent(
 
     agent = await _get_active_agent(agent_id, session)
 
-    if agent.created_by and agent.created_by != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the agent creator can deactivate this agent.",
-        )
-
+    # Allow any team member to deactivate agents (small team workspace)
     agent.active = False
     agent.status = "offline"
     agent.updated_at = datetime.utcnow()
@@ -457,11 +447,8 @@ async def update_agent_status(
 
     agent = await _get_active_agent(agent_id, session)
 
-    if agent.created_by and agent.created_by != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the agent creator can update this agent's status.",
-        )
+    # Allow any team member to update agent status (small team workspace)
+    _ = user_id  # kept for auth dependency
 
     agent.status = body.status
     agent.current_task = body.current_task

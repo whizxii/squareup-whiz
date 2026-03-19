@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -15,8 +16,9 @@ from sqlmodel import select
 
 from app.core.auth import get_current_user
 from app.core.db import get_session
-from app.models.chat import Message, Reaction
+from app.models.chat import Message, Reaction, Channel
 from app.models.users import UserProfile
+from app.models.agents import Agent
 from app.websocket.manager import hub_manager
 
 logger = logging.getLogger(__name__)
@@ -264,6 +266,51 @@ async def send_message(
         }, exclude=user_id)
     except Exception as exc:
         logger.warning("WS broadcast failed for message %s: %s", message.id, exc)
+
+    # ── Trigger agent execution for @mentioned agents ───────────────
+    triggered_agent_ids: set[str] = set()
+    mentions_list = body.mentions or []
+    agent_mention_ids = [
+        m.get("id") for m in mentions_list
+        if isinstance(m, dict) and m.get("type") == "agent" and m.get("id")
+    ]
+
+    if agent_mention_ids:
+        from app.services.agent_engine import run_agent
+
+        for aid in agent_mention_ids:
+            agent_row = await session.get(Agent, aid)
+            if agent_row and agent_row.active:
+                triggered_agent_ids.add(aid)
+                asyncio.create_task(
+                    run_agent(
+                        agent_id=aid,
+                        trigger_message_id=message.id,
+                        channel_id=body.channel_id,
+                        user_id=user_id,
+                        content=body.content or "",
+                    )
+                )
+
+    # ── Auto-respond agents assigned to this channel ────────────────
+    try:
+        channel = await session.get(Channel, body.channel_id)
+        if channel and channel.agent_id and channel.agent_id not in triggered_agent_ids:
+            auto_agent = await session.get(Agent, channel.agent_id)
+            if auto_agent and auto_agent.active and auto_agent.trigger_mode == "auto":
+                from app.services.agent_engine import run_agent
+
+                asyncio.create_task(
+                    run_agent(
+                        agent_id=auto_agent.id,
+                        trigger_message_id=message.id,
+                        channel_id=body.channel_id,
+                        user_id=user_id,
+                        content=body.content or "",
+                    )
+                )
+    except Exception as exc:
+        logger.warning("Auto-respond agent check failed: %s", exc)
 
     return MessageResponse.from_message(message, sender_name=sender_display)
 

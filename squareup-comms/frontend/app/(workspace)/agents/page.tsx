@@ -6,6 +6,7 @@ import { AgentCard } from "@/components/agents/AgentCard";
 import { AgentChat } from "@/components/agents/AgentChat";
 import CreateAgentDialog from "@/components/agents/CreateAgentDialog";
 import AgentTemplates from "@/components/agents/AgentTemplates";
+import EditAgentDialog from "@/components/agents/EditAgentDialog";
 import {
   Bot,
   Plus,
@@ -18,6 +19,8 @@ import {
   DollarSign,
   Clock,
   CheckCircle2,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +28,7 @@ type ViewMode = "grid" | "list";
 type FilterStatus = "all" | AgentStatus;
 
 export default function AgentsPage() {
-  const { agents, selectedAgentId, setSelectedAgent, addAgent, fetchAgents } =
+  const { agents, selectedAgentId, setSelectedAgent, addAgent, fetchAgents, removeAgent } =
     useAgentStore();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
@@ -37,6 +40,7 @@ export default function AgentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
 
   const filteredAgents = agents.filter((a) => {
     if (!a.active) return false;
@@ -74,6 +78,17 @@ export default function AgentsPage() {
       setShowTemplates(false);
     },
     [addAgent]
+  );
+
+  const handleEditAgent = useCallback((agent: Agent) => {
+    setEditingAgent(agent);
+  }, []);
+
+  const handleDeleteAgent = useCallback(
+    (agent: Agent) => {
+      removeAgent(agent.id);
+    },
+    [removeAgent]
   );
 
   // Show agent chat if an agent is selected
@@ -228,6 +243,8 @@ export default function AgentsPage() {
                 key={agent.id}
                 agent={agent}
                 onClick={() => setSelectedAgent(agent.id)}
+                onEdit={handleEditAgent}
+                onDelete={handleDeleteAgent}
               />
             ))}
           </div>
@@ -240,6 +257,8 @@ export default function AgentsPage() {
                 key={agent.id}
                 agent={agent}
                 onClick={() => setSelectedAgent(agent.id)}
+                onEdit={handleEditAgent}
+                onDelete={handleDeleteAgent}
               />
             ))}
           </div>
@@ -251,6 +270,14 @@ export default function AgentsPage() {
         <CreateAgentDialog
           onClose={() => setShowCreateDialog(false)}
           onCreate={handleCreateAgent}
+        />
+      )}
+
+      {/* Edit Agent Dialog */}
+      {editingAgent && (
+        <EditAgentDialog
+          agent={editingAgent}
+          onClose={() => setEditingAgent(null)}
         />
       )}
 
@@ -274,11 +301,21 @@ const statusDot: Record<string, string> = {
   offline: "bg-gray-400",
 };
 
-function AgentListRow({ agent, onClick }: { agent: Agent; onClick: () => void }) {
+function AgentListRow({
+  agent,
+  onClick,
+  onEdit,
+  onDelete,
+}: {
+  agent: Agent;
+  onClick: () => void;
+  onEdit?: (agent: Agent) => void;
+  onDelete?: (agent: Agent) => void;
+}) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-4 px-4 py-3 border-b border-border hover:bg-accent/50 transition-colors text-left"
+      className="w-full flex items-center gap-4 px-4 py-3 border-b border-border hover:bg-accent/50 transition-colors text-left group"
     >
       <div className="relative">
         <div className="w-10 h-10 rounded-xl bg-sq-agent/10 flex items-center justify-center ring-1 ring-sq-agent/20">
@@ -334,7 +371,34 @@ function AgentListRow({ agent, onClick }: { agent: Agent; onClick: () => void })
           )}
         </div>
       )}
+
+      {/* Edit/Delete on hover */}
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        {onEdit && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onEdit(agent); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onEdit(agent); } }}
+            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            title="Edit agent"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </span>
+        )}
+        {onDelete && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onDelete(agent); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onDelete(agent); } }}
+            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-red-500 transition-colors"
+            title="Delete agent"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </span>
+        )}
+      </div>
     </button>
   );
 }
-
