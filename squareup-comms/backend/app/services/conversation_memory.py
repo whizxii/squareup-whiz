@@ -203,19 +203,19 @@ async def load_crm_intelligence(user_id: str) -> str:
     automation reviews — giving Donna situational awareness without requiring
     the user to ask.
     """
-    import json
-    from datetime import timedelta
-
-    from sqlmodel import select as _select
-
-    from app.models.ai_insight import AIInsight
-    from app.models.automation_log import AutomationLog
-    from app.models.crm import CRMDeal
-
     parts: list[str] = []
-    cutoff = datetime.utcnow() - timedelta(days=7)
 
     try:
+        import json
+        from datetime import timedelta
+
+        from sqlmodel import select as _select
+
+        from app.models.ai_insight import AIInsight
+        from app.models.automation_log import AutomationLog
+        from app.models.crm import CRMDeal
+
+        cutoff = datetime.utcnow() - timedelta(days=7)
         async with async_session() as session:
             # Recent high-priority unread insights
             stmt = (

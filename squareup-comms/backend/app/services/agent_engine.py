@@ -220,11 +220,28 @@ async def run_agent(
         return
     stream_message_id = str(uuid.uuid4())
 
-    # 2. Build context
-    history = await load_conversation_context(channel_id, agent.id, limit=20)
-    memory_facts = await load_agent_memory(agent.id, user_id)
-    crm_intelligence = await load_crm_intelligence(user_id)
-    system_prompt = build_system_prompt(agent, memory_facts, crm_intelligence=crm_intelligence)
+    # 2. Build context — wrapped in try/except so a crash here (e.g. unmigrated
+    #    models in load_crm_intelligence) doesn't leave the agent stuck "working".
+    try:
+        history = await load_conversation_context(channel_id, agent.id, limit=20)
+        memory_facts = await load_agent_memory(agent.id, user_id)
+        crm_intelligence = await load_crm_intelligence(user_id)
+        system_prompt = build_system_prompt(agent, memory_facts, crm_intelligence=crm_intelligence)
+    except Exception as ctx_exc:
+        logger.error("Agent %s (%s): context build failed: %s", agent.id, agent.name, ctx_exc, exc_info=True)
+        await _broadcast_error(
+            channel_id, agent.id,
+            "Something went wrong preparing my context. Please try again.",
+        )
+        async with async_session() as session:
+            db_agent = await session.get(Agent, agent.id)
+            if db_agent:
+                db_agent.status = "idle"
+                db_agent.current_task = None
+                session.add(db_agent)
+                await session.commit()
+        await _broadcast_status(channel_id, agent.id, "idle")
+        return
 
     # Start with history + trigger message
     messages: list[dict] = [*history, {"role": "user", "content": content}]
@@ -233,13 +250,29 @@ async def run_agent(
     messages = _ensure_alternating_roles(messages)
 
     # 3. Build tools (built-in + custom + MCP)
-    tools = await tool_registry.get_tools_for_agent(
-        agent.tools or "[]",
-        user_id,
-        custom_tools_json=agent.custom_tools,
-        mcp_servers_json=agent.mcp_servers,
-    )
-    tool_schemas = [t.to_claude_schema() for t in tools]
+    try:
+        tools = await tool_registry.get_tools_for_agent(
+            agent.tools or "[]",
+            user_id,
+            custom_tools_json=agent.custom_tools,
+            mcp_servers_json=agent.mcp_servers,
+        )
+        tool_schemas = [t.to_claude_schema() for t in tools]
+    except Exception as tool_exc:
+        logger.error("Agent %s (%s): tool build failed: %s", agent.id, agent.name, tool_exc, exc_info=True)
+        await _broadcast_error(
+            channel_id, agent.id,
+            "Something went wrong loading my tools. Please try again.",
+        )
+        async with async_session() as session:
+            db_agent = await session.get(Agent, agent.id)
+            if db_agent:
+                db_agent.status = "idle"
+                db_agent.current_task = None
+                session.add(db_agent)
+                await session.commit()
+        await _broadcast_status(channel_id, agent.id, "idle")
+        return
     tool_context = ToolContext(user_id=user_id, channel_id=channel_id, agent_id=agent.id)
 
     tool_calls_log: list[dict] = []
@@ -599,18 +632,52 @@ async def invoke_agent_sync(
         )
 
     # 2. Build context — no channel context for direct invoke (chat panel)
-    memory_facts = await load_agent_memory(agent.id, user_id)
-    system_prompt = build_system_prompt(agent, memory_facts)
+    try:
+        memory_facts = await load_agent_memory(agent.id, user_id)
+        system_prompt = build_system_prompt(agent, memory_facts)
+    except Exception as ctx_exc:
+        logger.error("Agent %s (%s): sync context build failed: %s", agent.id, agent.name, ctx_exc, exc_info=True)
+        async with async_session() as session:
+            db_agent = await session.get(Agent, agent.id)
+            if db_agent:
+                db_agent.status = "idle"
+                db_agent.current_task = None
+                session.add(db_agent)
+                await session.commit()
+        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+        return InvokeResult(
+            response_text="Something went wrong preparing my context. Please try again.",
+            tool_calls_log=[], input_tokens=0, output_tokens=0,
+            total_cost_usd=0, duration_ms=elapsed_ms, status="error",
+            error_message=str(ctx_exc)[:500],
+        )
     messages: list[dict] = [{"role": "user", "content": content}]
 
     # 3. Build tools
-    tools = await tool_registry.get_tools_for_agent(
-        agent.tools or "[]",
-        user_id,
-        custom_tools_json=agent.custom_tools,
-        mcp_servers_json=agent.mcp_servers,
-    )
-    tool_schemas = [t.to_claude_schema() for t in tools]
+    try:
+        tools = await tool_registry.get_tools_for_agent(
+            agent.tools or "[]",
+            user_id,
+            custom_tools_json=agent.custom_tools,
+            mcp_servers_json=agent.mcp_servers,
+        )
+        tool_schemas = [t.to_claude_schema() for t in tools]
+    except Exception as tool_exc:
+        logger.error("Agent %s (%s): sync tool build failed: %s", agent.id, agent.name, tool_exc, exc_info=True)
+        async with async_session() as session:
+            db_agent = await session.get(Agent, agent.id)
+            if db_agent:
+                db_agent.status = "idle"
+                db_agent.current_task = None
+                session.add(db_agent)
+                await session.commit()
+        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+        return InvokeResult(
+            response_text="Something went wrong loading my tools. Please try again.",
+            tool_calls_log=[], input_tokens=0, output_tokens=0,
+            total_cost_usd=0, duration_ms=elapsed_ms, status="error",
+            error_message=str(tool_exc)[:500],
+        )
     tool_context = ToolContext(user_id=user_id, channel_id="direct", agent_id=agent.id)
 
     tool_calls_log: list[dict] = []
