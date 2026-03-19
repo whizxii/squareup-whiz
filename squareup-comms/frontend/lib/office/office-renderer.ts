@@ -142,9 +142,6 @@ export function renderFloor(
     renderConcreteFloor(ctx, cols, rows, palette, isDark);
   }
 
-  // Walls with depth effect
-  renderWalls(ctx, cols, rows, palette, isDark);
-
   // Edge vignette for depth
   const vignette = ctx.createRadialGradient(w / 2, h / 2, w * 0.25, w / 2, h / 2, w * 0.65);
   vignette.addColorStop(0, "transparent");
@@ -1031,16 +1028,85 @@ function drawDivider(ctx: CanvasRenderingContext2D, x: number, y: number, isDark
 // Main furniture dispatcher
 // ---------------------------------------------------------------------------
 
+/** Screen-pixel height of the iso 3D side walls per furniture type */
+const FURNITURE_HEIGHTS: Readonly<Record<string, number>> = {
+  desk: 8,
+  chair: 6,
+  plant: 10,
+  coffee_machine: 8,
+  bookshelf: 12,
+  whiteboard: 12,
+  server_rack: 14,
+  lamp: 5,
+  rug: 0,
+  divider: 14,
+};
+
+/**
+ * Draws the SW and SE side walls for an iso furniture item in screen space.
+ * Must be called while the iso transform is still active on ctx —
+ * internally saves/resets/restores the transform.
+ */
+function drawFurnitureSideWalls(
+  ctx: CanvasRenderingContext2D,
+  tx: number,
+  ty: number,
+  tw: number,
+  th: number,
+  rows: number,
+  sideH: number,
+  isDark: boolean
+): void {
+  const T = TILE;
+  // Diamond vertices in CSS logical pixels (iso screen space)
+  const east  = { x: (tx + tw - ty + rows) * T,      y: (tx + tw + ty) * T / 2 };
+  const south = { x: (tx + tw - ty - th + rows) * T,  y: (tx + tw + ty + th) * T / 2 };
+  const west  = { x: (tx - ty - th + rows) * T,       y: (tx + ty + th) * T / 2 };
+
+  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+
+  ctx.save();
+  ctx.resetTransform();
+  ctx.scale(dpr, dpr);
+
+  // SW face (west→south): left visible wall (medium shade)
+  ctx.fillStyle = isDark ? "rgba(0,0,0,0.55)" : "rgba(80,55,30,0.55)";
+  ctx.beginPath();
+  ctx.moveTo(west.x, west.y);
+  ctx.lineTo(south.x, south.y);
+  ctx.lineTo(south.x, south.y + sideH);
+  ctx.lineTo(west.x, west.y + sideH);
+  ctx.closePath();
+  ctx.fill();
+
+  // SE face (east→south): right visible wall (darker shade)
+  ctx.fillStyle = isDark ? "rgba(0,0,0,0.72)" : "rgba(50,30,10,0.70)";
+  ctx.beginPath();
+  ctx.moveTo(east.x, east.y);
+  ctx.lineTo(south.x, south.y);
+  ctx.lineTo(south.x, south.y + sideH);
+  ctx.lineTo(east.x, east.y + sideH);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
 export function renderFurniture(
   ctx: CanvasRenderingContext2D,
   furniture: readonly OfficeFurniture[],
   isDark: boolean,
-  lampsOn: boolean
+  lampsOn: boolean,
+  gridRows: number
 ): void {
-  // Sort by Y for correct depth ordering
-  const sorted = [...furniture].sort((a, b) => a.y - b.y);
+  // Iso painter's algorithm: sort back-to-front by (x+y) sum
+  const sorted = [...furniture].sort((a, b) => (a.x + a.y) - (b.x + b.y));
 
   for (const item of sorted) {
+    const sideH = FURNITURE_HEIGHTS[item.type] ?? 6;
+    if (sideH > 0) {
+      drawFurnitureSideWalls(ctx, item.x, item.y, item.width, item.height, gridRows, sideH, isDark);
+    }
     switch (item.type) {
       case "desk":
         drawDesk(ctx, item.x, item.y, isDark);

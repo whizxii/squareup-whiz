@@ -59,14 +59,17 @@ export function useOfficeCamera(config: UseCameraConfig): CameraState {
       }
     }
 
-    const playerCenterX = (focusX + 0.5) * TILE * zoom;
-    const playerCenterY = (focusY + 0.5) * TILE * zoom;
+    // Iso screen position of focus tile (matches tileToIso formula)
+    const isoX = (focusX - focusY) * TILE + layout.gridRows * TILE;
+    const isoY = (focusX + focusY + 1) * (TILE / 2);
+    const playerCenterX = isoX * zoom;
+    const playerCenterY = isoY * zoom;
 
     const targetX = viewW / 2 - playerCenterX;
     const targetY = viewH / 2 - playerCenterY;
 
-    const totalW = layout.gridCols * TILE * zoom;
-    const totalH = layout.gridRows * TILE * zoom;
+    const totalW = (layout.gridCols + layout.gridRows) * TILE * zoom;
+    const totalH = (layout.gridCols + layout.gridRows) * (TILE / 2) * zoom;
 
     // When viewport is larger than office, center the office.
     // When office is larger, clamp so edges don't go past viewport edges.

@@ -81,7 +81,7 @@ export default function OfficeCanvas({ onClick }: OfficeCanvasProps) {
     ctx.clearRect(0, 0, canvasW, canvasH);
     ctx.transform(1, 0.5, -1, 0.5, gridRows * TILE, 0);
     renderZones(ctx, zones, showGrid);
-    renderFurniture(ctx, furniture, isDark, dayPhase === "dusk" || dayPhase === "night");
+    renderFurniture(ctx, furniture, isDark, dayPhase === "dusk" || dayPhase === "night", gridRows);
     if (showGrid) {
       renderGrid(ctx, gridCols, gridRows, isDark);
     }
