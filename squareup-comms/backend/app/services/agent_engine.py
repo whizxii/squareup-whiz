@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import logging
@@ -9,6 +10,9 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+
+# Maximum seconds to wait for a single LLM streaming response before timing out.
+LLM_STREAM_TIMEOUT = 120
 
 from sqlmodel import select
 from sqlalchemy import func
@@ -259,25 +263,26 @@ async def run_agent(
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            # Stream LLM response
-            async for event in llm.stream_with_tools(
-                system=system_prompt,
-                messages=messages,
-                tools=tool_schemas if tool_schemas else None,
-                model=resolved_model,
-                max_tokens=4096,
-                temperature=temperature,
-            ):
-                if isinstance(event, TextDelta):
-                    text_parts.append(event.text)
-                    await _broadcast_text_delta(
-                        channel_id, agent.id, stream_message_id, event.text,
-                    )
-                elif isinstance(event, ToolUseComplete):
-                    tool_use_blocks.append(event)
-                elif isinstance(event, UsageUpdate):
-                    total_input_tokens += event.input_tokens
-                    total_output_tokens += event.output_tokens
+            # Stream LLM response (with timeout to prevent infinite hangs)
+            async with asyncio.timeout(LLM_STREAM_TIMEOUT):
+                async for event in llm.stream_with_tools(
+                    system=system_prompt,
+                    messages=messages,
+                    tools=tool_schemas if tool_schemas else None,
+                    model=resolved_model,
+                    max_tokens=4096,
+                    temperature=temperature,
+                ):
+                    if isinstance(event, TextDelta):
+                        text_parts.append(event.text)
+                        await _broadcast_text_delta(
+                            channel_id, agent.id, stream_message_id, event.text,
+                        )
+                    elif isinstance(event, ToolUseComplete):
+                        tool_use_blocks.append(event)
+                    elif isinstance(event, UsageUpdate):
+                        total_input_tokens += event.input_tokens
+                        total_output_tokens += event.output_tokens
 
             full_text = "".join(text_parts)
 
@@ -351,6 +356,16 @@ async def run_agent(
         if not final_text and iteration >= max_iterations:
             final_text = "I've reached my maximum number of reasoning steps. Here's what I found so far."
 
+    except TimeoutError:
+        logger.error(
+            "Agent %s (%s): LLM stream timed out after %ds (provider=%s, iteration=%d)",
+            agent.id, agent.name, LLM_STREAM_TIMEOUT, llm.PROVIDER, iteration,
+        )
+        exec_status = "error"
+        error_message = f"LLM provider ({llm.PROVIDER}) timed out after {LLM_STREAM_TIMEOUT}s"
+        final_text = "I'm taking too long to respond. Please try again — if this keeps happening, the request may be too complex for a single message."
+        await _broadcast_error(channel_id, agent.id, final_text)
+
     except Exception as exc:
         # Try fallback provider before giving up
         fallback = get_fallback_client(llm.PROVIDER)
@@ -363,22 +378,23 @@ async def run_agent(
             try:
                 fallback_model = fallback.DEFAULT_MODEL
                 text_parts_fb: list[str] = []
-                async for event in fallback.stream_with_tools(
-                    system=system_prompt,
-                    messages=messages,
-                    tools=tool_schemas if tool_schemas else None,
-                    model=fallback_model,
-                    max_tokens=4096,
-                    temperature=temperature,
-                ):
-                    if isinstance(event, TextDelta):
-                        text_parts_fb.append(event.text)
-                        await _broadcast_text_delta(
-                            channel_id, agent.id, stream_message_id, event.text,
-                        )
-                    elif isinstance(event, UsageUpdate):
-                        total_input_tokens += event.input_tokens
-                        total_output_tokens += event.output_tokens
+                async with asyncio.timeout(LLM_STREAM_TIMEOUT):
+                    async for event in fallback.stream_with_tools(
+                        system=system_prompt,
+                        messages=messages,
+                        tools=tool_schemas if tool_schemas else None,
+                        model=fallback_model,
+                        max_tokens=4096,
+                        temperature=temperature,
+                    ):
+                        if isinstance(event, TextDelta):
+                            text_parts_fb.append(event.text)
+                            await _broadcast_text_delta(
+                                channel_id, agent.id, stream_message_id, event.text,
+                            )
+                        elif isinstance(event, UsageUpdate):
+                            total_input_tokens += event.input_tokens
+                            total_output_tokens += event.output_tokens
 
                 final_text = "".join(text_parts_fb)
                 llm = fallback  # Use fallback provider for cost calculation
@@ -618,21 +634,22 @@ async def invoke_agent_sync(
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            async for event in llm.stream_with_tools(
-                system=system_prompt,
-                messages=messages,
-                tools=tool_schemas if tool_schemas else None,
-                model=resolved_model,
-                max_tokens=4096,
-                temperature=temperature,
-            ):
-                if isinstance(event, TextDelta):
-                    text_parts.append(event.text)
-                elif isinstance(event, ToolUseComplete):
-                    tool_use_blocks.append(event)
-                elif isinstance(event, UsageUpdate):
-                    total_input_tokens += event.input_tokens
-                    total_output_tokens += event.output_tokens
+            async with asyncio.timeout(LLM_STREAM_TIMEOUT):
+                async for event in llm.stream_with_tools(
+                    system=system_prompt,
+                    messages=messages,
+                    tools=tool_schemas if tool_schemas else None,
+                    model=resolved_model,
+                    max_tokens=4096,
+                    temperature=temperature,
+                ):
+                    if isinstance(event, TextDelta):
+                        text_parts.append(event.text)
+                    elif isinstance(event, ToolUseComplete):
+                        tool_use_blocks.append(event)
+                    elif isinstance(event, UsageUpdate):
+                        total_input_tokens += event.input_tokens
+                        total_output_tokens += event.output_tokens
 
             full_text = "".join(text_parts)
 
@@ -691,6 +708,15 @@ async def invoke_agent_sync(
         if not final_text and iteration >= max_iterations:
             final_text = "I've reached my maximum number of reasoning steps. Here's what I found so far."
 
+    except TimeoutError:
+        logger.error(
+            "Agent %s (%s): sync LLM stream timed out after %ds (provider=%s, iteration=%d)",
+            agent.id, agent.name, LLM_STREAM_TIMEOUT, llm.PROVIDER, iteration,
+        )
+        exec_status = "error"
+        error_message = f"LLM provider ({llm.PROVIDER}) timed out after {LLM_STREAM_TIMEOUT}s"
+        final_text = "I'm taking too long to respond. Please try again — if this keeps happening, the request may be too complex for a single message."
+
     except Exception as exc:
         # Try fallback provider before giving up
         fallback = get_fallback_client(llm.PROVIDER)
@@ -702,19 +728,20 @@ async def invoke_agent_sync(
             try:
                 fallback_model = fallback.DEFAULT_MODEL
                 text_parts_fb: list[str] = []
-                async for event in fallback.stream_with_tools(
-                    system=system_prompt,
-                    messages=messages,
-                    tools=tool_schemas if tool_schemas else None,
-                    model=fallback_model,
-                    max_tokens=4096,
-                    temperature=temperature,
-                ):
-                    if isinstance(event, TextDelta):
-                        text_parts_fb.append(event.text)
-                    elif isinstance(event, UsageUpdate):
-                        total_input_tokens += event.input_tokens
-                        total_output_tokens += event.output_tokens
+                async with asyncio.timeout(LLM_STREAM_TIMEOUT):
+                    async for event in fallback.stream_with_tools(
+                        system=system_prompt,
+                        messages=messages,
+                        tools=tool_schemas if tool_schemas else None,
+                        model=fallback_model,
+                        max_tokens=4096,
+                        temperature=temperature,
+                    ):
+                        if isinstance(event, TextDelta):
+                            text_parts_fb.append(event.text)
+                        elif isinstance(event, UsageUpdate):
+                            total_input_tokens += event.input_tokens
+                            total_output_tokens += event.output_tokens
                 final_text = "".join(text_parts_fb)
                 llm = fallback
             except Exception as fb_exc:

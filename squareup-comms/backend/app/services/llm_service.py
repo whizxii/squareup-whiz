@@ -84,7 +84,10 @@ class GeminiLLMClient:
 
     def __init__(self, api_key: str) -> None:
         from google import genai
-        self._client = genai.Client(api_key=api_key)
+        self._client = genai.Client(
+            api_key=api_key,
+            http_options={"timeout": 90_000},  # 90s HTTP timeout in milliseconds
+        )
         self._genai_types = __import__("google.genai.types", fromlist=["types"])
 
     def _convert_tools_to_gemini(self, tools: list[dict] | None) -> list | None:
@@ -312,7 +315,10 @@ class AnthropicLLMClient:
 
     def __init__(self, api_key: str) -> None:
         from anthropic import AsyncAnthropic
-        self._client = AsyncAnthropic(api_key=api_key)
+        self._client = AsyncAnthropic(
+            api_key=api_key,
+            timeout=90.0,  # 90s HTTP timeout
+        )
 
     async def stream_with_tools(
         self,
@@ -436,6 +442,7 @@ class GroqLLMClient:
         self._client = AsyncOpenAI(
             api_key=api_key,
             base_url=settings.LLM_BASE_URL,
+            timeout=90.0,  # 90s HTTP timeout
         )
 
     def _convert_tools_to_openai(self, tools: list[dict] | None) -> list[dict] | None:
