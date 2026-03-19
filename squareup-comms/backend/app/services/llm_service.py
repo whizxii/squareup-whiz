@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Union
 
 from app.core.config import settings
 
@@ -52,7 +52,7 @@ class MessageComplete:
     stop_reason: str | None
 
 
-StreamEvent = TextDelta | ToolUseStart | ToolUseComplete | UsageUpdate | MessageComplete
+StreamEvent = Union[TextDelta, ToolUseStart, ToolUseComplete, UsageUpdate, MessageComplete]
 
 
 # ---------------------------------------------------------------------------
@@ -647,7 +647,7 @@ class GroqLLMClient:
 # Client type alias
 # ---------------------------------------------------------------------------
 
-LLMClient = GeminiLLMClient | AnthropicLLMClient | GroqLLMClient
+LLMClient = Union[GeminiLLMClient, AnthropicLLMClient, GroqLLMClient]
 
 
 # ---------------------------------------------------------------------------

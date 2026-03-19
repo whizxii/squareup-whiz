@@ -5,6 +5,8 @@ Dual-mode auth:
 - Dev mode (ENABLE_DEV_AUTH=true): Falls back to X-User-Id header
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import threading
