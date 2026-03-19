@@ -7,6 +7,7 @@
 
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import type {
   Contact,
   Company,
@@ -119,7 +120,7 @@ class CRMApiClient {
     path: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await fetchWithRetry(`${this.baseUrl}${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
