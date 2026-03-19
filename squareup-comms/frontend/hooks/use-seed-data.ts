@@ -4,11 +4,21 @@ import { useEffect, useRef } from "react";
 import { useAuthStore } from "@/lib/stores/auth-store";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const SEED_KEY = "squareup-comms-seeded";
+const SEED_KEY = "squareup-comms-seeded-v2";
 
 export function useSeedData() {
   const seeded = useRef(false);
   const token = useAuthStore((s) => s.token);
+
+  // Always seed agents (idempotent — backend checks by name, skips existing)
+  useEffect(() => {
+    if (!token) return;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
+    fetch(`${API_URL}/api/agents/seed`, { method: "POST", headers }).catch(() => {});
+  }, [token]);
 
   useEffect(() => {
     if (seeded.current) return;
@@ -47,12 +57,6 @@ export function useSeedData() {
             }),
           ]);
         }
-
-        // Seed agents
-        await fetch(`${API_URL}/api/agents/seed`, {
-          method: "POST",
-          headers,
-        });
 
         // Check if contacts exist
         const contactsRes = await fetch(`${API_URL}/api/crm/contacts`, { headers });
