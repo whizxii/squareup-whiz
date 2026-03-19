@@ -244,13 +244,20 @@ async def run_agent(
     exec_status = "success"
     error_message: str | None = None
 
+    resolved_model = resolve_model_for_client(llm, agent.model)
+    logger.info(
+        "Agent %s (%s): starting ReAct loop — provider=%s, resolved_model=%s, "
+        "tools=%d, system_prompt_len=%d",
+        agent.id, agent.name, llm.PROVIDER, resolved_model,
+        len(tool_schemas), len(system_prompt),
+    )
+
     try:
         while iteration < max_iterations:
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            # Stream LLM response (resolve model to match the selected provider)
-            resolved_model = resolve_model_for_client(llm, agent.model)
+            # Stream LLM response
             async for event in llm.stream_with_tools(
                 system=system_prompt,
                 messages=messages,
@@ -596,12 +603,19 @@ async def invoke_agent_sync(
     exec_status = "success"
     error_message: str | None = None
 
+    resolved_model = resolve_model_for_client(llm, agent.model)
+    logger.info(
+        "Agent %s (%s): starting direct invoke — provider=%s, resolved_model=%s, "
+        "tools=%d, system_prompt_len=%d",
+        agent.id, agent.name, llm.PROVIDER, resolved_model,
+        len(tool_schemas), len(system_prompt),
+    )
+
     try:
         while iteration < max_iterations:
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            resolved_model = resolve_model_for_client(llm, agent.model)
             async for event in llm.stream_with_tools(
                 system=system_prompt,
                 messages=messages,

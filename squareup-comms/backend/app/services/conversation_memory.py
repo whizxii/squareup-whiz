@@ -208,8 +208,8 @@ def build_system_prompt(agent: Agent, memory_facts: str) -> str:
     if agent.system_prompt:
         parts.append(f"## Your Role\n{agent.system_prompt}")
 
-    # Inject few-shot examples for Donna (strict name match)
-    if agent.name and agent.name.strip().lower() == "donna":
+    # Inject few-shot examples for Donna (matches "@donna", "donna", etc.)
+    if agent.name and "donna" in agent.name.strip().lower():
         parts.append(DONNA_FEW_SHOT_EXAMPLES)
 
     # Inject persistent memory facts
