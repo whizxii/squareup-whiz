@@ -215,7 +215,7 @@ class GeminiLLMClient:
         tracked_input = 0
         tracked_output = 0
 
-        async for chunk in self._client.aio.models.generate_content_stream(
+        async for chunk in await self._client.aio.models.generate_content_stream(
             model=model,
             contents=gemini_contents,
             config=config,
