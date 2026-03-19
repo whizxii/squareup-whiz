@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import time
@@ -22,10 +23,11 @@ from app.services.conversation_memory import (
     load_conversation_context,
 )
 from app.services.llm_service import (
-    MessageComplete,
     TextDelta,
     ToolUseComplete,
     UsageUpdate,
+    calculate_cost,
+    get_fallback_client,
     get_llm_client,
 )
 from app.services.tools import tool_registry
@@ -39,8 +41,11 @@ logger = logging.getLogger(__name__)
 # WebSocket broadcast helpers
 # ---------------------------------------------------------------------------
 
-async def _broadcast(channel_id: str, event: dict) -> None:
-    """Broadcast an event to all WebSocket clients."""
+async def _broadcast(_channel_id: str, event: dict) -> None:
+    """Broadcast an event to all WebSocket clients.
+
+    TODO: scope to channel once hub_manager supports channel-targeted broadcast.
+    """
     await hub_manager.broadcast_all(event)
 
 
@@ -190,7 +195,23 @@ async def run_agent(
     await _broadcast_status(channel_id, agent.id, "thinking")
 
     max_iterations = agent.max_iterations or 5
-    llm = get_llm_client(agent.model)
+    temperature = agent.temperature if agent.temperature is not None else 0.7
+    try:
+        llm = get_llm_client(agent.model)
+    except RuntimeError as exc:
+        logger.error("No LLM client available: %s", exc)
+        await _broadcast_error(
+            channel_id, agent_id,
+            "No LLM API key is configured. Set GEMINI_API_KEY (free), GROQ_API_KEY, or ANTHROPIC_API_KEY.",
+        )
+        async with async_session() as session:
+            db_agent = await session.get(Agent, agent.id)
+            if db_agent:
+                db_agent.status = "idle"
+                db_agent.current_task = None
+                session.add(db_agent)
+                await session.commit()
+        return
     stream_message_id = str(uuid.uuid4())
 
     # 2. Build context
@@ -234,7 +255,7 @@ async def run_agent(
                 tools=tool_schemas if tool_schemas else None,
                 model=agent.model,
                 max_tokens=4096,
-                temperature=agent.temperature,
+                temperature=temperature,
             ):
                 if isinstance(event, TextDelta):
                     text_parts.append(event.text)
@@ -287,6 +308,7 @@ async def run_agent(
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tu.tool_use_id,
+                    "name": tu.name,
                     "content": output_str[:10000],
                     "is_error": not result.success,
                 })
@@ -311,29 +333,53 @@ async def run_agent(
         if not final_text and iteration >= max_iterations:
             final_text = "I've reached my maximum number of reasoning steps. Here's what I found so far."
 
-    except RuntimeError as exc:
-        exec_status = "error"
-        error_message = str(exc)[:500]
-        # Surface the actual error so users know what to fix
-        if "No LLM API key configured" in str(exc):
-            final_text = (
-                "No LLM API key is configured on the server. "
-                "Please set ANTHROPIC_API_KEY or GROQ_API_KEY in the backend environment variables."
-            )
-        else:
-            final_text = final_text or f"Agent error: {str(exc)[:300]}"
-        logger.error("Agent %s execution failed: %s", agent.id, exc)
-        await _broadcast_error(channel_id, agent.id, final_text[:500])
     except Exception as exc:
-        exec_status = "error"
-        error_message = str(exc)[:500]
-        final_text = final_text or f"Agent error: {str(exc)[:300]}"
-        logger.error("Agent %s execution failed: %s", agent.id, exc, exc_info=True)
-        await _broadcast_error(channel_id, agent.id, final_text[:500])
+        # Try fallback provider before giving up
+        fallback = get_fallback_client(llm.PROVIDER)
+        if fallback:
+            logger.warning(
+                "Agent %s primary LLM (%s) failed on iteration %d: %s. Trying fallback (%s).",
+                agent.id, llm.PROVIDER, iteration, exc, fallback.PROVIDER,
+            )
+            await _broadcast_status(channel_id, agent.id, "thinking")
+            try:
+                fallback_model = fallback.DEFAULT_MODEL
+                text_parts_fb: list[str] = []
+                async for event in fallback.stream_with_tools(
+                    system=system_prompt,
+                    messages=messages,
+                    tools=tool_schemas if tool_schemas else None,
+                    model=fallback_model,
+                    max_tokens=4096,
+                    temperature=temperature,
+                ):
+                    if isinstance(event, TextDelta):
+                        text_parts_fb.append(event.text)
+                        await _broadcast_text_delta(
+                            channel_id, agent.id, stream_message_id, event.text,
+                        )
+                    elif isinstance(event, UsageUpdate):
+                        total_input_tokens += event.input_tokens
+                        total_output_tokens += event.output_tokens
+
+                final_text = "".join(text_parts_fb)
+                llm = fallback  # Use fallback provider for cost calculation
+            except Exception as fb_exc:
+                exec_status = "error"
+                error_message = f"Primary ({llm.PROVIDER}): {str(exc)[:200]}. Fallback ({fallback.PROVIDER}): {str(fb_exc)[:200]}"
+                final_text = final_text or f"Agent error: both LLM providers failed. {str(exc)[:200]}"
+                logger.error("Agent %s fallback also failed: %s", agent.id, fb_exc)
+                await _broadcast_error(channel_id, agent.id, final_text[:500])
+        else:
+            exec_status = "error"
+            error_message = str(exc)[:500]
+            final_text = final_text or f"Agent error: {str(exc)[:300]}"
+            logger.error("Agent %s execution failed: %s", agent.id, exc, exc_info=True)
+            await _broadcast_error(channel_id, agent.id, final_text[:500])
 
     elapsed_ms = int((time.monotonic() - start_time) * 1000)
-    # Claude pricing approximation (sonnet)
-    total_cost = (total_input_tokens * 0.000003) + (total_output_tokens * 0.000015)
+    # Per-provider cost calculation
+    total_cost = calculate_cost(llm.PROVIDER, total_input_tokens, total_output_tokens)
 
     # 5. Save message + execution + reset agent status atomically
     now = datetime.utcnow()
@@ -369,12 +415,22 @@ async def run_agent(
             )
             session.add(execution)
 
-            # Update agent stats (including budget tracking)
+            # Update agent stats (including budget tracking + success rate)
             db_agent = await session.get(Agent, agent.id)
             if db_agent:
                 db_agent.status = "idle"
                 db_agent.current_task = None
-                db_agent.total_executions += 1
+
+                # Incrementally recalculate success_rate (no intermediate rounding)
+                prev_total = db_agent.total_executions
+                is_success = 1 if exec_status == "success" else 0
+                new_total = prev_total + 1
+                prev_rate_fraction = (db_agent.success_rate / 100.0) if prev_total > 0 else 0.0
+                db_agent.success_rate = round(
+                    ((prev_rate_fraction * prev_total) + is_success) / new_total * 100.0, 1
+                )
+
+                db_agent.total_executions = new_total
                 db_agent.total_cost_usd += total_cost
                 # Track monthly cost for budget enforcement
                 current_month = now.strftime("%Y-%m")
@@ -488,7 +544,25 @@ async def invoke_agent_sync(
         await session.commit()
 
     max_iterations = agent.max_iterations or 5
-    llm = get_llm_client(agent.model)
+    temperature = agent.temperature if agent.temperature is not None else 0.7
+    try:
+        llm = get_llm_client(agent.model)
+    except RuntimeError as exc:
+        # Reset agent status so it doesn't stay stuck as "working"
+        async with async_session() as session:
+            db_agent = await session.get(Agent, agent.id)
+            if db_agent:
+                db_agent.status = "idle"
+                db_agent.current_task = None
+                session.add(db_agent)
+                await session.commit()
+        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+        return InvokeResult(
+            response_text="No LLM API key is configured. Set GEMINI_API_KEY (free), GROQ_API_KEY, or ANTHROPIC_API_KEY.",
+            tool_calls_log=[], input_tokens=0, output_tokens=0,
+            total_cost_usd=0, duration_ms=elapsed_ms, status="error",
+            error_message=str(exc)[:500],
+        )
 
     # 2. Build context — no channel context for direct invoke (chat panel)
     memory_facts = await load_agent_memory(agent.id, user_id)
@@ -524,7 +598,7 @@ async def invoke_agent_sync(
                 tools=tool_schemas if tool_schemas else None,
                 model=agent.model,
                 max_tokens=4096,
-                temperature=agent.temperature,
+                temperature=temperature,
             ):
                 if isinstance(event, TextDelta):
                     text_parts.append(event.text)
@@ -564,6 +638,7 @@ async def invoke_agent_sync(
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tu.tool_use_id,
+                    "name": tu.name,
                     "content": output_str[:10000],
                     "is_error": not result.success,
                 })
@@ -583,25 +658,45 @@ async def invoke_agent_sync(
         if not final_text and iteration >= max_iterations:
             final_text = "I've reached my maximum number of reasoning steps. Here's what I found so far."
 
-    except RuntimeError as exc:
-        exec_status = "error"
-        error_message = str(exc)[:500]
-        if "No LLM API key configured" in str(exc):
-            final_text = (
-                "No LLM API key is configured on the server. "
-                "Please set ANTHROPIC_API_KEY or GROQ_API_KEY in the backend environment variables."
-            )
-        else:
-            final_text = final_text or f"Agent error: {str(exc)[:300]}"
-        logger.error("Agent %s sync invoke failed: %s", agent.id, exc)
     except Exception as exc:
-        exec_status = "error"
-        error_message = str(exc)[:500]
-        final_text = final_text or f"Agent error: {str(exc)[:300]}"
-        logger.error("Agent %s sync invoke failed: %s", agent.id, exc, exc_info=True)
+        # Try fallback provider before giving up
+        fallback = get_fallback_client(llm.PROVIDER)
+        if fallback:
+            logger.warning(
+                "Agent %s sync primary (%s) failed on iteration %d: %s. Trying fallback (%s).",
+                agent.id, llm.PROVIDER, iteration, exc, fallback.PROVIDER,
+            )
+            try:
+                fallback_model = fallback.DEFAULT_MODEL
+                text_parts_fb: list[str] = []
+                async for event in fallback.stream_with_tools(
+                    system=system_prompt,
+                    messages=messages,
+                    tools=tool_schemas if tool_schemas else None,
+                    model=fallback_model,
+                    max_tokens=4096,
+                    temperature=temperature,
+                ):
+                    if isinstance(event, TextDelta):
+                        text_parts_fb.append(event.text)
+                    elif isinstance(event, UsageUpdate):
+                        total_input_tokens += event.input_tokens
+                        total_output_tokens += event.output_tokens
+                final_text = "".join(text_parts_fb)
+                llm = fallback
+            except Exception as fb_exc:
+                exec_status = "error"
+                error_message = f"Primary ({llm.PROVIDER}): {str(exc)[:200]}. Fallback ({fallback.PROVIDER}): {str(fb_exc)[:200]}"
+                final_text = final_text or f"Agent error: both LLM providers failed. {str(exc)[:200]}"
+                logger.error("Agent %s sync fallback also failed: %s", agent.id, fb_exc)
+        else:
+            exec_status = "error"
+            error_message = str(exc)[:500]
+            final_text = final_text or f"Agent error: {str(exc)[:300]}"
+            logger.error("Agent %s sync invoke failed: %s", agent.id, exc, exc_info=True)
 
     elapsed_ms = int((time.monotonic() - start_time) * 1000)
-    total_cost = (total_input_tokens * 0.000003) + (total_output_tokens * 0.000015)
+    total_cost = calculate_cost(llm.PROVIDER, total_input_tokens, total_output_tokens)
 
     # Save execution record + update agent stats
     now = datetime.utcnow()
@@ -628,7 +723,17 @@ async def invoke_agent_sync(
             if db_agent:
                 db_agent.status = "idle"
                 db_agent.current_task = None
-                db_agent.total_executions += 1
+
+                # Incrementally recalculate success_rate (no intermediate rounding)
+                prev_total = db_agent.total_executions
+                is_success = 1 if exec_status == "success" else 0
+                new_total = prev_total + 1
+                prev_rate_fraction = (db_agent.success_rate / 100.0) if prev_total > 0 else 0.0
+                db_agent.success_rate = round(
+                    ((prev_rate_fraction * prev_total) + is_success) / new_total * 100.0, 1
+                )
+
+                db_agent.total_executions = new_total
                 db_agent.total_cost_usd += total_cost
                 current_month = now.strftime("%Y-%m")
                 if db_agent.cost_month_key != current_month:
@@ -681,7 +786,7 @@ def _ensure_alternating_roles(messages: list[dict]) -> list[dict]:
     if not messages:
         return messages
 
-    merged: list[dict] = [messages[0]]
+    merged: list[dict] = [copy.deepcopy(messages[0])]
     for msg in messages[1:]:
         if msg["role"] == merged[-1]["role"]:
             # Merge content
@@ -692,9 +797,9 @@ def _ensure_alternating_roles(messages: list[dict]) -> list[dict]:
             else:
                 # Can't merge complex content blocks; insert a separator
                 merged.append({"role": "user" if msg["role"] == "assistant" else "assistant", "content": "(continued)"})
-                merged.append(msg)
+                merged.append(copy.deepcopy(msg))
         else:
-            merged.append(msg)
+            merged.append(copy.deepcopy(msg))
 
     # Ensure first message is "user" (required by Claude)
     if merged and merged[0]["role"] != "user":

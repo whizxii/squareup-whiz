@@ -19,3 +19,4 @@ eval-type-backport>=0.2.0
 slowapi>=0.1.9
 mcp>=1.0.0
 croniter>=1.4.0
+google-genai>=1.7.0,<2.0.0
