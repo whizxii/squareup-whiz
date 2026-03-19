@@ -112,9 +112,17 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
       }
 
       const data = await res.json();
+      // Backend returns tools_called as a JSON string — parse it safely
+      let parsedTools: unknown[] = [];
+      try {
+        const raw = data.tools_called;
+        parsedTools = Array.isArray(raw) ? raw : JSON.parse(raw || "[]");
+      } catch {
+        parsedTools = [];
+      }
       updateChatMessage(agent.id, agentMsgId, {
         content: data.response_text || "Done!",
-        toolCalls: data.tools_called || [],
+        toolCalls: parsedTools,
         status: "done",
       });
       updateAgent(agent.id, { status: "idle", current_task: undefined });
@@ -370,7 +378,7 @@ function ChatBubble({
         </div>
 
         {/* Tool calls */}
-        {message.toolCalls && message.toolCalls.length > 0 && (
+        {Array.isArray(message.toolCalls) && message.toolCalls.length > 0 && (
           <div className="space-y-1 pl-1">
             {message.toolCalls.map((tc, i) => (
               <div
