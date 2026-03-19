@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.core.auth import get_current_user_id
+from app.core.auth import get_current_user
 from app.services.automation_review import (
     approve_review,
     count_pending_reviews,
@@ -29,7 +29,7 @@ async def list_automation_logs(
     entity_type: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
-    user_id: str = get_current_user_id,
+    user_id: str = Depends(get_current_user),
 ):
     """List all automation logs with optional filtering."""
     logs = await get_automation_logs(
@@ -44,7 +44,7 @@ async def list_automation_logs(
 @router.get("/pending-review")
 async def list_pending_reviews(
     limit: int = 50,
-    user_id: str = get_current_user_id,
+    user_id: str = Depends(get_current_user),
 ):
     """Return pending automation actions that need human review."""
     logs = await get_pending_reviews(user_id=user_id, limit=min(limit, 100))
@@ -52,7 +52,7 @@ async def list_pending_reviews(
 
 
 @router.get("/pending-count")
-async def get_pending_count(user_id: str = get_current_user_id):
+async def get_pending_count(user_id: str = Depends(get_current_user)):
     """Return the count of pending reviews (for badge display)."""
     count = await count_pending_reviews()
     return {"count": count}
@@ -62,7 +62,7 @@ async def get_pending_count(user_id: str = get_current_user_id):
 async def approve_automation(
     log_id: str,
     body: ReviewAction,
-    user_id: str = get_current_user_id,
+    user_id: str = Depends(get_current_user),
 ):
     """Approve a pending automation action and execute it."""
     log = await approve_review(log_id, reviewer_id=user_id, notes=body.notes)
@@ -75,7 +75,7 @@ async def approve_automation(
 async def reject_automation(
     log_id: str,
     body: ReviewAction,
-    user_id: str = get_current_user_id,
+    user_id: str = Depends(get_current_user),
 ):
     """Reject a pending automation action."""
     log = await reject_review(log_id, reviewer_id=user_id, notes=body.notes)
