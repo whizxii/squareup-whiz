@@ -4,6 +4,8 @@
  * Renders a circular avatar with profile picture or initials + gradient,
  * status ring, name label, and activity indicators. Uses Framer Motion
  * for smooth tile-to-tile interpolation.
+ *
+ * Positioned using isometric coordinates via tileToIso().
  */
 
 "use client";
@@ -13,7 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { OfficeUser } from "@/lib/stores/office-store";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
-import { TILE } from "@/lib/office/office-renderer";
+import { tileToIso } from "@/lib/office/iso-coords";
 
 interface OfficeCharacterProps {
   readonly user: OfficeUser;
@@ -38,6 +40,7 @@ const springTransition = {
 
 export default function OfficeCharacter({ user, isMe }: OfficeCharacterProps) {
   const { tokens } = useOfficeTheme();
+  const gridRows = useOfficeStore((s) => s.layout.gridRows);
 
   const prefersReduced = useMemo(
     () =>
@@ -64,19 +67,23 @@ export default function OfficeCharacter({ user, isMe }: OfficeCharacterProps) {
     ? `linear-gradient(135deg, ${tokens.accent}, ${tokens.accentHover})`
     : `linear-gradient(135deg, ${user.appearance.shirtColor}, ${user.appearance.hairColor})`;
 
+  // Isometric position: center of the tile diamond
+  const isoPos = tileToIso(user.x, user.y, gridRows);
+
   return (
     <motion.div
       className="absolute cursor-pointer"
       style={{
         top: 0,
         left: 0,
-        zIndex: 20 + user.y,
+        // Depth sort: entities with higher (x+y) sum are "further south" = higher z
+        zIndex: 20 + user.x + user.y,
         width: AVATAR_SIZE,
         height: TOTAL_H,
       }}
       animate={{
-        x: user.x * TILE + (TILE - AVATAR_SIZE) / 2,
-        y: user.y * TILE + (TILE - TOTAL_H) / 2,
+        x: isoPos.x - AVATAR_SIZE / 2,
+        y: isoPos.y - TOTAL_H / 2,
       }}
       transition={transition}
       onClick={() => {

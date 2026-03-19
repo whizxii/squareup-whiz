@@ -8,13 +8,14 @@
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOfficeStore } from "@/lib/stores/office-store";
-import { TILE } from "@/lib/office/office-renderer";
+import { tileToIso } from "@/lib/office/iso-coords";
 
 export default function WaveEffect() {
   const waveTarget = useOfficeStore((s) => s.waveTarget);
   const clearWave = useOfficeStore((s) => s.clearWave);
   const users = useOfficeStore((s) => s.users);
   const agents = useOfficeStore((s) => s.agents);
+  const gridRows = useOfficeStore((s) => s.layout.gridRows);
 
   // Auto-clear wave after animation duration
   useEffect(() => {
@@ -30,15 +31,19 @@ export default function WaveEffect() {
       : agents.find((a) => a.id === waveTarget.id)
     : null;
 
+  const targetIso = targetEntity
+    ? tileToIso(targetEntity.x, targetEntity.y, gridRows)
+    : null;
+
   return (
     <AnimatePresence>
-      {targetEntity && (
+      {targetEntity && targetIso && (
         <motion.div
           key={`wave-${waveTarget!.id}-${Date.now()}`}
           className="pointer-events-none absolute text-2xl"
           style={{
-            left: targetEntity.x * TILE + TILE / 2,
-            top: targetEntity.y * TILE - 16,
+            left: targetIso.x,
+            top: targetIso.y - 16,
             zIndex: 46,
             transform: "translateX(-50%)",
           }}

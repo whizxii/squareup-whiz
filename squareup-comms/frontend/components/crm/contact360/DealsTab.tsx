@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Plus, Trophy, XCircle, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
+import DealCoachingCard from "@/components/crm/DealCoachingCard";
 
 const STATUS_FILTERS: { value: DealStatus | "all"; label: string }[] = [
   { value: "all", label: "All" },
@@ -90,13 +91,15 @@ export function DealsTab({ contactId }: DealsTabProps) {
       </div>
 
       {/* Deal cards */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {filtered.map((deal) => (
-          <DealRow
-            key={deal.id}
-            deal={deal}
-            onSelect={() => setSelectedDealId(deal.id)}
-          />
+          <div key={deal.id} className="space-y-1.5">
+            <DealRow
+              deal={deal}
+              onSelect={() => setSelectedDealId(deal.id)}
+            />
+            {deal.status === "open" && <DealCoachingCard dealId={deal.id} />}
+          </div>
         ))}
 
         {filtered.length === 0 && (
@@ -105,6 +108,7 @@ export function DealsTab({ contactId }: DealsTabProps) {
           </p>
         )}
       </div>
+
     </div>
   );
 }

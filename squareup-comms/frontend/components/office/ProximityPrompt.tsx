@@ -14,7 +14,7 @@ import { useOfficeStore } from "@/lib/stores/office-store";
 import { useCallStore } from "@/lib/stores/call-store";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
-import { TILE } from "@/lib/office/office-renderer";
+import { tileToIso } from "@/lib/office/iso-coords";
 
 const INTERACT_RANGE = 3;
 
@@ -25,6 +25,7 @@ export default function ProximityPrompt() {
   const users = useOfficeStore((s) => s.users);
   const agents = useOfficeStore((s) => s.agents);
   const selectedEntity = useOfficeStore((s) => s.selectedEntity);
+  const gridRows = useOfficeStore((s) => s.layout.gridRows);
   const isInCall = useCallStore((s) => s.isInCall);
   const joinCall = useCallStore((s) => s.joinCall);
 
@@ -73,14 +74,16 @@ export default function ProximityPrompt() {
 
   if (prefersReduced) return null;
 
+  const nearestIso = nearest ? tileToIso(nearest.x, nearest.y, gridRows) : null;
+
   return (
     <AnimatePresence>
-      {nearest && (
+      {nearest && nearestIso && (
         <motion.div
           className="pointer-events-auto absolute flex flex-col items-center gap-1"
           style={{
-            left: nearest.x * TILE + TILE / 2,
-            top: nearest.y * TILE - 20,
+            left: nearestIso.x,
+            top: nearestIso.y - 20,
             zIndex: 45,
             transform: "translateX(-50%)",
           }}

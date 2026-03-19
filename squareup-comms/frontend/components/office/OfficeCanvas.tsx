@@ -3,6 +3,9 @@
  * Layer 0: Floor (repaints on theme/floor style change)
  * Layer 1: Zones + furniture + grid (repaints on edit/furniture change)
  * Layer 2: Day/night + light shafts (repaints on dayPhase change)
+ *
+ * Renders in isometric 2.5D projection using ctx.transform(1, 0.5, -1, 0.5, ...).
+ * All top-down fillRect calls become isometric diamonds automatically.
  */
 
 "use client";
@@ -19,6 +22,7 @@ import {
   renderDayNightOverlay,
   renderLightShafts,
 } from "@/lib/office/office-renderer";
+import { isoCanvasSize, isoToTile } from "@/lib/office/iso-coords";
 
 interface OfficeCanvasProps {
   readonly onClick?: (tileX: number, tileY: number) => void;
@@ -39,10 +43,11 @@ export default function OfficeCanvas({ onClick }: OfficeCanvasProps) {
   const dayPhase = useOfficeStore((s) => s.dayPhase);
 
   const { gridCols, gridRows, floorStyle } = layout;
-  const canvasW = gridCols * TILE;
-  const canvasH = gridRows * TILE;
 
-  // Setup HiDPI canvas
+  // Isometric canvas dimensions
+  const { width: canvasW, height: canvasH } = isoCanvasSize(gridCols, gridRows);
+
+  // Setup HiDPI canvas (DPR transform only — iso transform applied per layer)
   const setupCanvas = useCallback(
     (canvas: HTMLCanvasElement | null): CanvasRenderingContext2D | null => {
       if (!canvas) return null;
@@ -59,10 +64,12 @@ export default function OfficeCanvas({ onClick }: OfficeCanvasProps) {
     [canvasW, canvasH]
   );
 
-  // Layer 0: Floor
+  // Layer 0: Floor — apply iso transform, then render
   useEffect(() => {
     const ctx = setupCanvas(floorRef.current);
     if (!ctx) return;
+    // Apply isometric projection: fillRect calls become diamond tiles
+    ctx.transform(1, 0.5, -1, 0.5, gridRows * TILE, 0);
     renderFloor(ctx, gridCols, gridRows, floorStyle, isDark);
   }, [setupCanvas, gridCols, gridRows, floorStyle, isDark]);
 
@@ -70,7 +77,9 @@ export default function OfficeCanvas({ onClick }: OfficeCanvasProps) {
   useEffect(() => {
     const ctx = setupCanvas(contentRef.current);
     if (!ctx) return;
+    // clearRect BEFORE iso transform (uses DPR-only space = full canvas)
     ctx.clearRect(0, 0, canvasW, canvasH);
+    ctx.transform(1, 0.5, -1, 0.5, gridRows * TILE, 0);
     renderZones(ctx, zones, showGrid);
     renderFurniture(ctx, furniture, isDark, dayPhase === "dusk" || dayPhase === "night");
     if (showGrid) {
@@ -78,7 +87,7 @@ export default function OfficeCanvas({ onClick }: OfficeCanvasProps) {
     }
   }, [setupCanvas, zones, furniture, showGrid, gridCols, gridRows, isDark, dayPhase, canvasW, canvasH]);
 
-  // Layer 2: Ambient overlay
+  // Layer 2: Ambient overlay — NO iso transform (flat full-canvas color tint)
   useEffect(() => {
     const ctx = setupCanvas(ambientRef.current);
     if (!ctx) return;
@@ -87,20 +96,24 @@ export default function OfficeCanvas({ onClick }: OfficeCanvasProps) {
     renderLightShafts(ctx, canvasW, canvasH, dayPhase);
   }, [setupCanvas, dayPhase, canvasW, canvasH]);
 
-  // Click-to-move handler
+  // Click-to-move: convert screen position back to tile coords via inverse iso math
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!onClick) return;
       const rect = e.currentTarget.getBoundingClientRect();
-      const tileW = rect.width / gridCols;
-      const tileH = rect.height / gridRows;
-      const x = Math.floor((e.clientX - rect.left) / tileW);
-      const y = Math.floor((e.clientY - rect.top) / tileH);
-      if (x >= 0 && x < gridCols && y >= 0 && y < gridRows) {
-        onClick(x, y);
+      // Scale from CSS pixels to canvas logical pixels
+      const scaleX = canvasW / rect.width;
+      const scaleY = canvasH / rect.height;
+      const sx = (e.clientX - rect.left) * scaleX;
+      const sy = (e.clientY - rect.top) * scaleY;
+      const { x, y } = isoToTile(sx, sy, gridRows);
+      const tileX = Math.floor(x);
+      const tileY = Math.floor(y);
+      if (tileX >= 0 && tileX < gridCols && tileY >= 0 && tileY < gridRows) {
+        onClick(tileX, tileY);
       }
     },
-    [onClick, gridCols, gridRows]
+    [onClick, gridCols, gridRows, canvasW, canvasH]
   );
 
   const canvasStyle: React.CSSProperties = {

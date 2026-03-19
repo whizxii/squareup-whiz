@@ -864,7 +864,9 @@ export type CRMView =
   | "companies"
   | "sequences"
   | "workflows"
-  | "smart_lists";
+  | "smart_lists"
+  | "automation"
+  | "digest";
 
 export const STAGES: { id: CRMStage; label: string; color: string }[] = [
   { id: "lead", label: "Lead", color: "bg-gray-400" },

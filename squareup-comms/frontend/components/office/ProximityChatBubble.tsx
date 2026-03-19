@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
-import { TILE } from "@/lib/office/office-renderer";
+import { tileToIso } from "@/lib/office/iso-coords";
 
 const INNER_RANGE = 2;
 const BUBBLE_LIFETIME_MS = 5000;
@@ -35,6 +35,7 @@ export default function ProximityChatBubbles() {
   const { tokens } = useOfficeTheme();
   const myUserId = useCurrentUserId();
   const myPosition = useOfficeStore((s) => s.myPosition);
+  const gridRows = useOfficeStore((s) => s.layout.gridRows);
   const users = useOfficeStore((s) => s.users);
   const agents = useOfficeStore((s) => s.agents);
   const chatBubbles = useOfficeStore((s) => s.chatBubbles);
@@ -119,8 +120,9 @@ export default function ProximityChatBubbles() {
       {/* Proximity status bubbles */}
       <AnimatePresence>
         {nearbyEntities.map((entity) => {
-          const px = entity.x * TILE + TILE / 2;
-          const py = entity.y * TILE - STATUS_BUBBLE_OFFSET;
+          const isoPos = tileToIso(entity.x, entity.y, gridRows);
+          const px = isoPos.x;
+          const py = isoPos.y - STATUS_BUBBLE_OFFSET;
 
           return (
             <motion.div
@@ -169,8 +171,9 @@ export default function ProximityChatBubbles() {
       {/* User-sent chat message bubbles */}
       <AnimatePresence>
         {activeChatBubbles.map((bubble) => {
-          const bpx = bubble.senderX * TILE + TILE / 2;
-          const bpy = bubble.senderY * TILE - CHAT_BUBBLE_OFFSET;
+          const bIsoPos = tileToIso(bubble.senderX, bubble.senderY, gridRows);
+          const bpx = bIsoPos.x;
+          const bpy = bIsoPos.y - CHAT_BUBBLE_OFFSET;
 
           return (
             <motion.div

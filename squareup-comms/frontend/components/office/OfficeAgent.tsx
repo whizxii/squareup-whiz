@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { OfficeAgent as AgentType } from "@/lib/stores/office-store";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
-import { TILE } from "@/lib/office/office-renderer";
+import { tileToIso } from "@/lib/office/iso-coords";
 
 interface OfficeAgentProps {
   readonly agent: AgentType;
@@ -53,11 +53,13 @@ export default function OfficeAgent({ agent }: OfficeAgentProps) {
     []
   );
 
+  const gridRows = useOfficeStore((s) => s.layout.gridRows);
   const selectedEntity = useOfficeStore((s) => s.selectedEntity);
   const setSelectedEntity = useOfficeStore((s) => s.setSelectedEntity);
   const isSelected =
     selectedEntity?.type === "agent" && selectedEntity?.id === agent.id;
 
+  const isoPos = tileToIso(agent.x, agent.y, gridRows);
   const accent = AGENT_ACCENT[agent.id] ?? tokens.accent;
   const statusColor = AGENT_STATUS_COLORS[agent.status] ?? tokens.textMuted;
   const isWorking = agent.status === "working" || agent.status === "thinking";
@@ -69,13 +71,13 @@ export default function OfficeAgent({ agent }: OfficeAgentProps) {
       style={{
         top: 0,
         left: 0,
-        zIndex: 20 + agent.y,
+        zIndex: 20 + agent.x + agent.y,
         width: AVATAR_SIZE,
         height: TOTAL_H,
       }}
       animate={{
-        x: agent.x * TILE + (TILE - AVATAR_SIZE) / 2,
-        y: agent.y * TILE + (TILE - TOTAL_H) / 2,
+        x: isoPos.x - AVATAR_SIZE / 2,
+        y: isoPos.y - TOTAL_H / 2,
       }}
       transition={transition}
       onClick={() => setSelectedEntity({ type: "agent", id: agent.id })}

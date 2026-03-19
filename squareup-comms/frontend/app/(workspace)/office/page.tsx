@@ -23,7 +23,7 @@ import { useProximityCall } from "@/lib/hooks/useProximityCall";
 import { useCallStore } from "@/lib/stores/call-store";
 import { CallOverlay } from "@/components/calls/CallOverlay";
 import { buildWalkableGrid, getBlockedTiles, findPath } from "@/lib/office/pathfinding";
-import { TILE } from "@/lib/office/office-renderer";
+import { isoCanvasSize } from "@/lib/office/iso-coords";
 import OfficeCanvas from "@/components/office/OfficeCanvas";
 import OfficeCharacter from "@/components/office/OfficeCharacter";
 import OfficeAgent from "@/components/office/OfficeAgent";
@@ -292,8 +292,7 @@ export default function OfficePage() {
     ]
   );
 
-  const totalW = layout.gridCols * TILE;
-  const totalH = layout.gridRows * TILE;
+  const { width: totalW, height: totalH } = isoCanvasSize(layout.gridCols, layout.gridRows);
 
   return (
     <div

@@ -22,6 +22,8 @@ import { UploadRecordingDialog } from "@/components/crm/dialogs/UploadRecordingD
 import { ImportDialog } from "@/components/crm/dialogs/ImportDialog";
 import { ExportDialog } from "@/components/crm/dialogs/ExportDialog";
 import { MergeContactsDialog } from "@/components/crm/dialogs/MergeContactsDialog";
+import AutomationFeed from "@/components/crm/AutomationFeed";
+import WeeklyDigestView from "@/components/crm/WeeklyDigestView";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useContacts } from "@/lib/hooks/use-crm-queries";
 import {
@@ -78,6 +80,18 @@ function ActiveView({ view }: { view: CRMView }) {
       return <WorkflowsView />;
     case "smart_lists":
       return <SmartListsView />;
+    case "automation":
+      return (
+        <div className="flex-1 overflow-auto p-4">
+          <AutomationFeed />
+        </div>
+      );
+    case "digest":
+      return (
+        <div className="flex-1 overflow-auto p-4 max-w-2xl mx-auto w-full">
+          <WeeklyDigestView />
+        </div>
+      );
     default:
       return <PipelineView />;
   }

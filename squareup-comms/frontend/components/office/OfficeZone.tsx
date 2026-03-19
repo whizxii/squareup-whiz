@@ -12,7 +12,7 @@ import { Lock, Users } from "lucide-react";
 import type { OfficeZone as ZoneType } from "@/lib/stores/office-store";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
-import { TILE } from "@/lib/office/office-renderer";
+import { tileToIso } from "@/lib/office/iso-coords";
 
 interface OfficeZoneProps {
   readonly zone: ZoneType;
@@ -28,6 +28,7 @@ const ZONE_ICONS: Readonly<Record<string, string>> = {
 
 export default function OfficeZoneOverlay({ zone }: OfficeZoneProps) {
   const { tokens } = useOfficeTheme();
+  const gridRows = useOfficeStore((s) => s.layout.gridRows);
   const users = useOfficeStore((s) => s.users);
   const agents = useOfficeStore((s) => s.agents);
   const editMode = useOfficeStore((s) => s.editMode);
@@ -51,23 +52,26 @@ export default function OfficeZoneOverlay({ zone }: OfficeZoneProps) {
     return Math.sqrt(dx * dx + dy * dy) <= 3;
   }, [myPosition.x, myPosition.y, zone.x, zone.y, zone.width, zone.height]);
 
+  // Position label cluster at iso center of zone diamond
+  const isoCenter = tileToIso(
+    zone.x + zone.width / 2,
+    zone.y + zone.height / 2,
+    gridRows,
+  );
+
   return (
     <div
-      className="absolute"
+      className="absolute flex flex-col items-center gap-0.5"
       style={{
-        left: zone.x * TILE,
-        top: zone.y * TILE,
-        width: zone.width * TILE,
-        height: zone.height * TILE,
+        left: isoCenter.x,
+        top: isoCenter.y,
+        transform: "translate(-50%, -50%)",
         zIndex: 5,
-        pointerEvents: editMode ? "auto" : "none",
+        pointerEvents: "none",
       }}
     >
       {/* Zone label */}
-      <div
-        className="absolute left-2 top-1 flex items-center gap-1"
-        style={{ pointerEvents: "auto" }}
-      >
+      <div className="flex items-center gap-1">
         <span className="text-[10px]">{ZONE_ICONS[zone.type] ?? "📍"}</span>
         <span
           className="rounded-sm px-1 py-0.5 text-[9px] font-semibold"
@@ -79,17 +83,19 @@ export default function OfficeZoneOverlay({ zone }: OfficeZoneProps) {
         >
           {zone.name}
         </span>
+        {zone.isPrivate && (
+          <Lock size={8} style={{ color: zone.color, opacity: 0.7 }} />
+        )}
       </div>
 
       {/* Capacity badge */}
       {zone.capacity && occupants > 0 && (
         <div
-          className="absolute right-1 top-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5"
+          className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5"
           style={{
             backgroundColor: tokens.glass,
             backdropFilter: "blur(8px)",
             border: `1px solid ${zone.color}30`,
-            pointerEvents: "auto",
           }}
         >
           <Users size={8} style={{ color: zone.color, opacity: 0.7 }} />
@@ -102,39 +108,15 @@ export default function OfficeZoneOverlay({ zone }: OfficeZoneProps) {
         </div>
       )}
 
-      {/* Privacy indicator */}
-      {zone.isPrivate && (
-        <div
-          className="absolute bottom-1 right-1 flex h-4 w-4 items-center justify-center rounded-full"
-          style={{
-            backgroundColor: tokens.glass,
-            backdropFilter: "blur(8px)",
-          }}
-        >
-          <Lock size={8} style={{ color: zone.color, opacity: 0.7 }} />
-        </div>
-      )}
-
-      {/* Proximity glow */}
+      {/* Proximity glow dot */}
       {isNearby && !editMode && (
         <div
-          className="office-proximity-pulse absolute inset-0 rounded-lg"
+          className="office-proximity-pulse rounded-full"
           style={{
-            border: `1px solid ${zone.color}`,
-            boxShadow: `inset 0 0 12px ${zone.color}15, 0 0 8px ${zone.color}10`,
-            opacity: 0.25,
-            pointerEvents: "none",
-          }}
-        />
-      )}
-
-      {/* Edit mode border */}
-      {editMode && (
-        <div
-          className="absolute inset-0 rounded-lg border-2 border-dashed cursor-move"
-          style={{
-            borderColor: `${zone.color}80`,
-            backgroundColor: `${zone.color}08`,
+            width: 6,
+            height: 6,
+            backgroundColor: zone.color,
+            opacity: 0.6,
           }}
         />
       )}
