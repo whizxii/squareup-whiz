@@ -33,7 +33,7 @@ router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 # List all providers + user connections
 # ---------------------------------------------------------------------------
 
-@router.get("")
+@router.get("/")
 async def list_integrations(
     session: AsyncSession = Depends(get_session),
     user_id: str = Depends(get_current_user),

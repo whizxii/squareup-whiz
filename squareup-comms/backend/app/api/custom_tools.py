@@ -88,7 +88,7 @@ class CustomToolResponse(BaseModel):
 # Routes
 # ---------------------------------------------------------------------------
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_custom_tool(
     body: CustomToolCreateBody,
     session: AsyncSession = Depends(get_session),
@@ -118,7 +118,7 @@ async def create_custom_tool(
     return success_response(CustomToolResponse.from_model(tool).model_dump(mode="json"))
 
 
-@router.get("")
+@router.get("/")
 async def list_custom_tools(
     tool_type: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),

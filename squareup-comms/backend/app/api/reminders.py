@@ -61,7 +61,7 @@ class ReminderResponse(BaseModel):
 # Routes
 # ---------------------------------------------------------------------------
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_reminder(
     body: ReminderCreateBody,
     session: AsyncSession = Depends(get_session),
@@ -89,7 +89,7 @@ async def create_reminder(
     return success_response(ReminderResponse.from_model(reminder).model_dump(mode="json"))
 
 
-@router.get("")
+@router.get("/")
 async def list_reminders(
     reminder_status: Optional[str] = Query(default=None, alias="status"),
     limit: int = Query(default=50, ge=1, le=200),

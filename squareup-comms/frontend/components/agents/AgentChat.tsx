@@ -5,6 +5,7 @@ import {
   AgentChatMessage,
 } from "@/lib/stores/agent-store";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/lib/stores/auth-store";
 import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { formatTime } from "@/lib/format";
 import {
@@ -94,12 +95,14 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
 
     // Call the real backend API
     try {
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = token
+        ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+        : { "X-User-Id": getCurrentUserId(), "Content-Type": "application/json" };
+
       const res = await fetch(`${API_URL}/api/agents/${agent.id}/invoke`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": getCurrentUserId(),
-        },
+        headers,
         body: JSON.stringify({ message: text }),
       });
 

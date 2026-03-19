@@ -88,7 +88,7 @@ class TaskResponse(BaseModel):
 # Routes
 # ---------------------------------------------------------------------------
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_task(
     body: TaskCreateBody,
     session: AsyncSession = Depends(get_session),
@@ -117,7 +117,7 @@ async def create_task(
     return success_response(TaskResponse.from_model(task).model_dump(mode="json"))
 
 
-@router.get("")
+@router.get("/")
 async def list_tasks(
     assigned_to: Optional[str] = Query(default=None),
     task_status: Optional[str] = Query(default=None, alias="status"),

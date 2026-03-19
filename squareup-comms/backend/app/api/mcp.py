@@ -53,7 +53,7 @@ async def connect_mcp_server(
     })
 
 
-@router.get("")
+@router.get("/")
 async def list_mcp_servers(
     user_id: str = Depends(get_current_user),
 ):

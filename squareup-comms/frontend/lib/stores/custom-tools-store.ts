@@ -145,7 +145,8 @@ export const useCustomToolsStore = create<CustomToolsState>((set) => ({
       });
       if (!res.ok) throw new Error(`Failed to fetch tools: ${res.status}`);
       const data = await res.json();
-      const tools = data.data?.tools ?? data.tools ?? data ?? [];
+      const payload = data.data ?? data;
+      const tools = Array.isArray(payload) ? payload : (payload?.tools ?? []);
       set({ tools, toolsLoading: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to fetch tools";
@@ -175,7 +176,7 @@ export const useCustomToolsStore = create<CustomToolsState>((set) => ({
         throw new Error(err.detail || `Create failed: ${res.status}`);
       }
       const result = await res.json();
-      const tool = result.data?.tool ?? result.tool ?? result;
+      const tool = result.data ?? result;
       set((s) => ({ tools: [...s.tools, tool] }));
       return tool;
     } catch (err) {
@@ -194,7 +195,7 @@ export const useCustomToolsStore = create<CustomToolsState>((set) => ({
       });
       if (!res.ok) throw new Error(`Update failed: ${res.status}`);
       const result = await res.json();
-      const updated = result.data?.tool ?? result.tool ?? result;
+      const updated = result.data ?? result;
       set((s) => ({
         tools: s.tools.map((t) => (t.id === id ? { ...t, ...updated } : t)),
       }));
@@ -272,7 +273,8 @@ export const useCustomToolsStore = create<CustomToolsState>((set) => ({
         });
         if (refreshRes.ok) {
           const refreshData = await refreshRes.json();
-          const tools = refreshData.data?.tools ?? refreshData.tools ?? refreshData ?? [];
+          const refreshPayload = refreshData.data ?? refreshData;
+          const tools = Array.isArray(refreshPayload) ? refreshPayload : (refreshPayload?.tools ?? []);
           set({ tools, importLoading: false });
         } else {
           set({ importLoading: false });
@@ -298,7 +300,8 @@ export const useCustomToolsStore = create<CustomToolsState>((set) => ({
       });
       if (!res.ok) throw new Error(`Failed to fetch MCP servers: ${res.status}`);
       const data = await res.json();
-      const servers = data.data?.servers ?? data.servers ?? data ?? [];
+      const mcpPayload = data.data ?? data;
+      const servers = Array.isArray(mcpPayload) ? mcpPayload : (mcpPayload?.servers ?? []);
       set({ mcpServers: servers, mcpLoading: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to fetch MCP servers";
@@ -319,9 +322,9 @@ export const useCustomToolsStore = create<CustomToolsState>((set) => ({
         throw new Error(err.detail || `Connect failed: ${res.status}`);
       }
       const result = await res.json();
-      const server = result.data ?? result;
-      set((s) => ({ mcpServers: [...s.mcpServers, server], mcpLoading: false }));
-      return server;
+      const serverData = result.data ?? result;
+      set((s) => ({ mcpServers: [...s.mcpServers, serverData], mcpLoading: false }));
+      return serverData;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to connect";
       set({ mcpLoading: false, mcpError: message });
