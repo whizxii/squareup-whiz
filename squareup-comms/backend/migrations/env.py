@@ -33,6 +33,11 @@ from app.models.integrations import IntegrationConfig  # noqa: F401
 from app.models.custom_tools import CustomTool  # noqa: F401
 from app.models.reminders import Reminder  # noqa: F401
 from app.models.tasks import Task  # noqa: F401
+from app.models.ai_insight import AIInsight  # noqa: F401
+from app.models.automation_log import AutomationLog  # noqa: F401
+from app.models.chat_signal import ChatSignal  # noqa: F401
+from app.models.digest import Digest  # noqa: F401
+from app.models.office import OfficeLayoutRecord, OfficeFurnitureRecord, OfficeZoneRecord  # noqa: F401
 
 from sqlmodel import SQLModel
 
