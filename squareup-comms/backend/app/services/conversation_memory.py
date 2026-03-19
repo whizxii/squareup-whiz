@@ -184,16 +184,20 @@ async def load_conversation_context(
 
 async def load_agent_memory(agent_id: str, user_id: str) -> str:
     """Load persistent facts about this user from agent's long-term memory."""
-    async with async_session() as session:
-        stmt = (
-            select(AgentMemory)
-            .where(AgentMemory.agent_id == agent_id, AgentMemory.user_id == user_id)
-            .order_by(AgentMemory.updated_at.desc())
-            .limit(20)
-        )
-        result = await session.execute(stmt)
-        facts = [f"- {m.key}: {m.value}" for m in result.scalars().all()]
-    return "\n".join(facts) if facts else ""
+    try:
+        async with async_session() as session:
+            stmt = (
+                select(AgentMemory)
+                .where(AgentMemory.agent_id == agent_id, AgentMemory.user_id == user_id)
+                .order_by(AgentMemory.updated_at.desc())
+                .limit(20)
+            )
+            result = await session.execute(stmt)
+            facts = [f"- {m.key}: {m.value}" for m in result.scalars().all()]
+        return "\n".join(facts) if facts else ""
+    except Exception:
+        logger.warning("Agent memory load failed (non-fatal)", exc_info=True)
+        return ""
 
 
 async def load_crm_intelligence(user_id: str) -> str:
@@ -213,7 +217,7 @@ async def load_crm_intelligence(user_id: str) -> str:
 
         from app.models.ai_insight import AIInsight
         from app.models.automation_log import AutomationLog
-        from app.models.crm import CRMDeal
+        from app.models.crm_deal import CRMDeal
 
         cutoff = datetime.utcnow() - timedelta(days=7)
         async with async_session() as session:
@@ -242,16 +246,16 @@ async def load_crm_intelligence(user_id: str) -> str:
             # Open deals pipeline summary
             stmt = (
                 _select(CRMDeal)
-                .where(CRMDeal.stage.notin_(["won", "lost"]))
+                .where(CRMDeal.status.notin_(["won", "lost"]))
                 .limit(10)
             )
             result = await session.execute(stmt)
             open_deals = list(result.scalars().all())
 
             if open_deals:
-                total = sum(d.amount or 0 for d in open_deals)
+                total = sum(d.value or 0 for d in open_deals)
                 lines = [
-                    f"- {d.title} ({d.stage}, ${d.amount or 0:,.0f})"
+                    f"- {d.title} ({d.stage}, ${d.value or 0:,.0f})"
                     for d in open_deals[:5]
                 ]
                 suffix = "\n  ..." if len(open_deals) > 5 else ""

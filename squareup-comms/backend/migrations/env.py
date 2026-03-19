@@ -13,7 +13,7 @@ from alembic import context
 from app.core.config import settings
 from app.models.users import UserProfile  # noqa: F401
 from app.models.chat import Channel, ChannelMember, Message, Reaction  # noqa: F401
-from app.models.agents import Agent, AgentExecution  # noqa: F401
+from app.models.agents import Agent, AgentExecution, AgentMemory  # noqa: F401
 from app.models.crm import CRMContact, CRMActivity  # noqa: F401
 from app.models.crm_company import CRMCompany  # noqa: F401
 from app.models.crm_tag import CRMTag, CRMContactTag  # noqa: F401

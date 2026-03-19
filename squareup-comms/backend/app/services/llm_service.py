@@ -646,7 +646,7 @@ class GroqLLMClient:
                 openai_messages.append({"role": msg["role"], "content": text})
 
         response = await self._client.chat.completions.create(
-            model=model or settings.LLM_MODEL,
+            model=model or self.DEFAULT_MODEL,
             messages=openai_messages,
             max_tokens=max_tokens,
             temperature=temperature,

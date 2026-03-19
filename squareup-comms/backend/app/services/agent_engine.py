@@ -152,46 +152,49 @@ async def run_agent(
             logger.warning("Agent %s not found or inactive", agent_id)
             return
 
-        # --- Budget enforcement ---
-        current_month = datetime.utcnow().strftime("%Y-%m")
+        # --- Budget enforcement (wrapped in try/except for schema resilience) ---
+        try:
+            current_month = datetime.utcnow().strftime("%Y-%m")
 
-        # Reset monthly cost if month changed
-        if agent.cost_month_key != current_month:
-            agent.cost_this_month = 0.0
-            agent.cost_month_key = current_month
+            # Reset monthly cost if month changed
+            if agent.cost_month_key != current_month:
+                agent.cost_this_month = 0.0
+                agent.cost_month_key = current_month
 
-        # Check monthly budget
-        if agent.monthly_budget_usd is not None and agent.cost_this_month >= agent.monthly_budget_usd:
-            logger.info("Agent %s exceeded monthly budget ($%.2f/$%.2f)",
-                        agent_id, agent.cost_this_month, agent.monthly_budget_usd)
-            session.add(agent)
-            await session.commit()
-            await _broadcast_error(
-                channel_id, agent_id,
-                f"I've hit my monthly budget limit (${agent.monthly_budget_usd:.2f}). "
-                "Ask an admin to increase it.",
-            )
-            return
-
-        # Check daily execution limit
-        if agent.daily_execution_limit is not None:
-            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            count_result = await session.execute(
-                select(func.count(AgentExecution.id)).where(
-                    AgentExecution.agent_id == agent_id,
-                    AgentExecution.created_at >= today_start,
-                )
-            )
-            today_count = count_result.scalar() or 0
-            if today_count >= agent.daily_execution_limit:
-                logger.info("Agent %s hit daily limit (%d/%d)",
-                            agent_id, today_count, agent.daily_execution_limit)
+            # Check monthly budget
+            if agent.monthly_budget_usd is not None and agent.cost_this_month >= agent.monthly_budget_usd:
+                logger.info("Agent %s exceeded monthly budget ($%.2f/$%.2f)",
+                            agent_id, agent.cost_this_month, agent.monthly_budget_usd)
+                session.add(agent)
+                await session.commit()
                 await _broadcast_error(
                     channel_id, agent_id,
-                    f"I've reached my daily execution limit ({agent.daily_execution_limit} runs/day). "
-                    "Try again tomorrow or ask an admin to increase the limit.",
+                    f"I've hit my monthly budget limit (${agent.monthly_budget_usd:.2f}). "
+                    "Ask an admin to increase it.",
                 )
                 return
+
+            # Check daily execution limit
+            if agent.daily_execution_limit is not None:
+                today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                count_result = await session.execute(
+                    select(func.count(AgentExecution.id)).where(
+                        AgentExecution.agent_id == agent_id,
+                        AgentExecution.created_at >= today_start,
+                    )
+                )
+                today_count = count_result.scalar() or 0
+                if today_count >= agent.daily_execution_limit:
+                    logger.info("Agent %s hit daily limit (%d/%d)",
+                                agent_id, today_count, agent.daily_execution_limit)
+                    await _broadcast_error(
+                        channel_id, agent_id,
+                        f"I've reached my daily execution limit ({agent.daily_execution_limit} runs/day). "
+                        "Try again tomorrow or ask an admin to increase the limit.",
+                    )
+                    return
+        except Exception:
+            logger.warning("Budget enforcement failed (non-fatal), proceeding", exc_info=True)
 
         agent.status = "working"
         agent.current_task = "Processing message"
