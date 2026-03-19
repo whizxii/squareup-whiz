@@ -38,3 +38,44 @@ async def get_session():
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+
+    # Add new columns to existing tables (create_all only creates new tables,
+    # it does not alter existing ones).
+    await _migrate_new_columns()
+
+
+async def _migrate_new_columns() -> None:
+    """Safely add columns that were added after the initial schema.
+
+    Uses ADD COLUMN IF NOT EXISTS (PostgreSQL 9.6+) or catches errors
+    for SQLite (dev).
+    """
+    from sqlalchemy import text as sa_text
+
+    _AGENT_COLUMNS = [
+        ("max_iterations", "INTEGER DEFAULT 5"),
+        ("autonomy_level", "INTEGER DEFAULT 2"),
+        ("temperature", "FLOAT DEFAULT 0.7"),
+        ("custom_tools", "TEXT DEFAULT '[]'"),
+        ("monthly_budget_usd", "FLOAT"),
+        ("daily_execution_limit", "INTEGER"),
+        ("cost_this_month", "FLOAT DEFAULT 0.0"),
+        ("cost_month_key", "VARCHAR(7)"),
+        ("last_scheduled_run", "TIMESTAMP"),
+    ]
+
+    async with engine.begin() as conn:
+        if "postgresql" in db_url:
+            for col_name, col_type in _AGENT_COLUMNS:
+                await conn.execute(sa_text(
+                    f"ALTER TABLE agents ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+                ))
+        else:
+            # SQLite: no IF NOT EXISTS — catch the "duplicate column" error
+            for col_name, col_type in _AGENT_COLUMNS:
+                try:
+                    await conn.execute(sa_text(
+                        f"ALTER TABLE agents ADD COLUMN {col_name} {col_type}"
+                    ))
+                except Exception:
+                    pass  # Column already exists

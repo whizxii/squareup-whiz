@@ -66,7 +66,7 @@ logger = get_logger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(application: FastAPI):
     logger.info("Starting SquareUp Comms backend...")
 
     # Production safety: warn loudly if dev auth is enabled in non-debug mode
@@ -84,14 +84,14 @@ async def lifespan(app: FastAPI):
     logger.info("Agent tool registry initialized.")
 
     # Initialize shared infrastructure on app.state
-    app.state.event_bus = EventBus()
-    app.state.background = BackgroundTaskManager()
-    app.state.cache = TTLCache(default_ttl=300)
+    application.state.event_bus = EventBus()
+    application.state.background = BackgroundTaskManager()
+    application.state.cache = TTLCache(default_ttl=300)
     logger.info("Event bus, background tasks, and cache initialized.")
 
     # Register activity auto-capture handlers
     activity_capture = ActivityCaptureService(
-        event_bus=app.state.event_bus,
+        event_bus=application.state.event_bus,
         session_factory=async_session,
     )
     activity_capture.register_handlers()
@@ -100,9 +100,9 @@ async def lifespan(app: FastAPI):
     # Register follow-up auto-creation handlers
     followup_svc = FollowUpService(
         session=None,
-        events=app.state.event_bus,
-        background=app.state.background,
-        cache=app.state.cache,
+        events=application.state.event_bus,
+        background=application.state.background,
+        cache=application.state.cache,
         session_factory=async_session,
     )
     followup_svc.register_handlers()
@@ -114,13 +114,13 @@ async def lifespan(app: FastAPI):
             async with async_session() as session:
                 gmail_svc = GmailSyncService(
                     session,
-                    app.state.event_bus,
-                    app.state.background,
-                    app.state.cache,
+                    application.state.event_bus,
+                    application.state.background,
+                    application.state.cache,
                 )
                 await gmail_svc.sync_now()
 
-        app.state.background.schedule_periodic(
+        application.state.background.schedule_periodic(
             _gmail_sync_job,
             interval_seconds=settings.GMAIL_SYNC_INTERVAL_SECONDS,
             name="gmail-sync",
@@ -139,9 +139,9 @@ async def lifespan(app: FastAPI):
     _scheduler_task.cancel()
 
     logger.info("Shutting down...")
-    await app.state.background.shutdown()
-    app.state.event_bus.clear()
-    app.state.cache.clear()
+    await application.state.background.shutdown()
+    application.state.event_bus.clear()
+    application.state.cache.clear()
 
 
 app = FastAPI(
