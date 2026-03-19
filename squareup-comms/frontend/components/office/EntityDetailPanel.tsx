@@ -1,6 +1,7 @@
 /**
  * Glass slide-in panel showing details for a selected user or agent.
  * Slides in from the right with spring animation.
+ * Fully themed via useOfficeTheme.
  */
 
 "use client";
@@ -10,8 +11,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, MessageSquare, Hand, Eye, Zap, Send } from "lucide-react";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
+import type { OfficeThemeTokens } from "@/lib/office/theme";
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS: Readonly<Record<string, string>> = {
   online: "Online",
   away: "Away",
   busy: "Busy",
@@ -23,19 +26,23 @@ const STATUS_LABELS: Record<string, string> = {
   offline: "Offline",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  online: "#22c55e",
-  away: "#eab308",
-  busy: "#ef4444",
-  dnd: "#ef4444",
-  idle: "#22c55e",
-  thinking: "#eab308",
-  working: "#4a90d9",
-  error: "#ef4444",
-  offline: "#999",
-};
+function getStatusColor(status: string, tokens: OfficeThemeTokens): string {
+  const map: Readonly<Record<string, string>> = {
+    online: tokens.status.online,
+    away: tokens.status.away,
+    busy: tokens.status.busy,
+    dnd: tokens.status.dnd,
+    idle: tokens.status.online,
+    thinking: tokens.status.away,
+    working: tokens.accent,
+    error: tokens.status.busy,
+    offline: tokens.status.offline,
+  };
+  return map[status] ?? tokens.status.offline;
+}
 
 export default function EntityDetailPanel() {
+  const { tokens } = useOfficeTheme();
   const selectedEntity = useOfficeStore((s) => s.selectedEntity);
   const setSelectedEntity = useOfficeStore((s) => s.setSelectedEntity);
   const users = useOfficeStore((s) => s.users);
@@ -80,10 +87,12 @@ export default function EntityDetailPanel() {
     <AnimatePresence>
       {entity && (
         <motion.div
-          className="absolute top-4 right-4 z-50 w-64 overflow-hidden rounded-2xl border border-white/15 shadow-xl"
+          className="absolute top-4 right-4 z-50 w-64 overflow-hidden rounded-2xl shadow-xl"
           style={{
-            backgroundColor: "rgba(30, 27, 24, 0.88)",
+            backgroundColor: tokens.glass,
             backdropFilter: "blur(24px) saturate(180%)",
+            border: `1px solid ${tokens.glassBorder}`,
+            boxShadow: tokens.shadowLg,
           }}
           initial={{ opacity: 0, x: 40, scale: 0.95 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -91,12 +100,16 @@ export default function EntityDetailPanel() {
           transition={{ type: "spring", stiffness: 350, damping: 30 }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div
+            className="flex items-center justify-between px-4 py-3"
+            style={{ borderBottom: `1px solid ${tokens.borderSubtle}` }}
+          >
             <div className="flex items-center gap-2">
               <div
-                className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-white"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold"
                 style={{
-                  backgroundColor: isUser ? "#FF6B00" : "#4a90d9",
+                  backgroundColor: isUser ? tokens.accentSoft : `${tokens.accent}20`,
+                  color: tokens.accent,
                 }}
               >
                 {isUser
@@ -104,7 +117,10 @@ export default function EntityDetailPanel() {
                   : (entity as (typeof agents)[number]).icon}
               </div>
               <div>
-                <p className="text-sm font-semibold text-white">
+                <p
+                  className="text-sm font-semibold"
+                  style={{ color: tokens.text }}
+                >
                   {isUser
                     ? (entity as (typeof users)[number]).name
                     : (entity as (typeof agents)[number]).name}
@@ -113,15 +129,18 @@ export default function EntityDetailPanel() {
                   <div
                     className="h-1.5 w-1.5 rounded-full"
                     style={{
-                      backgroundColor:
-                        STATUS_COLORS[
-                          isUser
-                            ? (entity as (typeof users)[number]).status
-                            : (entity as (typeof agents)[number]).status
-                        ] ?? "#999",
+                      backgroundColor: getStatusColor(
+                        isUser
+                          ? (entity as (typeof users)[number]).status
+                          : (entity as (typeof agents)[number]).status,
+                        tokens
+                      ),
                     }}
                   />
-                  <span className="text-[10px] text-white/50">
+                  <span
+                    className="text-[10px]"
+                    style={{ color: tokens.textMuted }}
+                  >
                     {STATUS_LABELS[
                       isUser
                         ? (entity as (typeof users)[number]).status
@@ -132,7 +151,8 @@ export default function EntityDetailPanel() {
               </div>
             </div>
             <button
-              className="sq-tap flex h-6 w-6 items-center justify-center rounded-lg text-white/40 hover:bg-white/10 hover:text-white/70"
+              className="sq-tap flex h-6 w-6 items-center justify-center rounded-lg transition-colors"
+              style={{ color: tokens.textMuted }}
               onClick={() => setSelectedEntity(null)}
               aria-label="Close panel"
             >
@@ -147,20 +167,32 @@ export default function EntityDetailPanel() {
               <>
                 {(entity as (typeof users)[number]).activity && (
                   <div>
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-white/30">
+                    <p
+                      className="text-[10px] font-medium uppercase tracking-wider"
+                      style={{ color: tokens.textMuted }}
+                    >
                       Activity
                     </p>
-                    <p className="text-xs text-white/70">
+                    <p
+                      className="text-xs"
+                      style={{ color: tokens.textSecondary }}
+                    >
                       {(entity as (typeof users)[number]).activity}
                     </p>
                   </div>
                 )}
                 {(entity as (typeof users)[number]).statusMessage && (
                   <div>
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-white/30">
+                    <p
+                      className="text-[10px] font-medium uppercase tracking-wider"
+                      style={{ color: tokens.textMuted }}
+                    >
                       Status
                     </p>
-                    <p className="text-xs text-white/70">
+                    <p
+                      className="text-xs"
+                      style={{ color: tokens.textSecondary }}
+                    >
                       {(entity as (typeof users)[number]).statusEmoji}{" "}
                       {(entity as (typeof users)[number]).statusMessage}
                     </p>
@@ -174,16 +206,25 @@ export default function EntityDetailPanel() {
               <>
                 {(entity as (typeof agents)[number]).currentTask && (
                   <div>
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-white/30">
+                    <p
+                      className="text-[10px] font-medium uppercase tracking-wider"
+                      style={{ color: tokens.textMuted }}
+                    >
                       Current Task
                     </p>
-                    <p className="text-xs text-white/70">
+                    <p
+                      className="text-xs"
+                      style={{ color: tokens.textSecondary }}
+                    >
                       {(entity as (typeof agents)[number]).currentTask}
                     </p>
                   </div>
                 )}
                 <div>
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-white/30">
+                  <p
+                    className="text-[10px] font-medium uppercase tracking-wider"
+                    style={{ color: tokens.textMuted }}
+                  >
                     Desk Items
                   </p>
                   <p className="text-sm">
@@ -195,10 +236,13 @@ export default function EntityDetailPanel() {
 
             {/* Location */}
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-white/30">
+              <p
+                className="text-[10px] font-medium uppercase tracking-wider"
+                style={{ color: tokens.textMuted }}
+              >
                 Position
               </p>
-              <p className="text-xs text-white/50">
+              <p className="text-xs" style={{ color: tokens.textMuted }}>
                 Tile ({(entity as { x: number; y: number }).x},{" "}
                 {(entity as { x: number; y: number }).y})
               </p>
@@ -206,12 +250,15 @@ export default function EntityDetailPanel() {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-1 border-t border-white/10 px-4 py-3">
+          <div
+            className="flex gap-1 px-4 py-3"
+            style={{ borderTop: `1px solid ${tokens.borderSubtle}` }}
+          >
             <ActionButton
               icon={MessageSquare}
               label="Message"
+              tokens={tokens}
               onClick={() => {
-                /* Focus the chat input below */
                 const input = document.getElementById("entity-chat-input");
                 if (input) input.focus();
               }}
@@ -219,6 +266,7 @@ export default function EntityDetailPanel() {
             <ActionButton
               icon={Hand}
               label="Wave"
+              tokens={tokens}
               onClick={() => {
                 if (selectedEntity) sendWave(selectedEntity);
               }}
@@ -227,24 +275,38 @@ export default function EntityDetailPanel() {
               icon={Eye}
               label={isFollowing ? "Unfollow" : "Follow"}
               active={isFollowing}
+              tokens={tokens}
               onClick={() => {
                 setFollowingEntity(isFollowing ? null : selectedEntity);
               }}
             />
-            {!isUser && <ActionButton icon={Zap} label="Run task" />}
+            {!isUser && (
+              <ActionButton icon={Zap} label="Run task" tokens={tokens} />
+            )}
           </div>
 
           {/* Quick Chat (proximity only) */}
           {isNearby && (
-            <div className="border-t border-white/10 px-4 py-3">
-              <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
+            <div
+              className="px-4 py-3"
+              style={{ borderTop: `1px solid ${tokens.borderSubtle}` }}
+            >
+              <p
+                className="mb-2 text-[10px] font-medium uppercase tracking-wider"
+                style={{ color: tokens.textMuted }}
+              >
                 Quick Chat
               </p>
               <div className="flex gap-1.5">
                 <input
                   id="entity-chat-input"
                   type="text"
-                  className="flex-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white placeholder-white/30 outline-none focus:border-white/25"
+                  className="flex-1 rounded-lg px-2.5 py-1.5 text-xs outline-none"
+                  style={{
+                    backgroundColor: tokens.accentSoft,
+                    border: `1px solid ${tokens.borderSubtle}`,
+                    color: tokens.text,
+                  }}
                   placeholder="Say something..."
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
@@ -257,7 +319,8 @@ export default function EntityDetailPanel() {
                   maxLength={120}
                 />
                 <button
-                  className="sq-tap flex h-7 w-7 items-center justify-center rounded-lg text-white/40 hover:bg-white/10 hover:text-white/70"
+                  className="sq-tap flex h-7 w-7 items-center justify-center rounded-lg transition-colors"
+                  style={{ color: tokens.textMuted }}
                   onClick={handleSendChat}
                   aria-label="Send message"
                 >
@@ -277,17 +340,21 @@ function ActionButton({
   label,
   onClick,
   active,
+  tokens,
 }: {
   readonly icon: typeof MessageSquare;
   readonly label: string;
   readonly onClick?: () => void;
   readonly active?: boolean;
+  readonly tokens: OfficeThemeTokens;
 }) {
   return (
     <button
-      className={`sq-tap flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 transition-colors hover:bg-white/10 hover:text-white/80 ${
-        active ? "bg-white/10 text-white/80" : "text-white/50"
-      }`}
+      className="sq-tap flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 transition-colors"
+      style={{
+        color: active ? tokens.accent : tokens.textMuted,
+        backgroundColor: active ? tokens.accentSoft : "transparent",
+      }}
       title={label}
       onClick={onClick}
     >

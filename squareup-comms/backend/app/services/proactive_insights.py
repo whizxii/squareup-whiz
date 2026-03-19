@@ -56,6 +56,8 @@ async def run_proactive_insights() -> None:
 
     Called every scheduler tick (60s), but most checks only produce
     new insights when thresholds are crossed.
+
+    Top-priority insights (critical severity) are enriched with LLM reasoning.
     """
     try:
         insights: list[Insight] = []
@@ -76,10 +78,80 @@ async def run_proactive_insights() -> None:
             return
 
         logger.info("Generated %d proactive insights", len(insights))
-        await _broadcast_insights(insights)
+
+        # Enrich critical insights with LLM reasoning (up to 3 to keep latency low)
+        enriched = await _enrich_critical_insights(insights)
+
+        await _broadcast_insights(enriched)
 
     except Exception:
         logger.error("Proactive insights tick failed", exc_info=True)
+
+
+async def _enrich_critical_insights(insights: list[Insight]) -> list[Insight]:
+    """Add LLM reasoning to critical insights. Returns original list if LLM unavailable."""
+    try:
+        from app.services.llm_service import llm_available
+        if not llm_available():
+            return insights
+    except ImportError:
+        return insights
+
+    from app.core.db import async_session
+    from app.core.background import BackgroundTaskManager
+    from app.core.events import EventBus
+    from app.services.ai.insights_engine import AIInsightsEngine
+
+    critical = [i for i in insights if i.severity == "critical"][:3]
+    if not critical:
+        return insights
+
+    try:
+        async with async_session() as session:
+            engine = AIInsightsEngine(
+                session=session,
+                events=EventBus(),
+                background=BackgroundTaskManager(),
+            )
+            enriched_map: dict[str, dict] = {}
+            for insight in critical:
+                try:
+                    enrichment = await engine.enrich_insight(
+                        insight_type=insight.type,
+                        entity_name=insight.entity_name,
+                        base_description=insight.description,
+                        metadata=insight.metadata,
+                    )
+                    enriched_map[insight.entity_id] = enrichment
+                except Exception:
+                    logger.debug("Enrichment failed for %s", insight.entity_id, exc_info=True)
+
+        # Rebuild list with enriched descriptions where available
+        result: list[Insight] = []
+        for insight in insights:
+            enrichment = enriched_map.get(insight.entity_id)
+            if enrichment:
+                result.append(Insight(
+                    type=insight.type,
+                    severity=insight.severity,
+                    title=insight.title,
+                    description=enrichment.get("enriched_description", insight.description),
+                    entity_type=insight.entity_type,
+                    entity_id=insight.entity_id,
+                    entity_name=insight.entity_name,
+                    owner_id=insight.owner_id,
+                    metadata={
+                        **insight.metadata,
+                        "ai_reasoning": enrichment.get("ai_reasoning", ""),
+                        "suggested_actions": enrichment.get("suggested_actions", []),
+                    },
+                ))
+            else:
+                result.append(insight)
+        return result
+    except Exception:
+        logger.warning("LLM enrichment of insights failed; using rule-based descriptions", exc_info=True)
+        return insights
 
 
 # ---------------------------------------------------------------------------

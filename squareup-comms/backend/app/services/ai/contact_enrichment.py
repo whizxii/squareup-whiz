@@ -174,12 +174,87 @@ def serialize_enrichment(
     }
 
 
+_ENRICHMENT_SYSTEM = """You are a professional profile enrichment AI. Given contact information, generate a plausible professional profile.
+
+Return ONLY valid JSON:
+{
+  "bio": "2-3 sentence professional bio",
+  "headline": "LinkedIn-style headline under 80 characters",
+  "location": "City, Country",
+  "timezone": "IANA timezone (e.g. America/New_York)",
+  "skills": ["skill1", "skill2"],
+  "interests": ["interest1", "interest2"],
+  "confidence_score": <0.0-1.0>
+}
+Provide 4-6 skills relevant to their role, 2-4 interests. confidence_score reflects data quality (0.5-0.8 typical)."""
+
+
+class LLMEnrichmentService:
+    """LLM-powered contact enrichment using Gemini (free)."""
+
+    def __init__(self) -> None:
+        self._fallback = MockEnrichmentService()
+
+    async def enrich(self, contact: CRMContact) -> EnrichmentResult:
+        from app.services.llm_service import get_llm_client, llm_available, parse_llm_json
+
+        if not llm_available():
+            return self._fallback.enrich(contact)
+
+        try:
+            client = get_llm_client()  # Gemini free tier
+            context = (
+                f"Name: {contact.name or 'Unknown'}\n"
+                f"Title: {contact.title or 'Unknown'}\n"
+                f"Company: {contact.company or 'Unknown'}\n"
+                f"Email: {contact.email or 'Unknown'}\n"
+                f"AI tags: {contact.ai_tags or '[]'}\n"
+                f"Activity count: {contact.activity_count or 0}"
+            )
+            response = await client.chat(
+                messages=[{"role": "user", "content": f"Enrich this contact profile:\n\n{context}"}],
+                system=_ENRICHMENT_SYSTEM,
+                max_tokens=600,
+                temperature=0.4,
+            )
+            parsed = parse_llm_json(response)
+            if not parsed:
+                return self._fallback.enrich(contact)
+
+            # Use mock for fields LLM can't infer (education, work history, news)
+            mock = self._fallback.enrich(contact)
+            name_slug = (contact.name or "user").lower().replace(" ", "")
+            skills = tuple(s for s in parsed.get("skills", []) if isinstance(s, str))[:8]
+            interests = tuple(i for i in parsed.get("interests", []) if isinstance(i, str))[:6]
+
+            return EnrichmentResult(
+                linkedin_url=f"https://linkedin.com/in/{name_slug}",
+                twitter_url=None,
+                github_url=None,
+                bio=parsed.get("bio", mock.bio),
+                headline=parsed.get("headline", mock.headline),
+                location=parsed.get("location", mock.location),
+                timezone=parsed.get("timezone", mock.timezone),
+                education=mock.education,
+                work_history=mock.work_history,
+                skills=skills if skills else mock.skills,
+                interests=interests if interests else mock.interests,
+                mutual_connections=(),
+                company_news=mock.company_news,
+                confidence_score=max(0.0, min(1.0, float(parsed.get("confidence_score", 0.7)))),
+                source="llm-enrichment-gemini",
+            )
+        except Exception:
+            logger.exception("LLM enrichment failed, using fallback")
+            return self._fallback.enrich(contact)
+
+
 class ContactEnrichmentService(BaseService):
     """Business logic for AI-powered contact enrichment."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._enricher = MockEnrichmentService()
+        self._enricher = LLMEnrichmentService()
 
     @property
     def contact_repo(self) -> ContactRepository:
@@ -191,7 +266,7 @@ class ContactEnrichmentService(BaseService):
         if contact is None:
             return None
 
-        result = self._enricher.enrich(contact)
+        result = await self._enricher.enrich(contact)
         serialized = serialize_enrichment(result, contact_id)
 
         # Emit event for activity capture

@@ -193,12 +193,96 @@ def serialize_relationship(
     }
 
 
+_RELATIONSHIP_SYSTEM = """You are a CRM relationship strength analyzer. Analyze this contact's relationship health.
+
+Return ONLY valid JSON:
+{
+  "strength": <1-10>,
+  "interaction_count": <int>,
+  "last_interaction_at": "ISO datetime or null",
+  "avg_response_time_hours": <float>,
+  "sentiment_trend": "warming|stable|cooling",
+  "sentiment_score": <0.0-1.0>,
+  "communication_frequency": "daily|weekly|monthly|quarterly|inactive",
+  "factors": [
+    {"factor": "...", "impact": "positive|negative|neutral", "detail": "..."}
+  ]
+}
+Provide 2-3 factors. Strength: 1-3=weak, 4-6=moderate, 7-10=strong."""
+
+
+class LLMRelationshipService:
+    """LLM-powered relationship strength analysis using Gemini (free)."""
+
+    def __init__(self) -> None:
+        self._fallback = MockRelationshipService()
+
+    async def analyze(self, contact: CRMContact) -> RelationshipResult:
+        from app.services.llm_service import get_llm_client, llm_available, parse_llm_json
+
+        if not llm_available():
+            return self._fallback.analyze(contact)
+
+        try:
+            client = get_llm_client()  # Gemini free tier
+            context = (
+                f"Name: {contact.name or 'Unknown'}\n"
+                f"Title: {contact.title or 'Unknown'}\n"
+                f"Company: {contact.company or 'Unknown'}\n"
+                f"Activity count: {contact.activity_count or 0}\n"
+                f"Current relationship strength: {contact.relationship_strength or 0}/10\n"
+                f"Sentiment score: {contact.sentiment_score or 0}\n"
+                f"AI tags: {contact.ai_tags or '[]'}\n"
+                f"Last activity: {contact.last_activity_at.isoformat() if contact.last_activity_at else 'Never'}"
+            )
+            response = await client.chat(
+                messages=[{"role": "user", "content": f"Analyze relationship strength for this contact:\n\n{context}"}],
+                system=_RELATIONSHIP_SYSTEM,
+                max_tokens=600,
+                temperature=0.3,
+            )
+            parsed = parse_llm_json(response)
+            if not parsed:
+                return self._fallback.analyze(contact)
+
+            sentiment_trend = parsed.get("sentiment_trend", "stable")
+            if sentiment_trend not in ("warming", "stable", "cooling"):
+                sentiment_trend = "stable"
+            frequency = parsed.get("communication_frequency", "monthly")
+            if frequency not in ("daily", "weekly", "monthly", "quarterly", "inactive"):
+                frequency = "monthly"
+
+            raw_factors = parsed.get("factors", [])
+            factors = tuple(
+                RelationshipFactor(
+                    f.get("factor", "Unknown"),
+                    f.get("impact", "neutral"),
+                    f.get("detail", ""),
+                )
+                for f in raw_factors[:4] if isinstance(f, dict) and f.get("factor")
+            ) or tuple(random.sample(_FACTOR_POOL, k=2))
+
+            return RelationshipResult(
+                strength=max(1, min(10, int(parsed.get("strength", 5)))),
+                interaction_count=max(0, int(parsed.get("interaction_count", contact.activity_count or 0))),
+                last_interaction_at=parsed.get("last_interaction_at"),
+                avg_response_time_hours=max(0.0, float(parsed.get("avg_response_time_hours", 24.0))),
+                sentiment_trend=sentiment_trend,
+                sentiment_score=max(0.0, min(1.0, float(parsed.get("sentiment_score", 0.5)))),
+                communication_frequency=frequency,
+                factors=factors,
+            )
+        except Exception:
+            logger.exception("LLM relationship analysis failed, using fallback")
+            return self._fallback.analyze(contact)
+
+
 class RelationshipStrengthService(BaseService):
     """Business logic for AI-powered relationship strength analysis."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._analyzer = MockRelationshipService()
+        self._analyzer = LLMRelationshipService()
 
     @property
     def contact_repo(self) -> ContactRepository:
@@ -210,7 +294,7 @@ class RelationshipStrengthService(BaseService):
         if contact is None:
             return None
 
-        result = self._analyzer.analyze(contact)
+        result = await self._analyzer.analyze(contact)
         serialized = serialize_relationship(result, contact_id)
 
         # Persist denormalized strength

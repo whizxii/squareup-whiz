@@ -122,6 +122,31 @@ const ACTIVITY_TYPE_CONFIG: Record<ActivityType, ActivityTypeConfig> = {
     label: "Workflow",
     color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   },
+  chat_mention: {
+    icon: <MessageSquarePlus className="w-3.5 h-3.5" />,
+    label: "Chat Mention",
+    color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  },
+  chat_deal_signal: {
+    icon: <TrendingUp className="w-3.5 h-3.5" />,
+    label: "Deal Signal",
+    color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  },
+  chat_action_item: {
+    icon: <Bot className="w-3.5 h-3.5" />,
+    label: "Action Item",
+    color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  },
+  chat_meeting_request: {
+    icon: <Calendar className="w-3.5 h-3.5" />,
+    label: "Meeting Request",
+    color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+  },
+  chat_follow_up: {
+    icon: <Clock className="w-3.5 h-3.5" />,
+    label: "Chat Follow-up",
+    color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  },
 };
 
 // ─── Filter chips ───────────────────────────────────────────────

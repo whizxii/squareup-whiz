@@ -753,6 +753,19 @@ def llm_available() -> bool:
     return bool(settings.GEMINI_API_KEY or settings.ANTHROPIC_API_KEY or settings.GROQ_API_KEY)
 
 
+def parse_llm_json(text: str) -> dict | None:
+    """Strip markdown code fences and parse JSON from an LLM response."""
+    import re
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*\n?", "", text)
+    text = re.sub(r"\n?```$", "", text)
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Backwards-compatible singleton (used by old invoke endpoint)
 # ---------------------------------------------------------------------------

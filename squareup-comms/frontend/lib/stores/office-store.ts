@@ -145,6 +145,15 @@ export interface OfficeLayout {
   readonly gridRows: number;
 }
 
+/** Snapshot of editable state for undo/redo and cancel-to-revert. */
+export interface EditorSnapshot {
+  readonly zones: readonly OfficeZone[];
+  readonly furniture: readonly OfficeFurniture[];
+  readonly layout: OfficeLayout;
+}
+
+const MAX_UNDO_HISTORY = 50;
+
 // ---------------------------------------------------------------------------
 // Defaults
 // ---------------------------------------------------------------------------
@@ -210,7 +219,7 @@ interface OfficeState {
   readonly cameraOffset: { readonly x: number; readonly y: number };
 
   // UI state
-  readonly viewMode: "grid" | "pixel";
+  readonly viewMode: "simplified" | "immersive";
   readonly selectedEntity: { readonly type: "user" | "agent"; readonly id: string } | null;
   readonly editMode: boolean;
   readonly showGrid: boolean;
@@ -229,6 +238,11 @@ interface OfficeState {
   readonly weather: WeatherCondition;
   readonly ambientEvents: readonly AmbientEvent[];
 
+  // Editor state (undo/redo + snapshot for cancel)
+  readonly editorHistory: readonly EditorSnapshot[];
+  readonly editorFuture: readonly EditorSnapshot[];
+  readonly editorSnapshot: EditorSnapshot | null;
+
   // Actions
   readonly setUsers: (users: readonly OfficeUser[]) => void;
   readonly setAgents: (agents: readonly OfficeAgent[]) => void;
@@ -242,7 +256,7 @@ interface OfficeState {
   readonly moveAgent: (agentId: string, x: number, y: number) => void;
   readonly setZoom: (zoom: number) => void;
   readonly setCameraOffset: (x: number, y: number) => void;
-  readonly setViewMode: (mode: "grid" | "pixel") => void;
+  readonly setViewMode: (mode: "simplified" | "immersive") => void;
   readonly setEditMode: (editMode: boolean) => void;
   readonly setShowGrid: (showGrid: boolean) => void;
   readonly setListViewActive: (active: boolean) => void;
@@ -254,7 +268,22 @@ interface OfficeState {
   readonly setFurniture: (furniture: readonly OfficeFurniture[]) => void;
   readonly addFurniture: (item: OfficeFurniture) => void;
   readonly removeFurniture: (id: string) => void;
+  readonly moveFurniture: (id: string, x: number, y: number) => void;
+  readonly updateFurniture: (id: string, patch: Partial<OfficeFurniture>) => void;
+  readonly rotateFurniture: (id: string) => void;
   readonly setLayout: (layout: OfficeLayout) => void;
+
+  // Zone CRUD
+  readonly setZones: (zones: readonly OfficeZone[]) => void;
+  readonly addZone: (zone: OfficeZone) => void;
+  readonly updateZone: (id: string, patch: Partial<OfficeZone>) => void;
+  readonly deleteZone: (id: string) => void;
+
+  // Editor undo/redo
+  readonly pushEditorUndo: () => void;
+  readonly editorUndo: () => void;
+  readonly editorRedo: () => void;
+  readonly cancelEdits: () => void;
 
   // Hydration
   readonly hydrateUsers: (
@@ -342,7 +371,7 @@ export const useOfficeStore = create<OfficeState>((set) => ({
   cameraOffset: { x: 0, y: 0 },
 
   // UI state
-  viewMode: "grid",
+  viewMode: "simplified",
   selectedEntity: null,
   editMode: false,
   showGrid: false,
@@ -360,6 +389,11 @@ export const useOfficeStore = create<OfficeState>((set) => ({
   dayPhase: "morning",
   weather: "clear",
   ambientEvents: [],
+
+  // Editor state
+  editorHistory: [],
+  editorFuture: [],
+  editorSnapshot: null,
 
   // Actions — all immutable (return new objects)
   setUsers: (users) => set({ users }),
@@ -409,7 +443,17 @@ export const useOfficeStore = create<OfficeState>((set) => ({
   setZoom: (zoom) => set({ zoom: Math.max(0.5, Math.min(2.0, zoom)) }),
   setCameraOffset: (x, y) => set({ cameraOffset: { x, y } }),
   setViewMode: (mode) => set({ viewMode: mode }),
-  setEditMode: (editMode) => set({ editMode, showGrid: editMode }),
+  setEditMode: (editMode) =>
+    set((s) => ({
+      editMode,
+      showGrid: editMode,
+      // Snapshot current state when entering edit mode; clear on exit
+      editorSnapshot: editMode
+        ? { zones: s.zones, furniture: s.furniture, layout: s.layout }
+        : null,
+      editorHistory: editMode ? [] : s.editorHistory,
+      editorFuture: editMode ? [] : s.editorFuture,
+    })),
   setShowGrid: (showGrid) => set({ showGrid }),
   setListViewActive: (active) => set({ listViewActive: active }),
   setMinimapExpanded: (expanded) => set({ minimapExpanded: expanded }),
@@ -428,7 +472,93 @@ export const useOfficeStore = create<OfficeState>((set) => ({
     set((s) => ({ furniture: [...s.furniture, item] })),
   removeFurniture: (id) =>
     set((s) => ({ furniture: s.furniture.filter((f) => f.id !== id) })),
+  moveFurniture: (id, x, y) =>
+    set((s) => ({
+      furniture: s.furniture.map((f) => (f.id === id ? { ...f, x, y } : f)),
+    })),
+  updateFurniture: (id, patch) =>
+    set((s) => ({
+      furniture: s.furniture.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+    })),
+  rotateFurniture: (id) =>
+    set((s) => ({
+      furniture: s.furniture.map((f) =>
+        f.id === id
+          ? { ...f, rotation: ((f.rotation ?? 0) + 90) % 360 }
+          : f
+      ),
+    })),
   setLayout: (layout) => set({ layout }),
+
+  // Zone CRUD
+  setZones: (zones) => set({ zones }),
+  addZone: (zone) => set((s) => ({ zones: [...s.zones, zone] })),
+  updateZone: (id, patch) =>
+    set((s) => ({
+      zones: s.zones.map((z) => (z.id === id ? { ...z, ...patch } : z)),
+    })),
+  deleteZone: (id) =>
+    set((s) => ({
+      zones: s.zones.filter((z) => z.id !== id),
+      // Remove furniture assigned to the deleted zone
+      furniture: s.furniture.map((f) =>
+        f.zoneId === id ? { ...f, zoneId: undefined } : f
+      ),
+    })),
+
+  // Editor undo/redo
+  pushEditorUndo: () =>
+    set((s) => ({
+      editorHistory: [
+        ...s.editorHistory.slice(-MAX_UNDO_HISTORY + 1),
+        { zones: s.zones, furniture: s.furniture, layout: s.layout },
+      ],
+      editorFuture: [], // clear redo on new action
+    })),
+  editorUndo: () =>
+    set((s) => {
+      if (s.editorHistory.length === 0) return s;
+      const prev = s.editorHistory[s.editorHistory.length - 1];
+      return {
+        editorHistory: s.editorHistory.slice(0, -1),
+        editorFuture: [
+          { zones: s.zones, furniture: s.furniture, layout: s.layout },
+          ...s.editorFuture,
+        ],
+        zones: prev.zones,
+        furniture: prev.furniture,
+        layout: prev.layout,
+      };
+    }),
+  editorRedo: () =>
+    set((s) => {
+      if (s.editorFuture.length === 0) return s;
+      const next = s.editorFuture[0];
+      return {
+        editorFuture: s.editorFuture.slice(1),
+        editorHistory: [
+          ...s.editorHistory,
+          { zones: s.zones, furniture: s.furniture, layout: s.layout },
+        ],
+        zones: next.zones,
+        furniture: next.furniture,
+        layout: next.layout,
+      };
+    }),
+  cancelEdits: () =>
+    set((s) => {
+      if (!s.editorSnapshot) return { editMode: false, showGrid: false };
+      return {
+        zones: s.editorSnapshot.zones,
+        furniture: s.editorSnapshot.furniture,
+        layout: s.editorSnapshot.layout,
+        editMode: false,
+        showGrid: false,
+        editorSnapshot: null,
+        editorHistory: [],
+        editorFuture: [],
+      };
+    }),
 
   // Hydration — populate users from backend API response
   hydrateUsers: (apiUsers, myUserId) => {

@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cream: #f5f2ed;
+  --cream-dark: #eae5dd;
+  --coral: #FF5A36;
+  --coral-bright: #F73B20;
+  --maze-black: #212121;
+  --maze-gray: #757575;
+}
+
+body {
+  color: var(--maze-black);
+  background: var(--cream);
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--maze-gray);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--maze-black);
+}
+
+/* Glass morphism utility */
+.glass {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.40), rgba(255, 255, 255, 0.20));
+  backdrop-filter: blur(48px) saturate(2.0);
+  -webkit-backdrop-filter: blur(48px) saturate(2.0);
+}
+
+/* Source chip style */
+.source-chip {
+  @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-pill border border-maze-gray/30 text-maze-gray bg-white/60;
+}
+
+/* Coral glow for executive summary */
+.coral-glow {
+  box-shadow: 0 0 20px rgba(255, 90, 54, 0.15), 0 0 40px rgba(255, 90, 54, 0.05);
+  border: 1.5px solid rgba(255, 90, 54, 0.3);
+}

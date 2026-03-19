@@ -27,7 +27,9 @@ from app.core.responses import (
 from app.core.rate_limit import limiter, rate_limit_handler
 from slowapi.errors import RateLimitExceeded
 from app.websocket.manager import hub_manager
-from app.websocket.handlers import handle_ws_message
+from app.websocket.handlers import handle_ws_message, set_event_bus
+from app.services.ai.chat_intelligence import ChatIntelligenceService
+from app.services.chat_activity_bridge import ChatActivityBridge
 from app.api.channels import router as channels_router
 from app.api.messages import router as messages_router
 from app.api.crm import router as crm_router
@@ -59,6 +61,10 @@ from app.api.reminders import router as reminders_router
 from app.api.custom_tools import router as custom_tools_router
 from app.api.mcp import router as mcp_router
 from app.api.integrations import router as integrations_router
+from app.api.chat_intelligence import router as chat_intelligence_router
+from app.api.office import router as office_router
+from app.api.ai_insights import router as ai_insights_router
+from app.api.automation import router as automation_router
 
 # Initialize structured logging before anything else
 setup_logging()
@@ -96,6 +102,21 @@ async def lifespan(application: FastAPI):
     )
     activity_capture.register_handlers()
     logger.info("Activity auto-capture handlers registered.")
+
+    # Register Chat Intelligence pipeline (chat → CRM signals)
+    set_event_bus(application.state.event_bus)
+    chat_intelligence = ChatIntelligenceService(
+        event_bus=application.state.event_bus,
+        session_factory=async_session,
+    )
+    chat_intelligence.register_handlers()
+
+    chat_bridge = ChatActivityBridge(
+        event_bus=application.state.event_bus,
+        session_factory=async_session,
+    )
+    chat_bridge.register_handlers()
+    logger.info("Chat Intelligence pipeline registered.")
 
     # Register follow-up auto-creation handlers
     followup_svc = FollowUpService(
@@ -204,6 +225,10 @@ app.include_router(reminders_router)
 app.include_router(custom_tools_router)
 app.include_router(mcp_router)
 app.include_router(integrations_router)
+app.include_router(chat_intelligence_router)
+app.include_router(office_router)
+app.include_router(ai_insights_router)
+app.include_router(automation_router)
 
 
 @app.get("/health")

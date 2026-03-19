@@ -196,7 +196,100 @@ async def load_agent_memory(agent_id: str, user_id: str) -> str:
     return "\n".join(facts) if facts else ""
 
 
-def build_system_prompt(agent: Agent, memory_facts: str) -> str:
+async def load_crm_intelligence(user_id: str) -> str:
+    """Load live CRM intelligence signals to inject into Donna's context.
+
+    Pulls high-priority unread insights, open pipeline summary, and pending
+    automation reviews — giving Donna situational awareness without requiring
+    the user to ask.
+    """
+    import json
+    from datetime import timedelta
+
+    from sqlmodel import select as _select
+
+    from app.models.ai_insight import AIInsight
+    from app.models.automation_log import AutomationLog
+    from app.models.crm import CRMDeal
+
+    parts: list[str] = []
+    cutoff = datetime.utcnow() - timedelta(days=7)
+
+    try:
+        async with async_session() as session:
+            # Recent high-priority unread insights
+            stmt = (
+                _select(AIInsight)
+                .where(
+                    AIInsight.target_user_id == user_id,
+                    AIInsight.is_dismissed == False,  # noqa: E712
+                    AIInsight.created_at >= cutoff,
+                    AIInsight.severity.in_(["high", "critical"]),
+                )
+                .order_by(AIInsight.created_at.desc())
+                .limit(5)
+            )
+            result = await session.execute(stmt)
+            insights = list(result.scalars().all())
+
+            if insights:
+                lines = [
+                    f"- [{i.severity.upper()}] {i.title}: {i.description}"
+                    for i in insights
+                ]
+                parts.append("### Recent AI Insights (high-priority, unread):\n" + "\n".join(lines))
+
+            # Open deals pipeline summary
+            stmt = (
+                _select(CRMDeal)
+                .where(CRMDeal.stage.notin_(["won", "lost"]))
+                .limit(10)
+            )
+            result = await session.execute(stmt)
+            open_deals = list(result.scalars().all())
+
+            if open_deals:
+                total = sum(d.amount or 0 for d in open_deals)
+                lines = [
+                    f"- {d.title} ({d.stage}, ${d.amount or 0:,.0f})"
+                    for d in open_deals[:5]
+                ]
+                suffix = "\n  ..." if len(open_deals) > 5 else ""
+                parts.append(
+                    f"### Open Pipeline ({len(open_deals)} deals, ${total:,.0f} total):\n"
+                    + "\n".join(lines) + suffix
+                )
+
+            # Pending automation reviews
+            stmt = (
+                _select(AutomationLog)
+                .where(AutomationLog.status == "pending_review")
+                .limit(5)
+            )
+            result = await session.execute(stmt)
+            pending = list(result.scalars().all())
+
+            if pending:
+                lines = [
+                    f"- {p.action_type} on {p.entity_name} ({int(p.confidence * 100)}% confidence)"
+                    for p in pending
+                ]
+                parts.append(
+                    f"### Pending AI Actions Needing Review ({len(pending)}):\n"
+                    + "\n".join(lines)
+                )
+
+    except Exception:
+        logger.debug("CRM intelligence load failed (non-fatal)", exc_info=True)
+        return ""
+
+    if not parts:
+        return ""
+
+    return "## Live CRM Intelligence\n\n" + "\n\n".join(parts)
+
+
+def build_system_prompt(agent: Agent, memory_facts: str, crm_intelligence: str = "") -> str:
     """Assemble the full system prompt with behavioral rules, personality, memory, and timestamp."""
     parts: list[str] = [UNIVERSAL_AGENT_INSTRUCTIONS]
 
@@ -215,6 +308,10 @@ def build_system_prompt(agent: Agent, memory_facts: str) -> str:
     # Inject persistent memory facts
     if memory_facts:
         parts.append(f"## Things you remember about this user:\n{memory_facts}")
+
+    # Inject live CRM intelligence (pipeline, insights, pending automation)
+    if crm_intelligence:
+        parts.append(crm_intelligence)
 
     parts.append(f"\nCurrent time: {datetime.utcnow().isoformat()}Z")
     return "\n\n".join(parts)

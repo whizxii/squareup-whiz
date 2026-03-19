@@ -1,6 +1,7 @@
 /**
  * Animated proximity rings around the local player.
  * Inner ring (warm glow) for close range, outer ring (subtle pulse) for awareness range.
+ * Themed via useOfficeTheme.
  */
 
 "use client";
@@ -9,13 +10,14 @@ import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 import { TILE } from "@/lib/office/office-renderer";
-import { CHAR_W, CHAR_H } from "@/lib/office/character-generator";
 
 const INNER_RANGE = 2; // tiles
 const OUTER_RANGE = 5; // tiles
 
 export default function ProximityIndicator() {
+  const { tokens } = useOfficeTheme();
   const myUserId = useCurrentUserId();
   const myPosition = useOfficeStore((s) => s.myPosition);
   const users = useOfficeStore((s) => s.users);
@@ -55,6 +57,7 @@ export default function ProximityIndicator() {
 
   const cx = myPosition.x * TILE + TILE / 2;
   const cy = myPosition.y * TILE + TILE / 2;
+  const accent = tokens.accent;
 
   return (
     <AnimatePresence>
@@ -68,8 +71,8 @@ export default function ProximityIndicator() {
             top: cy - OUTER_RANGE * TILE,
             width: OUTER_RANGE * 2 * TILE,
             height: OUTER_RANGE * 2 * TILE,
-            border: "1px solid rgba(255, 107, 0, 0.25)",
-            background: "rgba(255,107,0,0.04)",
+            border: `1px solid ${accent}25`,
+            background: `${accent}08`,
             pointerEvents: "none",
             zIndex: 4,
           }}
@@ -90,9 +93,8 @@ export default function ProximityIndicator() {
             top: cy - INNER_RANGE * TILE,
             width: INNER_RANGE * 2 * TILE,
             height: INNER_RANGE * 2 * TILE,
-            background:
-              "radial-gradient(circle, rgba(255,107,0,0.15) 0%, rgba(255,107,0,0.05) 60%, transparent 100%)",
-            border: "1px solid rgba(255, 107, 0, 0.35)",
+            background: `radial-gradient(circle, ${accent}20 0%, ${accent}08 60%, transparent 100%)`,
+            border: `1px solid ${accent}40`,
             pointerEvents: "none",
             zIndex: 4,
           }}

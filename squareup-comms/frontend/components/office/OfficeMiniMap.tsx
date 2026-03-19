@@ -1,7 +1,8 @@
 /**
  * Glass-style corner minimap showing the entire office floor plan.
- * Orange dots = users, blue dots = agents, pulsing dot = you.
+ * Themed dots for users and agents, pulsing dot = you.
  * Click anywhere on minimap to pan camera.
+ * Fully themed via useOfficeTheme.
  */
 
 "use client";
@@ -11,11 +12,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Maximize2 } from "lucide-react";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 
 const MAP_W = 160;
 const MAP_H = 128;
 
 export default function OfficeMiniMap() {
+  const { tokens } = useOfficeTheme();
   const layout = useOfficeStore((s) => s.layout);
   const users = useOfficeStore((s) => s.users);
   const agents = useOfficeStore((s) => s.agents);
@@ -60,7 +63,11 @@ export default function OfficeMiniMap() {
     <div className="absolute bottom-4 right-4 z-40">
       {/* Collapse / expand toggle */}
       <button
-        className="sq-tap absolute -top-8 right-0 flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white/60 backdrop-blur-md hover:bg-white/20"
+        className="sq-tap absolute -top-8 right-0 flex h-6 w-6 items-center justify-center rounded-full backdrop-blur-md"
+        style={{
+          backgroundColor: tokens.glass,
+          color: tokens.textMuted,
+        }}
         onClick={() => setMinimapExpanded(!minimapExpanded)}
         aria-label={minimapExpanded ? "Collapse minimap" : "Expand minimap"}
       >
@@ -70,12 +77,13 @@ export default function OfficeMiniMap() {
       <AnimatePresence>
         {minimapExpanded && (
           <motion.div
-            className="cursor-crosshair overflow-hidden rounded-xl border border-white/10 shadow-lg"
+            className="cursor-crosshair overflow-hidden rounded-xl shadow-lg"
             style={{
               width: MAP_W,
               height: MAP_H,
-              backgroundColor: "rgba(0,0,0,0.45)",
+              backgroundColor: tokens.glass,
               backdropFilter: "blur(24px) saturate(180%)",
+              border: `1px solid ${tokens.glassBorder}`,
             }}
             initial={{ opacity: 0, scale: 0.9, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -108,7 +116,7 @@ export default function OfficeMiniMap() {
                   style={{
                     left: a.x * scaleX - 4,
                     top: a.y * scaleY - 4,
-                    backgroundColor: "#4a90d9",
+                    backgroundColor: tokens.accent,
                     opacity: 0.8,
                   }}
                 />
@@ -124,7 +132,10 @@ export default function OfficeMiniMap() {
                 style={{
                   left: u.x * scaleX - 5,
                   top: u.y * scaleY - 5,
-                  backgroundColor: u.id === myUserId ? "#FF6B00" : "#22c55e",
+                  backgroundColor:
+                    u.id === myUserId
+                      ? tokens.accentHover
+                      : tokens.status.online,
                 }}
               />
             ))}

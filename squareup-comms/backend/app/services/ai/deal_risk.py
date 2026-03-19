@@ -219,12 +219,97 @@ def serialize_deal_risk(
     }
 
 
+_DEAL_RISK_SYSTEM = """You are a B2B sales deal risk assessment AI. Analyze this deal and identify risk factors.
+
+Return ONLY valid JSON:
+{
+  "risk_level": "low|medium|high|critical",
+  "risk_score": <0-100>,
+  "risk_factors": [
+    {"factor": "...", "severity": "low|medium|high", "detail": "...", "recommendation": "..."}
+  ],
+  "predicted_outcome": "win|lose|stall",
+  "predicted_close_date": "ISO date string or null",
+  "confidence": <0.0-1.0>,
+  "ai_reasoning": "2-3 sentence analysis"
+}
+Provide 2-4 risk factors. Score ranges: low=0-30, medium=30-55, high=55-75, critical=75-100."""
+
+
+class LLMDealRiskService:
+    """LLM-powered deal risk assessment using Claude."""
+
+    def __init__(self) -> None:
+        self._fallback = MockDealRiskService()
+
+    async def assess(self, deal: CRMDeal) -> DealRiskResult:
+        from app.services.llm_service import get_llm_client, llm_available, parse_llm_json
+
+        if not llm_available():
+            return self._fallback.assess(deal)
+
+        try:
+            client = get_llm_client("claude-sonnet-4-6")
+            context = (
+                f"Title: {deal.title or 'Untitled'}\n"
+                f"Stage: {deal.stage or 'Unknown'}\n"
+                f"Value: ${deal.value or 0:,.0f} {deal.currency or 'USD'}\n"
+                f"Probability: {deal.probability}%\n"
+                f"Deal health: {deal.deal_health or 'unknown'}\n"
+                f"Status: {deal.status or 'open'}\n"
+                f"Expected close: {deal.expected_close_date.isoformat() if deal.expected_close_date else 'Not set'}\n"
+                f"Created: {deal.created_at.isoformat() if deal.created_at else 'Unknown'}\n"
+                f"Updated: {deal.updated_at.isoformat() if deal.updated_at else 'Unknown'}"
+            )
+            response = await client.chat(
+                messages=[{"role": "user", "content": f"Assess risk for this deal:\n\n{context}"}],
+                system=_DEAL_RISK_SYSTEM,
+                max_tokens=800,
+                temperature=0.3,
+            )
+            parsed = parse_llm_json(response)
+            if not parsed:
+                return self._fallback.assess(deal)
+
+            def _make_factors(raw: list) -> tuple:
+                factors = tuple(
+                    RiskFactor(
+                        f.get("factor", "Unknown"),
+                        f.get("severity", "medium"),
+                        f.get("detail", ""),
+                        f.get("recommendation", ""),
+                    )
+                    for f in raw[:4] if isinstance(f, dict) and f.get("factor")
+                )
+                return factors if factors else tuple(random.sample(_RISK_FACTOR_POOL, k=2))
+
+            risk_level = parsed.get("risk_level", "medium")
+            if risk_level not in ("low", "medium", "high", "critical"):
+                risk_level = "medium"
+            predicted_outcome = parsed.get("predicted_outcome", "stall")
+            if predicted_outcome not in ("win", "lose", "stall"):
+                predicted_outcome = "stall"
+
+            return DealRiskResult(
+                risk_level=risk_level,
+                risk_score=max(0, min(100, int(parsed.get("risk_score", 50)))),
+                risk_factors=_make_factors(parsed.get("risk_factors", [])),
+                predicted_outcome=predicted_outcome,
+                predicted_close_date=parsed.get("predicted_close_date"),
+                confidence=max(0.0, min(1.0, float(parsed.get("confidence", 0.75)))),
+                ai_reasoning=parsed.get("ai_reasoning", "AI analysis completed."),
+            )
+        except Exception:
+            logger.exception("LLM deal risk assessment failed, using fallback")
+            return self._fallback.assess(deal)
+
+
 class DealRiskService(BaseService):
     """Business logic for AI-powered deal risk assessment."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._assessor = MockDealRiskService()
+        self._assessor = LLMDealRiskService()
 
     @property
     def deal_repo(self) -> DealRepository:
@@ -236,7 +321,7 @@ class DealRiskService(BaseService):
         if deal is None:
             return None
 
-        result = self._assessor.assess(deal)
+        result = await self._assessor.assess(deal)
         serialized = serialize_deal_risk(result, deal_id)
 
         # Update deal health based on risk

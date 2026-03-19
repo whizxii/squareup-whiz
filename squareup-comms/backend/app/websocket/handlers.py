@@ -1,13 +1,25 @@
+from __future__ import annotations
+
 from app.websocket.manager import hub_manager
 from app.core.db import async_session
 from app.models.chat import Message, ChannelMember
 from app.models.users import UserProfile
+from app.core.events import EventBus
 from sqlmodel import select
 import uuid
 import logging
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# Module-level EventBus reference — set by main.py lifespan via set_event_bus()
+_event_bus: EventBus | None = None
+
+
+def set_event_bus(bus: EventBus) -> None:
+    """Called from main.py lifespan to give handlers access to the EventBus."""
+    global _event_bus
+    _event_bus = bus
 
 
 async def handle_ws_message(user_id: str, data: dict):
@@ -31,6 +43,15 @@ async def handle_ws_message(user_id: str, data: dict):
 
     elif msg_type == "office.status":
         await handle_office_status(user_id, data)
+
+    elif msg_type == "call.invite":
+        await handle_call_invite(user_id, data)
+
+    elif msg_type == "call.accept":
+        await handle_call_accept(user_id, data)
+
+    elif msg_type == "call.reject":
+        await handle_call_reject(user_id, data)
 
     else:
         logger.warning(f"Unknown message type: {msg_type}")
@@ -88,6 +109,23 @@ async def handle_chat_send(user_id: str, data: dict):
                 session.add(parent)
 
         await session.commit()
+
+    # Emit event for Chat Intelligence pipeline (async — non-blocking)
+    if _event_bus is not None:
+        import asyncio
+
+        asyncio.create_task(
+            _event_bus.emit(
+                "chat.message_sent",
+                {
+                    "message_id": message.id,
+                    "channel_id": channel_id,
+                    "sender_id": user_id,
+                    "content": content,
+                    "thread_id": thread_id,
+                },
+            )
+        )
 
     # Broadcast to all connected users (simple for 3-person team)
     broadcast_data = {
@@ -244,4 +282,71 @@ async def handle_office_status(user_id: str, data: dict):
             "status_message": status_message,
         },
         exclude=user_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Call signaling
+# ---------------------------------------------------------------------------
+
+
+async def handle_call_invite(user_id: str, data: dict):
+    """Handle call invite — forward to target user."""
+    target_user_id = data.get("target_user_id")
+    room_name = data.get("room_name")
+
+    if not target_user_id or not room_name:
+        return
+
+    # Look up sender display name
+    display_name = user_id
+    async with async_session() as session:
+        profile = await session.get(UserProfile, user_id)
+        if profile is not None:
+            display_name = profile.display_name or profile.email or user_id
+
+    await hub_manager.send_to_user(
+        target_user_id,
+        {
+            "type": "call.invite",
+            "from_user_id": user_id,
+            "from_name": display_name,
+            "room_name": room_name,
+        },
+    )
+
+
+async def handle_call_accept(user_id: str, data: dict):
+    """Handle call accept — notify the inviter that the call was accepted."""
+    target_user_id = data.get("target_user_id")
+    room_name = data.get("room_name")
+
+    if not target_user_id or not room_name:
+        return
+
+    await hub_manager.send_to_user(
+        target_user_id,
+        {
+            "type": "call.accepted",
+            "from_user_id": user_id,
+            "room_name": room_name,
+        },
+    )
+
+
+async def handle_call_reject(user_id: str, data: dict):
+    """Handle call reject — notify the inviter that the call was declined."""
+    target_user_id = data.get("target_user_id")
+    room_name = data.get("room_name")
+
+    if not target_user_id or not room_name:
+        return
+
+    await hub_manager.send_to_user(
+        target_user_id,
+        {
+            "type": "call.rejected",
+            "from_user_id": user_id,
+            "room_name": room_name,
+        },
     )

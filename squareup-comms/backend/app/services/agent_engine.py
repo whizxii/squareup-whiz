@@ -21,6 +21,7 @@ from app.services.conversation_memory import (
     extract_and_save_memory,
     load_agent_memory,
     load_conversation_context,
+    load_crm_intelligence,
 )
 from app.services.llm_service import (
     TextDelta,
@@ -218,7 +219,8 @@ async def run_agent(
     # 2. Build context
     history = await load_conversation_context(channel_id, agent.id, limit=20)
     memory_facts = await load_agent_memory(agent.id, user_id)
-    system_prompt = build_system_prompt(agent, memory_facts)
+    crm_intelligence = await load_crm_intelligence(user_id)
+    system_prompt = build_system_prompt(agent, memory_facts, crm_intelligence=crm_intelligence)
 
     # Start with history + trigger message
     messages: list[dict] = [*history, {"role": "user", "content": content}]

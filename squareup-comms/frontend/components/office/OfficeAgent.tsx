@@ -1,26 +1,39 @@
 /**
- * AI Agent avatar with personality-driven idle behaviors and status animations.
- * Uses canvas sprite for the robot body and Framer Motion for movement/effects.
+ * AI Agent avatar for the immersive office view.
+ *
+ * Enhanced circular avatar with agent icon, status ring, typing dots,
+ * and task bubble. Themed via useOfficeTheme.
  */
 
 "use client";
 
-import { useRef, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { OfficeAgent as AgentType } from "@/lib/stores/office-store";
 import { useOfficeStore } from "@/lib/stores/office-store";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 import { TILE } from "@/lib/office/office-renderer";
-import { generateAgentSprite, CHAR_W, CHAR_H } from "@/lib/office/character-generator";
 
 interface OfficeAgentProps {
   readonly agent: AgentType;
 }
 
-const AGENT_COLORS: Record<string, string> = {
-  "crm-agent": "#06b6d4",
-  "github-agent": "#f43f5e",
-  "meeting-agent": "#8b5cf6",
-  "scheduler-agent": "#f59e0b",
+const AVATAR_SIZE = 38;
+const TOTAL_H = AVATAR_SIZE + 18;
+
+const AGENT_ACCENT: Readonly<Record<string, string>> = {
+  "crm-agent": "#06B6D4",
+  "github-agent": "#F43F5E",
+  "meeting-agent": "#8B5CF6",
+  "scheduler-agent": "#F59E0B",
+};
+
+const AGENT_STATUS_COLORS: Readonly<Record<string, string>> = {
+  idle: "#22C55E",
+  thinking: "#EAB308",
+  working: "#4A90D9",
+  error: "#EF4444",
+  offline: "#9CA3AF",
 };
 
 const springTransition = {
@@ -30,7 +43,7 @@ const springTransition = {
 };
 
 export default function OfficeAgent({ agent }: OfficeAgentProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { tokens } = useOfficeTheme();
 
   const prefersReduced = useMemo(
     () =>
@@ -45,24 +58,10 @@ export default function OfficeAgent({ agent }: OfficeAgentProps) {
   const isSelected =
     selectedEntity?.type === "agent" && selectedEntity?.id === agent.id;
 
-  const color = AGENT_COLORS[agent.id] ?? "#4a90d9";
-
-  // Draw agent sprite
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const sprite = generateAgentSprite(color, agent.icon, agent.status);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, CHAR_W, CHAR_H);
-    ctx.drawImage(sprite, 0, 0);
-  }, [agent.status, agent.icon, color]);
-
-  const transition = prefersReduced ? { duration: 0 } : springTransition;
-
+  const accent = AGENT_ACCENT[agent.id] ?? tokens.accent;
+  const statusColor = AGENT_STATUS_COLORS[agent.status] ?? tokens.textMuted;
   const isWorking = agent.status === "working" || agent.status === "thinking";
+  const transition = prefersReduced ? { duration: 0 } : springTransition;
 
   return (
     <motion.div
@@ -71,24 +70,26 @@ export default function OfficeAgent({ agent }: OfficeAgentProps) {
         top: 0,
         left: 0,
         zIndex: 20 + agent.y,
-        width: CHAR_W,
-        height: CHAR_H,
+        width: AVATAR_SIZE,
+        height: TOTAL_H,
       }}
       animate={{
-        x: agent.x * TILE + (TILE - CHAR_W) / 2,
-        y: agent.y * TILE + (TILE - CHAR_H),
+        x: agent.x * TILE + (TILE - AVATAR_SIZE) / 2,
+        y: agent.y * TILE + (TILE - TOTAL_H) / 2,
       }}
       transition={transition}
       onClick={() => setSelectedEntity({ type: "agent", id: agent.id })}
     >
       {/* Ground shadow */}
       <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2"
+        className="absolute left-1/2 -translate-x-1/2"
         style={{
-          width: CHAR_W * 0.7,
+          bottom: 14,
+          width: AVATAR_SIZE * 0.7,
           height: 6,
           borderRadius: "50%",
-          background: "radial-gradient(ellipse, rgba(0,0,0,0.25), transparent 70%)",
+          background:
+            "radial-gradient(ellipse, rgba(0,0,0,0.18), transparent 70%)",
           pointerEvents: "none",
         }}
       />
@@ -97,10 +98,7 @@ export default function OfficeAgent({ agent }: OfficeAgentProps) {
       <motion.div
         animate={
           !prefersReduced
-            ? {
-                scale: [1, 1.02, 1],
-                y: [0, -1, 0],
-              }
+            ? { scale: [1, 1.02, 1], y: [0, -1, 0] }
             : {}
         }
         transition={
@@ -109,59 +107,88 @@ export default function OfficeAgent({ agent }: OfficeAgentProps) {
             : { duration: 0 }
         }
       >
-        <canvas
-          ref={canvasRef}
-          width={CHAR_W}
-          height={CHAR_H}
-          style={{ imageRendering: "pixelated", filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.35))" }}
-        />
+        {/* Working glow */}
+        {isWorking && !prefersReduced && (
+          <div
+            className="absolute rounded-full"
+            style={{
+              inset: -6,
+              height: AVATAR_SIZE + 12,
+              background: `radial-gradient(circle, ${accent}25, transparent 70%)`,
+              animation: "pulse 2s ease-in-out infinite",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+
+        {/* Selection ring */}
+        {isSelected && (
+          <div
+            className="absolute rounded-full"
+            style={{
+              inset: -3,
+              height: AVATAR_SIZE + 6,
+              border: `2px dashed ${accent}`,
+              opacity: 0.6,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+
+        {/* Avatar circle */}
+        <div
+          className="relative flex items-center justify-center rounded-full text-lg transition-transform hover:scale-110"
+          style={{
+            width: AVATAR_SIZE,
+            height: AVATAR_SIZE,
+            background: `linear-gradient(135deg, ${accent}20, ${accent}40)`,
+            border: `2px solid ${accent}`,
+            boxShadow: isWorking
+              ? `0 0 12px ${accent}30, 0 2px 8px rgba(0,0,0,0.1)`
+              : "0 2px 8px rgba(0,0,0,0.1)",
+          }}
+        >
+          <span>{agent.icon}</span>
+
+          {/* Status dot */}
+          <span
+            className="absolute -bottom-0.5 -right-0.5 rounded-full"
+            style={{
+              width: 9,
+              height: 9,
+              backgroundColor: statusColor,
+              border: `2px solid ${tokens.surface}`,
+            }}
+          />
+        </div>
       </motion.div>
 
       {/* Agent name */}
-      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
+      <div
+        className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap"
+        style={{ bottom: 0 }}
+      >
         <span
           className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none"
           style={{
-            backgroundColor: "rgba(0,0,0,0.5)",
-            color: "rgba(255,255,255,0.9)",
+            backgroundColor: accent + "18",
+            color: accent,
           }}
         >
           {agent.name}
         </span>
       </div>
 
-      {/* Working glow */}
-      {isWorking && !prefersReduced && (
-        <div
-          className="office-agent-glow absolute -inset-2 rounded-full"
-          style={{ pointerEvents: "none" }}
-        />
-      )}
-
-      {/* Status indicator */}
-      <div
-        className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full text-[6px]"
-        style={{
-          backgroundColor:
-            agent.status === "working"
-              ? "#4a90d9"
-              : agent.status === "thinking"
-                ? "#eab308"
-                : agent.status === "error"
-                  ? "#ef4444"
-                  : agent.status === "offline"
-                    ? "#999"
-                    : "#22c55e",
-          border: "1.5px solid white",
-        }}
-      />
-
-      {/* Typing dots when working */}
+      {/* Typing dots */}
       <AnimatePresence>
         {agent.visualState === "typing" && !prefersReduced && (
           <motion.div
-            className="absolute -top-6 left-1/2 -translate-x-1/2 flex gap-1 rounded-full px-2.5 py-1.5 shadow-md"
-            style={{ backgroundColor: "rgba(30, 27, 24, 0.85)" }}
+            className="absolute left-1/2 -translate-x-1/2 flex gap-1 rounded-full px-2.5 py-1.5 shadow-md"
+            style={{
+              top: -24,
+              backgroundColor: tokens.surfaceElevated,
+              border: `1px solid ${tokens.borderSubtle}`,
+            }}
             initial={{ opacity: 0, scale: 0.8, y: 4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 4 }}
@@ -169,7 +196,8 @@ export default function OfficeAgent({ agent }: OfficeAgentProps) {
             {[0, 1, 2].map((i) => (
               <motion.div
                 key={i}
-                className="h-1.5 w-1.5 rounded-full bg-white/70"
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: tokens.textMuted }}
                 animate={{ y: [-1, 1, -1] }}
                 transition={{
                   duration: 0.6,
@@ -186,7 +214,13 @@ export default function OfficeAgent({ agent }: OfficeAgentProps) {
       <AnimatePresence>
         {agent.currentTask && isSelected && (
           <motion.div
-            className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-white/95 px-2 py-1 text-[10px] text-gray-700 shadow-md dark:bg-gray-800/95 dark:text-gray-200"
+            className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg px-2.5 py-1 text-[10px] shadow-md"
+            style={{
+              top: -30,
+              backgroundColor: tokens.surfaceElevated,
+              color: tokens.text,
+              border: `1px solid ${tokens.borderSubtle}`,
+            }}
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
@@ -196,22 +230,19 @@ export default function OfficeAgent({ agent }: OfficeAgentProps) {
         )}
       </AnimatePresence>
 
-      {/* Selection ring */}
-      {isSelected && (
-        <div
-          className="absolute -inset-1 rounded-full border-2 border-dashed"
-          style={{ borderColor: color, pointerEvents: "none" }}
-        />
-      )}
-
       {/* Desk items (personality props) */}
-      <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-0.5">
-        {agent.personality.deskItems.slice(0, 3).map((emoji, i) => (
-          <span key={i} className="text-[10px]" style={{ opacity: 0.8 }}>
-            {emoji}
-          </span>
-        ))}
-      </div>
+      {agent.personality.deskItems.length > 0 && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 flex gap-0.5"
+          style={{ bottom: -4, pointerEvents: "none" }}
+        >
+          {agent.personality.deskItems.slice(0, 3).map((emoji, i) => (
+            <span key={i} className="text-[8px]" style={{ opacity: 0.7 }}>
+              {emoji}
+            </span>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }

@@ -1,36 +1,33 @@
 /**
- * Pixel art character rendered from procedural sprite sheet.
- * Uses Framer Motion for smooth tile-to-tile movement.
- * Displays name label and status indicators.
+ * Enhanced avatar character for the immersive (pixel) office view.
+ *
+ * Renders a circular avatar with profile picture or initials + gradient,
+ * status ring, name label, and activity indicators. Uses Framer Motion
+ * for smooth tile-to-tile interpolation.
  */
 
 "use client";
 
-import { useRef, useEffect, useMemo } from "react";
-import { motion } from "framer-motion";
+import { useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { OfficeUser } from "@/lib/stores/office-store";
 import { useOfficeStore } from "@/lib/stores/office-store";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 import { TILE } from "@/lib/office/office-renderer";
-import {
-  getCachedSpriteSheet,
-  CHAR_W,
-  CHAR_H,
-} from "@/lib/office/character-generator";
 
 interface OfficeCharacterProps {
   readonly user: OfficeUser;
   readonly isMe: boolean;
 }
 
-const WALK_FRAME_MS = 200;
-const SPRITE_W = 16;
-const SCALE = 3;
+const AVATAR_SIZE = 40;
+const TOTAL_H = AVATAR_SIZE + 18; // avatar + name label space
 
-const STATUS_COLORS: Record<string, string> = {
-  online: "#22c55e",
-  away: "#eab308",
-  busy: "#ef4444",
-  dnd: "#ef4444",
+const STATUS_COLORS: Readonly<Record<string, string>> = {
+  online: "#22C55E",
+  away: "#EAB308",
+  busy: "#EF4444",
+  dnd: "#EF4444",
 };
 
 const springTransition = {
@@ -40,9 +37,7 @@ const springTransition = {
 };
 
 export default function OfficeCharacter({ user, isMe }: OfficeCharacterProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const frameRef = useRef(0);
-  const animRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { tokens } = useOfficeTheme();
 
   const prefersReduced = useMemo(
     () =>
@@ -54,58 +49,20 @@ export default function OfficeCharacter({ user, isMe }: OfficeCharacterProps) {
 
   const selectedEntity = useOfficeStore((s) => s.selectedEntity);
   const setSelectedEntity = useOfficeStore((s) => s.setSelectedEntity);
+  const followingEntity = useOfficeStore((s) => s.followingEntity);
+  const setFollowingEntity = useOfficeStore((s) => s.setFollowingEntity);
+
   const isSelected =
     selectedEntity?.type === "user" && selectedEntity?.id === user.id;
+  const isFollowed =
+    followingEntity?.type === "user" && followingEntity?.id === user.id;
 
-  // Draw current sprite frame
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const sheet = getCachedSpriteSheet(user.appearance, user.direction);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const drawFrame = () => {
-      const frame = frameRef.current % 4;
-      ctx.clearRect(0, 0, CHAR_W, CHAR_H);
-      ctx.drawImage(
-        sheet,
-        frame * SPRITE_W * SCALE,
-        0,
-        SPRITE_W * SCALE,
-        CHAR_H,
-        0,
-        0,
-        CHAR_W,
-        CHAR_H
-      );
-    };
-
-    drawFrame();
-
-    // Walk animation cycle
-    if (user.animationState === "walking" && !prefersReduced) {
-      if (animRef.current) clearInterval(animRef.current);
-      animRef.current = setInterval(() => {
-        frameRef.current += 1;
-        drawFrame();
-      }, WALK_FRAME_MS);
-    } else {
-      if (animRef.current) {
-        clearInterval(animRef.current);
-        animRef.current = null;
-      }
-      frameRef.current = 0;
-      drawFrame();
-    }
-
-    return () => {
-      if (animRef.current) clearInterval(animRef.current);
-    };
-  }, [user.direction, user.animationState, user.appearance, prefersReduced]);
-
+  const statusColor = STATUS_COLORS[user.status] ?? tokens.textMuted;
   const transition = prefersReduced ? { duration: 0 } : springTransition;
+
+  const avatarGradient = isMe
+    ? `linear-gradient(135deg, ${tokens.accent}, ${tokens.accentHover})`
+    : `linear-gradient(135deg, ${user.appearance.shirtColor}, ${user.appearance.hairColor})`;
 
   return (
     <motion.div
@@ -114,94 +71,170 @@ export default function OfficeCharacter({ user, isMe }: OfficeCharacterProps) {
         top: 0,
         left: 0,
         zIndex: 20 + user.y,
-        width: CHAR_W,
-        height: CHAR_H,
+        width: AVATAR_SIZE,
+        height: TOTAL_H,
       }}
       animate={{
-        x: user.x * TILE + (TILE - CHAR_W) / 2,
-        y: user.y * TILE + (TILE - CHAR_H),
+        x: user.x * TILE + (TILE - AVATAR_SIZE) / 2,
+        y: user.y * TILE + (TILE - TOTAL_H) / 2,
       }}
       transition={transition}
       onClick={() => {
+        setSelectedEntity({ type: "user", id: user.id });
+      }}
+      onDoubleClick={() => {
         if (!isMe) {
-          setSelectedEntity({ type: "user", id: user.id });
+          setFollowingEntity({ type: "user", id: user.id });
         }
       }}
     >
       {/* Ground shadow */}
       <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2"
+        className="absolute left-1/2 -translate-x-1/2"
         style={{
-          width: CHAR_W * 0.7,
-          height: 6,
+          bottom: 14,
+          width: AVATAR_SIZE * 0.8,
+          height: 8,
           borderRadius: "50%",
-          background: "radial-gradient(ellipse, rgba(0,0,0,0.25), transparent 70%)",
+          background:
+            "radial-gradient(ellipse, rgba(0,0,0,0.2), transparent 70%)",
           pointerEvents: "none",
         }}
       />
 
-      {/* Idle bob animation */}
+      {/* Idle bob / walk animation */}
       <motion.div
         animate={
-          user.animationState === "idle" && !prefersReduced
-            ? { y: [0, -2, 0] }
-            : { y: 0 }
+          user.animationState === "walking" && !prefersReduced
+            ? { y: [0, -3, 0, -3, 0] }
+            : user.animationState === "idle" && !prefersReduced
+              ? { y: [0, -1.5, 0] }
+              : { y: 0 }
         }
         transition={
-          user.animationState === "idle" && !prefersReduced
-            ? { duration: 3, repeat: Infinity, ease: "easeInOut" }
-            : { duration: 0 }
+          user.animationState === "walking" && !prefersReduced
+            ? { duration: 0.6, repeat: Infinity, ease: "easeInOut" }
+            : user.animationState === "idle" && !prefersReduced
+              ? { duration: 3, repeat: Infinity, ease: "easeInOut" }
+              : { duration: 0 }
         }
       >
-        <canvas
-          ref={canvasRef}
-          width={CHAR_W}
-          height={CHAR_H}
-          style={{ imageRendering: "pixelated", filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.35))" }}
-        />
+        {/* Selection / follow ring */}
+        {(isSelected || isFollowed) && (
+          <div
+            className="absolute rounded-full"
+            style={{
+              inset: -3,
+              height: AVATAR_SIZE + 6,
+              border: `2px ${isFollowed ? "solid" : "dashed"} ${tokens.accent}`,
+              opacity: 0.6,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+
+        {/* "Me" pulse ring */}
+        {isMe && !prefersReduced && (
+          <div
+            className="absolute rounded-full"
+            style={{
+              inset: -4,
+              height: AVATAR_SIZE + 8,
+              border: `2px solid ${tokens.accent}`,
+              opacity: 0.15,
+              animation: "pulse 3s ease-in-out infinite",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+
+        {/* Avatar circle */}
+        <div
+          className="relative flex items-center justify-center rounded-full text-sm font-bold text-white transition-transform hover:scale-110"
+          style={{
+            width: AVATAR_SIZE,
+            height: AVATAR_SIZE,
+            background: avatarGradient,
+            border: `2.5px solid ${statusColor}`,
+            boxShadow: `0 2px 8px rgba(0,0,0,0.15)`,
+          }}
+        >
+          {user.avatar ? (
+            <img
+              src={user.avatar}
+              alt={user.name}
+              className="h-full w-full rounded-full object-cover"
+            />
+          ) : (
+            <span style={{ fontSize: 15 }}>
+              {user.name.charAt(0).toUpperCase()}
+            </span>
+          )}
+
+          {/* Status dot */}
+          <span
+            className="absolute -bottom-0.5 -right-0.5 rounded-full"
+            style={{
+              width: 10,
+              height: 10,
+              backgroundColor: statusColor,
+              border: `2px solid ${tokens.surface}`,
+            }}
+          />
+        </div>
+
+        {/* Status emoji floating above */}
+        {user.statusEmoji && (
+          <div
+            className="absolute -top-4 left-1/2 -translate-x-1/2 text-sm"
+            style={{ pointerEvents: "none" }}
+          >
+            {user.statusEmoji}
+          </div>
+        )}
       </motion.div>
 
       {/* Name label */}
-      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
+      <div
+        className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap"
+        style={{ bottom: 0 }}
+      >
         <span
-          className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none"
+          className="rounded-full px-2 py-0.5 text-[9px] font-semibold leading-none"
           style={{
-            backgroundColor: isMe ? "rgba(255,107,0,0.8)" : "rgba(0,0,0,0.5)",
-            color: isMe ? "#fff" : "rgba(255,255,255,0.9)",
+            backgroundColor: isMe
+              ? tokens.accent + "CC"
+              : tokens.glass,
+            color: isMe ? "#FFFFFF" : tokens.textSecondary,
+            backdropFilter: isMe ? "none" : "blur(8px)",
           }}
         >
-          {user.name}
+          {isMe ? "You" : user.name}
         </span>
       </div>
 
-      {/* Status dot */}
-      <div
-        className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full border border-white"
-        style={{ backgroundColor: STATUS_COLORS[user.status] ?? "#999" }}
-      />
-
-      {/* "Me" pulse ring */}
-      {isMe && !prefersReduced && (
-        <div
-          className="office-pulse-me absolute -inset-1 rounded-full"
-          style={{ pointerEvents: "none" }}
-        />
-      )}
-
-      {/* Selection ring */}
-      {isSelected && (
-        <div
-          className="absolute -inset-1 rounded-full border-2 border-dashed"
-          style={{ borderColor: "#FF6B00", pointerEvents: "none" }}
-        />
-      )}
-
-      {/* Status emoji */}
-      {user.statusEmoji && (
-        <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-sm">
-          {user.statusEmoji}
-        </div>
-      )}
+      {/* Activity bubble */}
+      <AnimatePresence>
+        {user.activity && isSelected && (
+          <motion.div
+            className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg px-2.5 py-1 text-[10px] shadow-md"
+            style={{
+              top: -28,
+              backgroundColor: tokens.surfaceElevated,
+              color: tokens.text,
+              border: `1px solid ${tokens.borderSubtle}`,
+            }}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+          >
+            {user.statusEmoji && (
+              <span className="mr-1">{user.statusEmoji}</span>
+            )}
+            {user.activity}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

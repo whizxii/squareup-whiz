@@ -17,6 +17,11 @@ import { useOfficeCamera } from "@/lib/hooks/useOfficeCamera";
 import { useAgentRoutines } from "@/lib/hooks/useAgentRoutines";
 import { useWeather } from "@/lib/hooks/useWeather";
 import { useEasterEggs } from "@/lib/hooks/useEasterEggs";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
+import { useOfficePresence } from "@/lib/hooks/useOfficePresence";
+import { useProximityCall } from "@/lib/hooks/useProximityCall";
+import { useCallStore } from "@/lib/stores/call-store";
+import { CallOverlay } from "@/components/calls/CallOverlay";
 import { buildWalkableGrid, getBlockedTiles, findPath } from "@/lib/office/pathfinding";
 import { TILE } from "@/lib/office/office-renderer";
 import OfficeCanvas from "@/components/office/OfficeCanvas";
@@ -37,15 +42,75 @@ import GridOfficeView from "@/components/office/GridOfficeView";
 import ProximityChatBubbles from "@/components/office/ProximityChatBubble";
 import ProximityPrompt from "@/components/office/ProximityPrompt";
 import WaveEffect from "@/components/office/WaveEffect";
+import OfficeNotifications from "@/components/office/OfficeNotifications";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const LAYOUT_STORAGE_KEY = "sq-office-layout";
+
+/** Load office layout from backend API, falling back to localStorage. */
+async function loadOfficeLayout(authToken: string | null): Promise<void> {
+  // Try backend first
+  if (authToken) {
+    try {
+      const res = await fetchWithRetry(`${API_BASE}/api/office/layout`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const hasData =
+          (data.furniture && data.furniture.length > 0) ||
+          (data.zones && data.zones.length > 0);
+        if (hasData) {
+          const state = useOfficeStore.getState();
+          useOfficeStore.setState({
+            ...(data.furniture?.length ? { furniture: data.furniture } : {}),
+            ...(data.zones?.length ? { zones: data.zones } : {}),
+            ...(data.layout
+              ? {
+                  layout: {
+                    ...state.layout,
+                    floorStyle: data.layout.floor_style ?? state.layout.floorStyle,
+                    gridCols: data.layout.grid_cols ?? state.layout.gridCols,
+                    gridRows: data.layout.grid_rows ?? state.layout.gridRows,
+                  },
+                }
+              : {}),
+          });
+          return;
+        }
+      }
+    } catch {
+      // Fall through to localStorage
+    }
+  }
+
+  // Fallback: localStorage
+  if (typeof window === "undefined") return;
+  try {
+    const saved = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (!saved) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = JSON.parse(saved) as Record<string, any>;
+    const state = useOfficeStore.getState();
+    useOfficeStore.setState({
+      ...(data.furniture ? { furniture: data.furniture as typeof state.furniture } : {}),
+      ...(data.zones ? { zones: data.zones as typeof state.zones } : {}),
+      ...(data.layout
+        ? { layout: { ...state.layout, ...(data.layout as Partial<typeof state.layout>) } }
+        : {}),
+    });
+  } catch {
+    // silently ignore corrupt data
+  }
+}
 
 export default function OfficePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const myUserId = useCurrentUserId();
+  const { tokens } = useOfficeTheme();
 
-  const token = useAuthStore((s) => s.token);
-  const { send: wsSend, on: wsOn } = useWebSocket(token);
+  const authToken = useAuthStore((s) => s.token);
+  const { send: wsSend, on: wsOn } = useWebSocket(authToken);
 
   const users = useOfficeStore((s) => s.users);
   const agents = useOfficeStore((s) => s.agents);
@@ -58,39 +123,21 @@ export default function OfficePage() {
   const updateUserAnimation = useOfficeStore((s) => s.updateUserAnimation);
   const setMyPosition = useOfficeStore((s) => s.setMyPosition);
 
-  // Load persisted layout from localStorage on mount
+  // Load persisted layout from backend API (fallback: localStorage)
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const saved = localStorage.getItem(LAYOUT_STORAGE_KEY);
-      if (!saved) return;
-      const data = JSON.parse(saved) as {
-        furniture?: typeof furniture;
-        zones?: typeof zones;
-        layout?: typeof layout;
-      };
-      const state = useOfficeStore.getState();
-      useOfficeStore.setState({
-        ...(data.furniture ? { furniture: data.furniture } : {}),
-        ...(data.zones ? { zones: data.zones } : {}),
-        ...(data.layout ? { layout: { ...state.layout, ...data.layout } } : {}),
-      });
-    } catch {
-      // silently ignore corrupt data
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    loadOfficeLayout(authToken);
+  }, [authToken]);
 
   // Hydrate office users from backend
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   useEffect(() => {
     const unsub = useAuthStore.subscribe((state) => {
       if (!state.token || !state.profile) return;
 
-      const token = state.token;
+      const tkn = state.token;
       const uid = state.profile.firebase_uid;
 
-      fetchWithRetry(`${API_URL}/api/users/`, {
-        headers: { Authorization: `Bearer ${token}` },
+      fetchWithRetry(`${API_BASE}/api/users/`, {
+        headers: { Authorization: `Bearer ${tkn}` },
       })
         .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
         .then((data) => {
@@ -103,10 +150,10 @@ export default function OfficePage() {
     });
 
     // Also try immediately if already authenticated
-    const { token, profile } = useAuthStore.getState();
-    if (token && profile) {
-      fetchWithRetry(`${API_URL}/api/users/`, {
-        headers: { Authorization: `Bearer ${token}` },
+    const { token: existingToken, profile } = useAuthStore.getState();
+    if (existingToken && profile) {
+      fetchWithRetry(`${API_BASE}/api/users/`, {
+        headers: { Authorization: `Bearer ${existingToken}` },
       })
         .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
         .then((data) => {
@@ -127,6 +174,35 @@ export default function OfficePage() {
       moveUser(userId, data.x as number, data.y as number, "down");
     });
   }, [wsOn, moveUser, myUserId]);
+
+  // Idle detection & presence broadcasting
+  useOfficePresence({ userId: myUserId, enabled: true });
+
+  // Zone-based auto-join/leave for meeting rooms
+  useProximityCall({ userId: myUserId, enabled: true });
+
+  // Call signaling — incoming call invites via WebSocket
+  useEffect(() => {
+    const unsubInvite = wsOn("call.invite", (data) => {
+      useCallStore.getState().setIncomingCall({
+        fromUserId: data.from_user_id as string,
+        fromName: data.from_name as string,
+        roomName: data.room_name as string,
+        timestamp: Date.now(),
+      });
+    });
+    const unsubAccepted = wsOn("call.accepted", (_data) => {
+      // The other user accepted — our call is already active, no action needed
+    });
+    const unsubRejected = wsOn("call.rejected", (_data) => {
+      // The other user declined — could show a notification
+    });
+    return () => {
+      unsubInvite();
+      unsubAccepted();
+      unsubRejected();
+    };
+  }, [wsOn]);
 
   // Hooks — day/night cycle, weather, agent routines, keyboard controls, camera follow
   useOfficeTime();
@@ -222,11 +298,11 @@ export default function OfficePage() {
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full overflow-hidden"
-      style={{ backgroundColor: "#1a1714" }}
+      className="relative h-full w-full overflow-hidden transition-colors duration-300"
+      style={{ backgroundColor: tokens.background }}
     >
       {/* View mode: Grid (classic) or Pixel (canvas) */}
-      {viewMode === "grid" ? (
+      {viewMode === "simplified" ? (
         <GridOfficeView />
       ) : (
         /* Zoomable / pannable pixel stage */
@@ -282,6 +358,8 @@ export default function OfficePage() {
       )}
 
       {/* Layer 4: Glass UI (fixed position, outside zoom transform) */}
+      <CallOverlay />
+      <OfficeNotifications />
       <OfficeToolbar />
       <OfficeMiniMap />
       <EntityDetailPanel />

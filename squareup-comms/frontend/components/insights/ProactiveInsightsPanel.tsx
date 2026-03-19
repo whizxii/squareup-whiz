@@ -12,7 +12,12 @@ import {
   CalendarX,
   CheckCircle,
   Bell,
+  ChevronDown,
+  ChevronUp,
+  Lightbulb,
+  ArrowRight,
 } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useInsightsStore, type ProactiveInsight } from "@/lib/stores/insights-store";
 
@@ -101,9 +106,14 @@ function InsightCard({
   insight: ProactiveInsight;
   onDismiss: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const config = getConfig(insight.type);
   const severity = getSeverityStyle(insight.severity);
   const Icon = config.icon;
+
+  const aiReasoning = insight.metadata?.ai_reasoning as string | undefined;
+  const suggestedActions = insight.metadata?.suggested_actions as string[] | undefined;
+  const hasAI = !!(aiReasoning || (suggestedActions && suggestedActions.length > 0));
 
   return (
     <motion.div
@@ -111,13 +121,13 @@ function InsightCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 20 }}
       className={cn(
-        "group relative p-3 rounded-xl border transition-colors",
+        "group relative rounded-xl border transition-colors",
         insight.dismissed
           ? "opacity-50 border-border bg-muted/20"
           : `${severity.border} bg-card hover:bg-accent/30`
       )}
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-2.5 p-3">
         <div
           className={cn(
             "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
@@ -147,6 +157,23 @@ function InsightCard({
           <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
             {insight.description}
           </p>
+
+          {/* AI expand toggle */}
+          {hasAI && !insight.dismissed && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="mt-1.5 flex items-center gap-1 text-[10px] text-sq-agent hover:text-sq-agent/80 transition-colors"
+            >
+              <Lightbulb className="w-3 h-3" />
+              AI reasoning
+              {expanded ? (
+                <ChevronUp className="w-3 h-3" />
+              ) : (
+                <ChevronDown className="w-3 h-3" />
+              )}
+            </button>
+          )}
         </div>
 
         {!insight.dismissed && (
@@ -160,6 +187,50 @@ function InsightCard({
           </button>
         )}
       </div>
+
+      {/* AI reasoning panel */}
+      <AnimatePresence>
+        {expanded && hasAI && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="px-3 pb-3 border-t border-border/50 pt-2 space-y-2">
+              {aiReasoning && (
+                <div className="bg-sq-agent/5 rounded-lg p-2">
+                  <p className="text-[10px] font-semibold text-sq-agent mb-0.5 uppercase tracking-wider">
+                    AI Analysis
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {aiReasoning}
+                  </p>
+                </div>
+              )}
+              {suggestedActions && suggestedActions.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
+                    Suggested Actions
+                  </p>
+                  <ul className="space-y-1">
+                    {suggestedActions.map((action, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-1.5 text-xs text-foreground"
+                      >
+                        <ArrowRight className="w-3 h-3 text-sq-agent shrink-0 mt-0.5" />
+                        {action}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

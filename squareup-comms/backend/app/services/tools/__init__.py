@@ -15,6 +15,8 @@ from app.services.tools import (
     reminder_tools,
     calendar_tools,
     email_tools,
+    ai_insight_tools,
+    autonomous_tools,
 )
 
 # Register all tool modules
@@ -30,3 +32,5 @@ task_tools.register(tool_registry)
 reminder_tools.register(tool_registry)
 calendar_tools.register(tool_registry)
 email_tools.register(tool_registry)
+ai_insight_tools.register(tool_registry)
+autonomous_tools.register(tool_registry)

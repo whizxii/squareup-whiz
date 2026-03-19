@@ -2,6 +2,7 @@
  * Floating "Press E to interact" hint above nearest entity.
  * Appears when a non-self entity is within range and nothing is selected.
  * Shows a "Start Call" button when near another user.
+ * Themed via useOfficeTheme.
  */
 
 "use client";
@@ -12,12 +13,13 @@ import { Phone } from "lucide-react";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useCallStore } from "@/lib/stores/call-store";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 import { TILE } from "@/lib/office/office-renderer";
-import { CHAR_W } from "@/lib/office/character-generator";
 
 const INTERACT_RANGE = 3;
 
 export default function ProximityPrompt() {
+  const { tokens } = useOfficeTheme();
   const myUserId = useCurrentUserId();
   const myPosition = useOfficeStore((s) => s.myPosition);
   const users = useOfficeStore((s) => s.users);
@@ -77,7 +79,7 @@ export default function ProximityPrompt() {
         <motion.div
           className="pointer-events-auto absolute flex flex-col items-center gap-1"
           style={{
-            left: nearest.x * TILE + (TILE - CHAR_W) / 2 + CHAR_W / 2,
+            left: nearest.x * TILE + TILE / 2,
             top: nearest.y * TILE - 20,
             zIndex: 45,
             transform: "translateX(-50%)",
@@ -88,17 +90,35 @@ export default function ProximityPrompt() {
           transition={{ duration: 0.2 }}
         >
           <span
-            className="rounded-md px-2 py-1 text-[10px] font-semibold text-white shadow-md"
-            style={{ backgroundColor: "rgba(30, 27, 24, 0.85)" }}
+            className="rounded-md px-2 py-1 text-[10px] font-semibold shadow-md"
+            style={{
+              backgroundColor: tokens.glass,
+              backdropFilter: "blur(12px)",
+              color: tokens.text,
+              border: `1px solid ${tokens.glassBorder}`,
+            }}
           >
-            Press <kbd className="rounded bg-white/20 px-1 py-0.5 text-[9px]">E</kbd> to interact
+            Press{" "}
+            <kbd
+              className="rounded px-1 py-0.5 text-[9px]"
+              style={{
+                backgroundColor: tokens.accentSoft,
+                color: tokens.accent,
+              }}
+            >
+              E
+            </kbd>{" "}
+            to interact
           </span>
 
           {/* Start Call button — only for users, not agents */}
           {nearest.type === "user" && !isInCall && (
             <button
               onClick={handleStartCall}
-              className="flex items-center gap-1 rounded-md bg-sq-online/90 px-2 py-1 text-[10px] font-semibold text-white shadow-md transition-colors hover:bg-sq-online"
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold text-white shadow-md transition-colors"
+              style={{
+                backgroundColor: tokens.status.online,
+              }}
             >
               <Phone className="h-3 w-3" />
               Start Call

@@ -2,6 +2,7 @@
  * Interactive HTML overlay for office zones.
  * Renders on top of canvas-painted zones, adding hover tooltips,
  * capacity indicators, privacy icons, and proximity glow.
+ * Fully themed via useOfficeTheme.
  */
 
 "use client";
@@ -10,13 +11,14 @@ import { useMemo } from "react";
 import { Lock, Users } from "lucide-react";
 import type { OfficeZone as ZoneType } from "@/lib/stores/office-store";
 import { useOfficeStore } from "@/lib/stores/office-store";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 import { TILE } from "@/lib/office/office-renderer";
 
 interface OfficeZoneProps {
   readonly zone: ZoneType;
 }
 
-const ZONE_ICONS: Record<string, string> = {
+const ZONE_ICONS: Readonly<Record<string, string>> = {
   desk: "💻",
   meeting: "🤝",
   lounge: "☕",
@@ -25,6 +27,7 @@ const ZONE_ICONS: Record<string, string> = {
 };
 
 export default function OfficeZoneOverlay({ zone }: OfficeZoneProps) {
+  const { tokens } = useOfficeTheme();
   const users = useOfficeStore((s) => s.users);
   const agents = useOfficeStore((s) => s.agents);
   const editMode = useOfficeStore((s) => s.editMode);
@@ -68,7 +71,11 @@ export default function OfficeZoneOverlay({ zone }: OfficeZoneProps) {
         <span className="text-[10px]">{ZONE_ICONS[zone.type] ?? "📍"}</span>
         <span
           className="rounded-sm px-1 py-0.5 text-[9px] font-semibold"
-          style={{ color: zone.color, backgroundColor: "rgba(0,0,0,0.4)" }}
+          style={{
+            color: zone.color,
+            backgroundColor: tokens.glass,
+            backdropFilter: "blur(8px)",
+          }}
         >
           {zone.name}
         </span>
@@ -79,11 +86,13 @@ export default function OfficeZoneOverlay({ zone }: OfficeZoneProps) {
         <div
           className="absolute right-1 top-1 flex items-center gap-0.5 rounded-full px-1.5 py-0.5"
           style={{
-            backgroundColor: `${zone.color}20`,
+            backgroundColor: tokens.glass,
+            backdropFilter: "blur(8px)",
+            border: `1px solid ${zone.color}30`,
             pointerEvents: "auto",
           }}
         >
-          <Users size={8} style={{ color: zone.color, opacity: 0.6 }} />
+          <Users size={8} style={{ color: zone.color, opacity: 0.7 }} />
           <span
             className="text-[8px] font-medium"
             style={{ color: zone.color }}
@@ -97,9 +106,12 @@ export default function OfficeZoneOverlay({ zone }: OfficeZoneProps) {
       {zone.isPrivate && (
         <div
           className="absolute bottom-1 right-1 flex h-4 w-4 items-center justify-center rounded-full"
-          style={{ backgroundColor: `${zone.color}20` }}
+          style={{
+            backgroundColor: tokens.glass,
+            backdropFilter: "blur(8px)",
+          }}
         >
-          <Lock size={8} style={{ color: zone.color, opacity: 0.6 }} />
+          <Lock size={8} style={{ color: zone.color, opacity: 0.7 }} />
         </div>
       )}
 
@@ -109,7 +121,8 @@ export default function OfficeZoneOverlay({ zone }: OfficeZoneProps) {
           className="office-proximity-pulse absolute inset-0 rounded-lg"
           style={{
             border: `1px solid ${zone.color}`,
-            opacity: 0.2,
+            boxShadow: `inset 0 0 12px ${zone.color}15, 0 0 8px ${zone.color}10`,
+            opacity: 0.25,
             pointerEvents: "none",
           }}
         />
@@ -119,7 +132,10 @@ export default function OfficeZoneOverlay({ zone }: OfficeZoneProps) {
       {editMode && (
         <div
           className="absolute inset-0 rounded-lg border-2 border-dashed cursor-move"
-          style={{ borderColor: `${zone.color}80` }}
+          style={{
+            borderColor: `${zone.color}80`,
+            backgroundColor: `${zone.color}08`,
+          }}
         />
       )}
     </div>

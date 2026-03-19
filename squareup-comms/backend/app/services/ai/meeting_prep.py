@@ -161,12 +161,105 @@ def serialize_meeting_prep(
     }
 
 
+_MEETING_PREP_SYSTEM = """You are a B2B sales meeting preparation AI. Generate a concise, actionable meeting briefing.
+
+Return ONLY valid JSON:
+{
+  "contact_summary": "2-3 sentence contact summary",
+  "company_overview": "2-3 sentence company context",
+  "deal_status": "Current deal summary or null",
+  "recent_interactions": ["interaction1", "interaction2"],
+  "talking_points": ["point1", "point2", "point3"],
+  "potential_objections": ["objection1", "objection2"],
+  "open_action_items": [{"text": "...", "assignee": "Sales Rep", "due_date": "YYYY-MM-DD or null", "is_completed": false}]
+}
+Provide 3-5 talking points, 2-3 objections, 2-4 action items. Be specific and actionable."""
+
+
+class LLMMeetingPrepService:
+    """LLM-powered meeting prep using Groq."""
+
+    def __init__(self) -> None:
+        self._fallback = MockMeetingPrepService()
+
+    async def prepare(
+        self,
+        event: CRMCalendarEvent,
+        contact: CRMContact,
+        deal: CRMDeal | None,
+    ) -> MeetingPrepResult:
+        from app.services.llm_service import get_llm_client, llm_available, parse_llm_json
+
+        if not llm_available():
+            return self._fallback.prepare(event, contact, deal)
+
+        try:
+            client = get_llm_client("llama-3.3-70b-versatile")
+            deal_info = "None"
+            if deal:
+                deal_info = (
+                    f"{deal.title}: stage={deal.stage}, "
+                    f"value=${deal.value or 0:,.0f}, prob={deal.probability}%"
+                )
+            context = (
+                f"Meeting: {event.title or 'Untitled'}\n"
+                f"Time: {event.start_time.isoformat() if event.start_time else 'TBD'}\n"
+                f"Contact: {contact.name or 'Unknown'} "
+                f"({contact.title or 'Unknown'} at {contact.company or 'Unknown'})\n"
+                f"Relationship strength: {contact.relationship_strength or 0}/10\n"
+                f"Lead score: {contact.lead_score or 0}\n"
+                f"Activity count: {contact.activity_count or 0}\n"
+                f"Last activity: {contact.last_activity_at.isoformat() if contact.last_activity_at else 'Never'}\n"
+                f"Active deal: {deal_info}"
+            )
+            response = await client.chat(
+                messages=[{"role": "user", "content": f"Prepare meeting briefing:\n\n{context}"}],
+                system=_MEETING_PREP_SYSTEM,
+                max_tokens=800,
+                temperature=0.3,
+            )
+            parsed = parse_llm_json(response)
+            if not parsed:
+                return self._fallback.prepare(event, contact, deal)
+
+            raw_items = parsed.get("open_action_items", [])
+            action_items = tuple(
+                ActionItem(
+                    text=a.get("text", "Follow up"),
+                    assignee=a.get("assignee"),
+                    due_date=a.get("due_date"),
+                    is_completed=bool(a.get("is_completed", False)),
+                )
+                for a in raw_items[:5] if isinstance(a, dict) and a.get("text")
+            )
+
+            return MeetingPrepResult(
+                contact_summary=parsed.get("contact_summary", ""),
+                company_overview=parsed.get("company_overview", ""),
+                deal_status=parsed.get("deal_status"),
+                recent_interactions=tuple(
+                    i for i in parsed.get("recent_interactions", [])[:6] if isinstance(i, str)
+                ),
+                open_action_items=action_items,
+                talking_points=tuple(
+                    t for t in parsed.get("talking_points", [])[:6] if isinstance(t, str)
+                ),
+                potential_objections=tuple(
+                    o for o in parsed.get("potential_objections", [])[:5] if isinstance(o, str)
+                ),
+                relationship_strength=contact.relationship_strength or 5,
+            )
+        except Exception:
+            logger.exception("LLM meeting prep failed, using fallback")
+            return self._fallback.prepare(event, contact, deal)
+
+
 class MeetingPrepService(BaseService):
     """Business logic for AI-powered meeting prep briefings."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._preparer = MockMeetingPrepService()
+        self._preparer = LLMMeetingPrepService()
 
     @property
     def contact_repo(self) -> ContactRepository:
@@ -195,7 +288,7 @@ class MeetingPrepService(BaseService):
             deal_repo = DealRepository(self.session)
             deal = await deal_repo.get_by_id(event.deal_id)
 
-        prep_result = self._preparer.prepare(event, contact, deal)
+        prep_result = await self._preparer.prepare(event, contact, deal)
         serialized = serialize_meeting_prep(prep_result, event_id)
 
         logger.info("Prepared meeting brief for event %s", event_id)

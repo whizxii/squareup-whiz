@@ -18,8 +18,10 @@ logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_SECONDS = 60
 
-
 _INSIGHTS_INTERVAL_TICKS = 5  # Run proactive insights every 5 ticks (5 min)
+_DAILY_BRIEF_HOUR = 8          # Generate daily briefs at 08:00 UTC
+_WEEKLY_DIGEST_HOUR = 8        # Generate weekly digests at 08:00 UTC on Mondays
+_WEEKLY_DIGEST_WEEKDAY = 0     # Monday (0=Monday … 6=Sunday)
 
 
 async def scheduler_loop() -> None:
@@ -28,6 +30,9 @@ async def scheduler_loop() -> None:
 
     logger.info("Scheduler started (poll interval %ds)", _POLL_INTERVAL_SECONDS)
     tick_count = 0
+    _last_brief_date: datetime | None = None
+    _last_weekly_digest_date: datetime | None = None
+
     while True:
         try:
             await _fire_due_reminders()
@@ -46,6 +51,28 @@ async def scheduler_loop() -> None:
                 await run_proactive_insights()
             except Exception:
                 logger.error("Proactive insights tick failed", exc_info=True)
+
+        now = datetime.utcnow()
+
+        # Generate daily briefs once per day at _DAILY_BRIEF_HOUR UTC
+        if now.hour >= _DAILY_BRIEF_HOUR:
+            today = now.date()
+            if _last_brief_date != today:
+                _last_brief_date = today
+                try:
+                    await _generate_daily_briefs()
+                except Exception:
+                    logger.error("Daily brief generation failed", exc_info=True)
+
+        # Generate weekly digest once per week on Monday at _WEEKLY_DIGEST_HOUR UTC
+        if now.weekday() == _WEEKLY_DIGEST_WEEKDAY and now.hour >= _WEEKLY_DIGEST_HOUR:
+            this_week = now.date()
+            if _last_weekly_digest_date != this_week:
+                _last_weekly_digest_date = this_week
+                try:
+                    await _generate_weekly_digests()
+                except Exception:
+                    logger.error("Weekly digest generation failed", exc_info=True)
 
         await asyncio.sleep(_POLL_INTERVAL_SECONDS)
 
@@ -211,3 +238,112 @@ async def _run_scheduled_agent(agent_id: str, prompt: str) -> None:
         )
     except Exception:
         logger.error("Scheduled agent %s execution failed", agent_id, exc_info=True)
+
+
+# ---------------------------------------------------------------------------
+# Daily Briefs
+# ---------------------------------------------------------------------------
+
+async def _generate_daily_briefs() -> None:
+    """Generate a daily brief for every active user. Run once per day."""
+    from sqlmodel import select as sql_select
+
+    from app.core.background import BackgroundTaskManager
+    from app.core.db import async_session
+    from app.core.events import EventBus
+    from app.models.users import User
+    from app.services.ai.insights_engine import AIInsightsEngine
+    from app.websocket.manager import hub_manager
+
+    async with async_session() as session:
+        result = await session.execute(sql_select(User).where(User.is_active == True))  # noqa: E712
+        users = list(result.scalars().all())
+
+    if not users:
+        return
+
+    logger.info("Generating daily briefs for %d user(s)", len(users))
+
+    for user in users:
+        try:
+            async with async_session() as session:
+                engine = AIInsightsEngine(
+                    session=session,
+                    events=EventBus(),
+                    background=BackgroundTaskManager(),
+                )
+                brief = await engine.generate_daily_brief(user.id)
+
+            # Push brief to user via WebSocket
+            await hub_manager.send_to_user(user.id, {
+                "type": "insights.daily_brief",
+                "brief": brief,
+            })
+            logger.debug("Daily brief sent to user %s", user.id)
+        except Exception:
+            logger.error("Failed to generate daily brief for user %s", user.id, exc_info=True)
+
+
+# ---------------------------------------------------------------------------
+# Weekly Digests
+# ---------------------------------------------------------------------------
+
+async def _generate_weekly_digests() -> None:
+    """Generate a weekly digest (team-wide) and push it to all active users via WebSocket."""
+    from sqlmodel import select as sql_select
+
+    from app.core.background import BackgroundTaskManager
+    from app.core.db import async_session
+    from app.core.events import EventBus
+    from app.models.users import User
+    from app.services.ai.digest_service import DigestService
+    from app.websocket.manager import hub_manager
+
+    async with async_session() as session:
+        result = await session.execute(sql_select(User).where(User.is_active == True))  # noqa: E712
+        users = list(result.scalars().all())
+
+    if not users:
+        return
+
+    logger.info("Generating weekly digest for %d user(s)", len(users))
+
+    # Generate one team-wide digest (no target_user_id)
+    digest = None
+    try:
+        async with async_session() as session:
+            svc = DigestService(
+                session=session,
+                events=EventBus(),
+                background=BackgroundTaskManager(),
+            )
+            digest = await svc.generate_weekly_digest(target_user_id=None)
+    except Exception:
+        logger.error("Weekly digest generation failed", exc_info=True)
+        return
+
+    if digest is None:
+        return
+
+    import json
+
+    payload = {
+        "type": "insights.weekly_digest",
+        "digest": {
+            "id": digest.id,
+            "title": digest.title,
+            "summary": digest.summary,
+            "highlights": json.loads(digest.highlights or "[]"),
+            "stats": json.loads(digest.stats or "{}"),
+            "week_start": digest.week_start.isoformat() if digest.week_start else None,
+            "week_end": digest.week_end.isoformat() if digest.week_end else None,
+            "created_at": digest.created_at.isoformat(),
+        },
+    }
+
+    for user in users:
+        try:
+            await hub_manager.send_to_user(user.id, payload)
+            logger.debug("Weekly digest sent to user %s", user.id)
+        except Exception:
+            logger.error("Failed to send weekly digest to user %s", user.id, exc_info=True)

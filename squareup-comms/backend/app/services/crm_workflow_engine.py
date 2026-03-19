@@ -125,10 +125,14 @@ async def _execute_action(
             return await _action_move_stage(params, context, service)
         elif action_type == "assign_owner":
             return await _action_assign_owner(params, context, service)
-        elif action_type in ("send_email", "enroll_sequence", "create_task", "webhook"):
-            # Placeholder for future implementation
-            logger.info("Action '%s' registered but not yet implemented", action_type)
-            return {"status": "skipped", "reason": "not_implemented"}
+        elif action_type == "send_email":
+            return await _action_send_email(params, context, service)
+        elif action_type == "enroll_sequence":
+            return await _action_enroll_sequence(params, context, service)
+        elif action_type == "create_task":
+            return await _action_create_task(params, context, service)
+        elif action_type == "webhook":
+            return await _action_webhook(params, context, service)
         else:
             return {"status": "error", "reason": f"unknown action type: {action_type}"}
     except Exception as exc:
@@ -253,6 +257,91 @@ async def _action_assign_owner(
         return {"status": "success", "owner_id": owner_id}
 
     return {"status": "error", "reason": "contact not found"}
+
+
+async def _action_send_email(
+    params: dict, context: dict, service: "WorkflowEngineService"
+) -> dict:
+    """Emit an email send event (handled by email integration layer)."""
+    contact_id = context.get("contact_id")
+    to_email = params.get("to_email") or context.get("email")
+    subject = params.get("subject", "")
+    body = params.get("body", "")
+
+    if not to_email and not contact_id:
+        return {"status": "error", "reason": "missing to_email or contact_id"}
+
+    await service.events.emit("email.send_requested", {
+        "contact_id": contact_id,
+        "to_email": to_email,
+        "subject": subject,
+        "body": body,
+        "workflow_id": context.get("workflow_id"),
+    })
+    return {"status": "success", "to_email": to_email}
+
+
+async def _action_enroll_sequence(
+    params: dict, context: dict, service: "WorkflowEngineService"
+) -> dict:
+    """Enroll a contact in an email sequence."""
+    contact_id = context.get("contact_id")
+    sequence_id = params.get("sequence_id")
+    if not contact_id or not sequence_id:
+        return {"status": "error", "reason": "missing contact_id or sequence_id"}
+
+    await service.events.emit("sequence.enroll_requested", {
+        "contact_id": contact_id,
+        "sequence_id": sequence_id,
+        "workflow_id": context.get("workflow_id"),
+    })
+    return {"status": "success", "sequence_id": sequence_id}
+
+
+async def _action_create_task(
+    params: dict, context: dict, service: "WorkflowEngineService"
+) -> dict:
+    """Create a task for a contact."""
+    import uuid
+    from app.models.crm import CRMActivity
+
+    contact_id = context.get("contact_id")
+    if not contact_id:
+        return {"status": "error", "reason": "no contact_id in context"}
+
+    task = CRMActivity(
+        id=str(uuid.uuid4()),
+        contact_id=contact_id,
+        type="task",
+        title=params.get("title", "Workflow task"),
+        content=params.get("description"),
+        performed_by="workflow-engine",
+        performer_type="system",
+    )
+    service.session.add(task)
+    await service.session.flush()
+    return {"status": "success", "task_id": task.id}
+
+
+async def _action_webhook(
+    params: dict, context: dict, service: "WorkflowEngineService"  # noqa: ARG001
+) -> dict:
+    """POST to an external webhook URL."""
+    import httpx
+
+    url = params.get("url")
+    if not url:
+        return {"status": "error", "reason": "missing webhook url"}
+
+    payload = {**context, "params": params}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(url, json=payload)
+        if resp.is_success:
+            return {"status": "success", "http_status": resp.status_code}
+        return {"status": "error", "reason": f"HTTP {resp.status_code}"}
+    except Exception as exc:
+        return {"status": "error", "reason": str(exc)[:200]}
 
 
 # ─── Workflow Engine Service ─────────────────────────────────────

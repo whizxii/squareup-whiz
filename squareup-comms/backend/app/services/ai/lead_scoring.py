@@ -164,12 +164,94 @@ def serialize_lead_score(
     }
 
 
+_LEAD_SCORE_SYSTEM = """You are a B2B sales lead scoring AI. Score this contact on three dimensions.
+
+Return ONLY valid JSON:
+{
+  "overall_score": <0-100>,
+  "fit_score": <0-100>,
+  "engagement_score": <0-100>,
+  "intent_score": <0-100>,
+  "fit_factors": [{"factor": "...", "points": <1-10>, "detail": "..."}],
+  "engagement_factors": [{"factor": "...", "points": <1-10>, "detail": "..."}],
+  "intent_factors": [{"factor": "...", "points": <1-10>, "detail": "..."}],
+  "ai_reasoning": "2-3 sentence analysis",
+  "score_trend": "rising|stable|falling"
+}
+Overall = fit*0.3 + engagement*0.4 + intent*0.3. Provide 2-3 factors per dimension."""
+
+
+class LLMLeadScoringService:
+    """LLM-powered lead scoring using Groq."""
+
+    def __init__(self) -> None:
+        self._fallback = MockLeadScoringService()
+
+    async def score_contact(self, contact: CRMContact) -> LeadScoreResult:
+        from app.services.llm_service import get_llm_client, llm_available, parse_llm_json
+
+        if not llm_available():
+            return self._fallback.score_contact(contact)
+
+        try:
+            client = get_llm_client("llama-3.3-70b-versatile")
+            context = (
+                f"Name: {contact.name or 'Unknown'}\n"
+                f"Title: {contact.title or 'Unknown'}\n"
+                f"Company: {contact.company or 'Unknown'}\n"
+                f"Activity count: {contact.activity_count or 0}\n"
+                f"Deal value: ${contact.value or 0:,.0f}\n"
+                f"Current lead score: {contact.lead_score or 0}\n"
+                f"Relationship strength: {contact.relationship_strength or 0}/10\n"
+                f"AI tags: {contact.ai_tags or '[]'}\n"
+                f"Sentiment score: {contact.sentiment_score or 0}\n"
+                f"Last activity: {contact.last_activity_at.isoformat() if contact.last_activity_at else 'Never'}"
+            )
+            response = await client.chat(
+                messages=[{"role": "user", "content": f"Score this sales contact:\n\n{context}"}],
+                system=_LEAD_SCORE_SYSTEM,
+                max_tokens=800,
+                temperature=0.3,
+            )
+            parsed = parse_llm_json(response)
+            if not parsed:
+                return self._fallback.score_contact(contact)
+
+            old_score = contact.lead_score or 0
+            overall = max(0, min(100, int(parsed.get("overall_score", 50))))
+            trend = "rising" if overall > old_score + 5 else ("falling" if overall < old_score - 5 else "stable")
+
+            def _make_factors(raw: list, pool: list) -> tuple:
+                factors = tuple(
+                    ScoreFactor(f["factor"], max(1, min(10, int(f.get("points", 5)))), f.get("detail", ""))
+                    for f in raw[:4] if isinstance(f, dict) and f.get("factor")
+                )
+                return factors if factors else tuple(random.sample(pool, k=2))
+
+            return LeadScoreResult(
+                overall_score=overall,
+                fit_score=max(0, min(100, int(parsed.get("fit_score", 50)))),
+                engagement_score=max(0, min(100, int(parsed.get("engagement_score", 50)))),
+                intent_score=max(0, min(100, int(parsed.get("intent_score", 50)))),
+                breakdown=ScoreBreakdown(
+                    fit=_make_factors(parsed.get("fit_factors", []), _FIT_FACTORS),
+                    engagement=_make_factors(parsed.get("engagement_factors", []), _ENGAGEMENT_FACTORS),
+                    intent=_make_factors(parsed.get("intent_factors", []), _INTENT_FACTORS),
+                ),
+                ai_reasoning=parsed.get("ai_reasoning", "AI analysis completed."),
+                score_trend=trend,
+            )
+        except Exception:
+            logger.exception("LLM lead scoring failed, using fallback")
+            return self._fallback.score_contact(contact)
+
+
 class LeadScoringService(BaseService):
     """Business logic for AI-powered lead scoring."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._scorer = MockLeadScoringService()
+        self._scorer = LLMLeadScoringService()
 
     @property
     def contact_repo(self) -> ContactRepository:
@@ -181,7 +263,7 @@ class LeadScoringService(BaseService):
         if contact is None:
             return None
 
-        result = self._scorer.score_contact(contact)
+        result = await self._scorer.score_contact(contact)
         serialized = serialize_lead_score(result, contact_id)
         serialized["previous_score"] = contact.lead_score or 0
 
@@ -211,7 +293,7 @@ class LeadScoringService(BaseService):
 
         scored = 0
         for contact in contacts:
-            score_result = self._scorer.score_contact(contact)
+            score_result = await self._scorer.score_contact(contact)
             contact.lead_score = score_result.overall_score
             contact.updated_at = datetime.utcnow()
             self.session.add(contact)

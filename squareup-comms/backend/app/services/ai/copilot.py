@@ -135,12 +135,105 @@ class MockCopilotService:
         return _FALLBACK_RESPONSE
 
 
+_COPILOT_SYSTEM = """You are an AI sales assistant embedded in a B2B CRM. Answer questions about the user's pipeline, contacts, and deals using the provided CRM context.
+
+Return ONLY valid JSON:
+{
+  "type": "answer|action|insight|clarification",
+  "message": "Your response in markdown format",
+  "data": null
+}
+Types: answer=factual CRM data, insight=analysis+recommendations, action=something drafted/done, clarification=need more info.
+Be concise, specific, actionable. Reference real numbers from context when available."""
+
+
+class LLMCopilotService:
+    """LLM-powered copilot using Claude."""
+
+    def __init__(self) -> None:
+        self._fallback = MockCopilotService()
+
+    async def answer(self, query: str, context: str = "") -> CopilotResponse:
+        from app.services.llm_service import get_llm_client, llm_available, parse_llm_json
+
+        if not llm_available():
+            return self._fallback.answer(query)
+
+        try:
+            client = get_llm_client("claude-sonnet-4-6")
+            user_content = (
+                f"CRM Context:\n{context}\n\nUser query: {query}" if context
+                else f"User query: {query}"
+            )
+            response = await client.chat(
+                messages=[{"role": "user", "content": user_content}],
+                system=_COPILOT_SYSTEM,
+                max_tokens=800,
+                temperature=0.4,
+            )
+            parsed = parse_llm_json(response)
+            if not parsed:
+                return self._fallback.answer(query)
+
+            resp_type = parsed.get("type", "answer")
+            if resp_type not in ("answer", "action", "insight", "clarification"):
+                resp_type = "answer"
+
+            return CopilotResponse(
+                type=resp_type,
+                message=parsed.get("message", "I couldn't generate a response."),
+                data=parsed.get("data"),
+            )
+        except Exception:
+            logger.exception("LLM copilot failed, using fallback")
+            return self._fallback.answer(query)
+
+
 class CopilotService(BaseService):
     """Business logic for the AI copilot assistant."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._copilot = MockCopilotService()
+        self._copilot = LLMCopilotService()
+
+    async def _build_context(self) -> str:
+        """Build compact CRM summary to inject into copilot queries."""
+        from sqlalchemy import select
+        from app.models.crm import CRMContact
+        from app.models.crm_deal import CRMDeal
+
+        hot_stmt = (
+            select(CRMContact)
+            .where(CRMContact.is_archived == False)  # noqa: E712
+            .where(CRMContact.lead_score >= 70)
+            .order_by(CRMContact.lead_score.desc())
+            .limit(5)
+        )
+        hot_result = await self.session.execute(hot_stmt)
+        hot_leads = hot_result.scalars().all()
+
+        deal_stmt = select(CRMDeal).where(CRMDeal.status == "open")
+        deal_result = await self.session.execute(deal_stmt)
+        deals = deal_result.scalars().all()
+
+        total_value = sum(d.value or 0 for d in deals)
+        at_risk = [d for d in deals if d.deal_health in ("yellow", "red")]
+
+        hot_text = "\n".join(
+            f"  - {c.name} ({c.title or 'Unknown'}, score={c.lead_score})"
+            for c in hot_leads
+        ) or "  None"
+
+        risk_text = "\n".join(
+            f"  - {d.title}: ${d.value or 0:,.0f}, stage={d.stage}, health={d.deal_health}"
+            for d in at_risk[:5]
+        ) or "  None"
+
+        return (
+            f"Hot leads (score 70+):\n{hot_text}\n\n"
+            f"Open deals: {len(deals)} worth ${total_value:,.0f} total\n\n"
+            f"At-risk deals:\n{risk_text}"
+        )
 
     async def ask(self, query: str) -> dict[str, Any]:
         """Process a natural language query and return a response."""
@@ -151,7 +244,8 @@ class CopilotService(BaseService):
                 "data": None,
             }
 
-        result = self._copilot.answer(query)
+        context = await self._build_context()
+        result = await self._copilot.answer(query, context)
         logger.info("Copilot query: %s → type: %s", query[:80], result.type)
 
         return {

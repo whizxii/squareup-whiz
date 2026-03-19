@@ -13,6 +13,7 @@ import { NotesTab } from "./NotesTab";
 import { EmailsTab } from "./EmailsTab";
 import { CalendarTab } from "./CalendarTab";
 import { RecordingsTab } from "./RecordingsTab";
+import { ChatHistoryTab } from "./ChatHistoryTab";
 import {
   LayoutDashboard,
   Clock,
@@ -21,6 +22,7 @@ import {
   Mail,
   Mic,
   Calendar,
+  MessageSquare,
   AlertTriangle,
 } from "lucide-react";
 
@@ -34,6 +36,7 @@ const TABS = [
   { id: "notes", label: "Notes", icon: <FileText className="w-3.5 h-3.5" /> },
   { id: "calendar", label: "Calendar", icon: <Calendar className="w-3.5 h-3.5" /> },
   { id: "recordings", label: "Recordings", icon: <Mic className="w-3.5 h-3.5" /> },
+  { id: "chat", label: "Chat", icon: <MessageSquare className="w-3.5 h-3.5" /> },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -224,6 +227,10 @@ export function Contact360Page({ contactId, onBack }: Contact360PageProps) {
 
         {activeTab === "recordings" && (
           <RecordingsTab contactId={contactId} />
+        )}
+
+        {activeTab === "chat" && (
+          <ChatHistoryTab contactId={contactId} />
         )}
       </div>
     </div>

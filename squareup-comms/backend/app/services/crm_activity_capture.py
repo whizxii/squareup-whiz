@@ -33,6 +33,7 @@ class ActivityCaptureService:
         self._event_bus.on("recording.transcribed", self._on_recording_transcribed)
         self._event_bus.on("sequence.contact_enrolled", self._on_sequence_enrolled)
         self._event_bus.on("sequence.enrollment_completed", self._on_sequence_completed)
+        self._event_bus.on("chat.message_analyzed", self._on_chat_message_analyzed)
         logger.info("Activity auto-capture handlers registered")
 
     async def _update_contact_activity(self, session: AsyncSession, contact_id: str) -> None:
@@ -198,3 +199,49 @@ class ActivityCaptureService:
                 await session.commit()
         except Exception:
             logger.exception("Failed to auto-capture sequence completed activity")
+
+    async def _on_chat_message_analyzed(self, payload: dict) -> None:
+        """Auto-capture: chat message analyzed with CRM signal for a contact.
+
+        Creates a CRMActivity for the mention and triggers lead score +
+        relationship strength recalculation to keep AI signals fresh.
+        """
+        contact_id = payload.get("contact_id")
+        if not contact_id:
+            return
+
+        try:
+            async with self._session_factory() as session:
+                signal_type = payload.get("signal_type", "mention")
+                channel_id = payload.get("channel_id", "unknown")
+                activity = CRMActivity(
+                    contact_id=contact_id,
+                    type="note",
+                    title=f"Mentioned in chat (channel: {channel_id})",
+                    content=f"Signal type: {signal_type}",
+                    performed_by="system",
+                    performer_type="system",
+                )
+                session.add(activity)
+                await self._update_contact_activity(session, contact_id)
+                await session.commit()
+        except Exception:
+            logger.exception("Failed to auto-capture chat mention activity for %s", contact_id)
+
+        # Recalculate AI scores so contact intelligence stays current after a chat signal.
+        try:
+            from app.core.background import BackgroundTaskManager
+            from app.services.ai.lead_scoring import LeadScoringService
+            from app.services.ai.relationship_strength import RelationshipStrengthService
+
+            async with self._session_factory() as session:
+                bg = BackgroundTaskManager()
+                lead_svc = LeadScoringService(session, self._event_bus, bg)
+                await lead_svc.score_contact(contact_id)
+
+                rel_svc = RelationshipStrengthService(session, self._event_bus, bg)
+                await rel_svc.analyze_relationship(contact_id)
+
+            logger.info("Recalculated AI scores for contact %s after chat signal", contact_id)
+        except Exception:
+            logger.exception("Failed to recalculate AI scores after chat signal for %s", contact_id)

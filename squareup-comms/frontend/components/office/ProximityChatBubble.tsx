@@ -1,7 +1,8 @@
 /**
  * Proximity chat bubbles that appear above nearby users/agents
  * when within close range (INNER_RANGE = 2 tiles).
- * Shows their current activity or status message with warm glass styling.
+ * Shows their current activity or status message.
+ * Themed via useOfficeTheme.
  */
 
 "use client";
@@ -10,11 +11,16 @@ import { useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 import { TILE } from "@/lib/office/office-renderer";
-import { CHAR_H } from "@/lib/office/character-generator";
 
 const INNER_RANGE = 2;
 const BUBBLE_LIFETIME_MS = 5000;
+
+/** Pixels above tile origin for status bubbles */
+const STATUS_BUBBLE_OFFSET = 32;
+/** Pixels above tile origin for chat message bubbles */
+const CHAT_BUBBLE_OFFSET = 48;
 
 interface NearbyEntity {
   readonly id: string;
@@ -26,6 +32,7 @@ interface NearbyEntity {
 }
 
 export default function ProximityChatBubbles() {
+  const { tokens } = useOfficeTheme();
   const myUserId = useCurrentUserId();
   const myPosition = useOfficeStore((s) => s.myPosition);
   const users = useOfficeStore((s) => s.users);
@@ -113,7 +120,7 @@ export default function ProximityChatBubbles() {
       <AnimatePresence>
         {nearbyEntities.map((entity) => {
           const px = entity.x * TILE + TILE / 2;
-          const py = entity.y * TILE - CHAR_H / 2 - 28;
+          const py = entity.y * TILE - STATUS_BUBBLE_OFFSET;
 
           return (
             <motion.div
@@ -134,10 +141,10 @@ export default function ProximityChatBubbles() {
               <div
                 className="rounded-lg px-2.5 py-1.5 text-[10px] leading-tight shadow-lg"
                 style={{
-                  backgroundColor: "rgba(30, 27, 24, 0.85)",
+                  backgroundColor: tokens.glass,
                   backdropFilter: "blur(12px)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  color: "rgba(255,255,255,0.9)",
+                  border: `1px solid ${tokens.glassBorder}`,
+                  color: tokens.text,
                   maxWidth: 160,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -151,7 +158,7 @@ export default function ProximityChatBubbles() {
                 style={{
                   borderLeft: "4px solid transparent",
                   borderRight: "4px solid transparent",
-                  borderTop: "4px solid rgba(30, 27, 24, 0.85)",
+                  borderTop: `4px solid ${tokens.glass}`,
                 }}
               />
             </motion.div>
@@ -163,7 +170,7 @@ export default function ProximityChatBubbles() {
       <AnimatePresence>
         {activeChatBubbles.map((bubble) => {
           const bpx = bubble.senderX * TILE + TILE / 2;
-          const bpy = bubble.senderY * TILE - CHAR_H / 2 - 44;
+          const bpy = bubble.senderY * TILE - CHAT_BUBBLE_OFFSET;
 
           return (
             <motion.div
@@ -182,11 +189,10 @@ export default function ProximityChatBubbles() {
               transition={{ duration: 0.3, ease: "easeOut" }}
             >
               <div
-                className="rounded-lg px-2.5 py-1.5 text-[10px] leading-tight shadow-lg"
+                className="rounded-lg px-2.5 py-1.5 text-[10px] leading-tight text-white shadow-lg"
                 style={{
-                  backgroundColor: "rgba(255,107,0,0.9)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  color: "#fff",
+                  backgroundColor: tokens.accent,
+                  border: `1px solid ${tokens.glassBorder}`,
                   maxWidth: 180,
                   wordBreak: "break-word",
                   whiteSpace: "normal",
@@ -199,7 +205,7 @@ export default function ProximityChatBubbles() {
                 style={{
                   borderLeft: "4px solid transparent",
                   borderRight: "4px solid transparent",
-                  borderTop: "4px solid rgba(255,107,0,0.9)",
+                  borderTop: `4px solid ${tokens.accent}`,
                 }}
               />
             </motion.div>

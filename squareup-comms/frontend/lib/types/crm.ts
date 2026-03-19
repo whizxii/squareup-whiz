@@ -29,6 +29,13 @@ export interface Contact {
   activity_count: number;
   lead_score: number;
   relationship_strength: number;
+
+  // AI intelligence fields (populated by ChatIntelligenceService)
+  ai_summary?: string;
+  last_ai_analysis_at?: string;
+  ai_tags?: string[];
+  sentiment_score?: number; // -1.0 (negative) to 1.0 (positive)
+
   is_archived: boolean;
   created_by?: string;
   created_by_type: string;
@@ -131,6 +138,8 @@ export interface Activity {
   performer_name?: string;
   message_id?: string;
   agent_execution_id?: string;
+  chat_signal_id?: string;
+  chat_context?: string; // JSON: channel_id, message snippet, signal metadata
   created_at: string;
 }
 
@@ -151,7 +160,37 @@ export type ActivityType =
   | "email_opened"
   | "form_submitted"
   | "page_visited"
-  | "workflow_triggered";
+  | "workflow_triggered"
+  | "chat_mention"
+  | "chat_deal_signal"
+  | "chat_action_item"
+  | "chat_meeting_request"
+  | "chat_follow_up";
+
+// ─── Chat Intelligence ──────────────────────────────────────────────
+
+export type ChatSignalType =
+  | "contact_mention"
+  | "deal_signal"
+  | "action_item"
+  | "sentiment"
+  | "meeting_request"
+  | "follow_up";
+
+export interface ChatSignal {
+  id: string;
+  message_id: string;
+  channel_id: string;
+  sender_id: string;
+  signal_type: ChatSignalType;
+  entity_type?: string;
+  entity_id?: string;
+  confidence: number;
+  extracted_data: Record<string, unknown>;
+  ai_reasoning?: string;
+  processed: boolean;
+  created_at?: string;
+}
 
 // ─── Calendar ──────────────────────────────────────────────────────
 

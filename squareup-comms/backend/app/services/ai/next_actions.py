@@ -185,12 +185,144 @@ def serialize_suggestions(suggestions: list[FollowUpSuggestion]) -> list[dict[st
     return [asdict(s) for s in suggestions]
 
 
+_NEXT_ACTIONS_SYSTEM = """You are a B2B sales AI assistant. Generate actionable next steps for sales follow-up.
+
+Return ONLY valid JSON:
+{
+  "suggestions": [
+    {
+      "contact_id": "...",
+      "action": "...",
+      "reasoning": "...",
+      "priority": "high|medium|low",
+      "suggested_date": "YYYY-MM-DD or null"
+    }
+  ]
+}
+Provide 2-4 specific, actionable suggestions ordered by priority (high first).
+Focus on concrete actions executable within the next 1-7 days."""
+
+
+class LLMNextActionsService:
+    """LLM-powered next-action suggestions using Groq."""
+
+    def __init__(self) -> None:
+        self._fallback = MockNextActionsService()
+
+    async def suggest_for_contact(
+        self,
+        contact: CRMContact,
+        deals: list[CRMDeal],
+    ) -> list[FollowUpSuggestion]:
+        from app.services.llm_service import get_llm_client, llm_available, parse_llm_json
+
+        if not llm_available():
+            return self._fallback.suggest_for_contact(contact, deals)
+
+        try:
+            client = get_llm_client("llama-3.3-70b-versatile")
+            contact_id = str(contact.id)
+            deals_info = "\n".join(
+                f"  - {d.title}: stage={d.stage}, value=${d.value or 0:,.0f}, prob={d.probability}%"
+                for d in deals[:5]
+            ) or "  None"
+            context = (
+                f"Contact: {contact.name or 'Unknown'} ({contact.title or 'Unknown'} at {contact.company or 'Unknown'})\n"
+                f"Activity count: {contact.activity_count or 0}\n"
+                f"Lead score: {contact.lead_score or 0}\n"
+                f"Relationship: {contact.relationship_strength or 0}/10\n"
+                f"Last activity: {contact.last_activity_at.isoformat() if contact.last_activity_at else 'Never'}\n"
+                f"Open deals:\n{deals_info}"
+            )
+            response = await client.chat(
+                messages=[{"role": "user", "content": f"Suggest next actions for this contact:\n\n{context}"}],
+                system=_NEXT_ACTIONS_SYSTEM,
+                max_tokens=600,
+                temperature=0.3,
+            )
+            parsed = parse_llm_json(response)
+            if not parsed:
+                return self._fallback.suggest_for_contact(contact, deals)
+
+            raw = parsed.get("suggestions", [])
+            suggestions = [
+                FollowUpSuggestion(
+                    contact_id=contact_id,
+                    action=s.get("action", "Follow up"),
+                    reasoning=s.get("reasoning", ""),
+                    priority=s.get("priority", "medium") if s.get("priority") in ("high", "medium", "low") else "medium",
+                    suggested_date=s.get("suggested_date"),
+                )
+                for s in raw[:4] if isinstance(s, dict) and s.get("action")
+            ]
+            if not suggestions:
+                return self._fallback.suggest_for_contact(contact, deals)
+
+            priority_order = {"high": 0, "medium": 1, "low": 2}
+            return sorted(suggestions, key=lambda s: priority_order.get(s.priority, 9))
+        except Exception:
+            logger.exception("LLM next-actions failed, using fallback")
+            return self._fallback.suggest_for_contact(contact, deals)
+
+    async def suggest_dashboard(self, contacts: list[CRMContact]) -> list[FollowUpSuggestion]:
+        from app.services.llm_service import get_llm_client, llm_available, parse_llm_json
+
+        if not llm_available():
+            return self._fallback.suggest_dashboard(contacts)
+
+        try:
+            client = get_llm_client("llama-3.3-70b-versatile")
+            top = contacts[:10]
+            contacts_info = "\n".join(
+                f"  - {c.name} ({c.title or 'Unknown'}, score={c.lead_score or 0}, "
+                f"last={c.last_activity_at.strftime('%Y-%m-%d') if c.last_activity_at else 'Never'})"
+                for c in top
+            ) or "  No contacts"
+            context = f"Total contacts: {len(contacts)}\nTop contacts:\n{contacts_info}"
+            response = await client.chat(
+                messages=[{"role": "user", "content": f"Generate dashboard next-action suggestions:\n\n{context}"}],
+                system=_NEXT_ACTIONS_SYSTEM,
+                max_tokens=800,
+                temperature=0.3,
+            )
+            parsed = parse_llm_json(response)
+            if not parsed:
+                return self._fallback.suggest_dashboard(contacts)
+
+            raw = parsed.get("suggestions", [])
+            suggestions = []
+            for s in raw[:8]:
+                if not isinstance(s, dict) or not s.get("action"):
+                    continue
+                cid = s.get("contact_id", "")
+                if not cid and contacts:
+                    cid = str(contacts[0].id)
+                priority = s.get("priority", "medium")
+                if priority not in ("high", "medium", "low"):
+                    priority = "medium"
+                suggestions.append(FollowUpSuggestion(
+                    contact_id=cid,
+                    action=s.get("action", "Follow up"),
+                    reasoning=s.get("reasoning", ""),
+                    priority=priority,
+                    suggested_date=s.get("suggested_date"),
+                ))
+            if not suggestions:
+                return self._fallback.suggest_dashboard(contacts)
+
+            priority_order = {"high": 0, "medium": 1, "low": 2}
+            return sorted(suggestions, key=lambda s: priority_order.get(s.priority, 9))
+        except Exception:
+            logger.exception("LLM dashboard actions failed, using fallback")
+            return self._fallback.suggest_dashboard(contacts)
+
+
 class NextActionsService(BaseService):
     """Business logic for AI-powered next-action recommendations."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._suggester = MockNextActionsService()
+        self._suggester = LLMNextActionsService()
 
     @property
     def contact_repo(self) -> ContactRepository:
@@ -211,7 +343,7 @@ class NextActionsService(BaseService):
         result = await self.session.execute(stmt)
         deals = list(result.scalars().all())
 
-        suggestions = self._suggester.suggest_for_contact(contact, deals)
+        suggestions = await self._suggester.suggest_for_contact(contact, deals)
         logger.info("Generated %d actions for contact %s", len(suggestions), contact_id)
         return serialize_suggestions(suggestions)
 
@@ -226,7 +358,7 @@ class NextActionsService(BaseService):
         result = await self.session.execute(stmt)
         contacts = list(result.scalars().all())
 
-        suggestions = self._suggester.suggest_dashboard(contacts)
+        suggestions = await self._suggester.suggest_dashboard(contacts)
         logger.info("Generated %d dashboard actions", len(suggestions))
         return serialize_suggestions(suggestions)
 

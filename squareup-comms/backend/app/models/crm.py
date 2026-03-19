@@ -32,6 +32,13 @@ class CRMContact(SQLModel, table=True):
     follow_up_note: Optional[str] = None
     lead_score: Optional[int] = Field(default=None, index=True)  # 0-100, denormalized
     relationship_strength: Optional[int] = None  # 1-10, denormalized
+
+    # AI intelligence fields (populated by ChatIntelligenceService)
+    ai_summary: Optional[str] = None  # LLM-generated contact summary from chat context
+    last_ai_analysis_at: Optional[datetime] = None
+    ai_tags: Optional[str] = Field(default="[]")  # JSON array of AI-inferred tags
+    sentiment_score: Optional[float] = None  # -1.0 (negative) to 1.0 (positive)
+
     is_archived: bool = Field(default=False)
     created_by: Optional[str] = Field(default=None, max_length=128)
     created_by_type: str = Field(default="user", max_length=10)
@@ -53,4 +60,6 @@ class CRMActivity(SQLModel, table=True):
     performer_name: Optional[str] = Field(default=None, max_length=100)
     message_id: Optional[str] = Field(default=None, foreign_key="messages.id")
     agent_execution_id: Optional[str] = Field(default=None, foreign_key="agent_executions.id")
+    chat_signal_id: Optional[str] = Field(default=None, foreign_key="chat_signals.id")  # Link to originating signal
+    chat_context: Optional[str] = None  # JSON: channel_id, message snippet, signal metadata
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())

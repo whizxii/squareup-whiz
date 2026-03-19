@@ -9,7 +9,6 @@ import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { TILE } from "@/lib/office/office-renderer";
-import { CHAR_W } from "@/lib/office/character-generator";
 
 export default function WaveEffect() {
   const waveTarget = useOfficeStore((s) => s.waveTarget);
@@ -38,8 +37,7 @@ export default function WaveEffect() {
           key={`wave-${waveTarget!.id}-${Date.now()}`}
           className="pointer-events-none absolute text-2xl"
           style={{
-            left:
-              targetEntity.x * TILE + (TILE - CHAR_W) / 2 + CHAR_W / 2,
+            left: targetEntity.x * TILE + TILE / 2,
             top: targetEntity.y * TILE - 16,
             zIndex: 46,
             transform: "translateX(-50%)",

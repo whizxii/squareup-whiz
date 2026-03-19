@@ -1,6 +1,8 @@
 /**
  * Slide-in glass panel for browsing and placing furniture in edit mode.
  * Organized by category tabs with search filter.
+ *
+ * Placing pushes an undo snapshot so Cancel can revert all additions.
  */
 
 "use client";
@@ -9,6 +11,7 @@ import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Armchair, Monitor, Leaf, Cpu } from "lucide-react";
 import { useOfficeStore } from "@/lib/stores/office-store";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 import type { FurnitureType, OfficeFurniture } from "@/lib/stores/office-store";
 
 // ---------------------------------------------------------------------------
@@ -39,7 +42,11 @@ const CATALOG: readonly FurnitureCatalogItem[] = [
   { type: "divider", label: "Divider", emoji: "\u{1F6A7}", category: "desks", defaultWidth: 1, defaultHeight: 2 },
 ];
 
-const CATEGORY_TABS: readonly { readonly id: FurnitureCategory; readonly label: string; readonly icon: typeof Monitor }[] = [
+const CATEGORY_TABS: readonly {
+  readonly id: FurnitureCategory;
+  readonly label: string;
+  readonly icon: typeof Monitor;
+}[] = [
   { id: "desks", label: "Desks", icon: Monitor },
   { id: "seating", label: "Seating", icon: Armchair },
   { id: "decor", label: "Decor", icon: Leaf },
@@ -50,20 +57,26 @@ const CATEGORY_TABS: readonly { readonly id: FurnitureCategory; readonly label: 
 // Component
 // ---------------------------------------------------------------------------
 
-export default function FurnitureLibrary({ open, onClose }: {
+export default function FurnitureLibrary({
+  open,
+  onClose,
+}: {
   readonly open: boolean;
   readonly onClose: () => void;
 }) {
+  const { tokens } = useOfficeTheme();
   const [activeTab, setActiveTab] = useState<FurnitureCategory>("desks");
   const [search, setSearch] = useState("");
   const addFurniture = useOfficeStore((s) => s.addFurniture);
+  const pushEditorUndo = useOfficeStore((s) => s.pushEditorUndo);
   const layout = useOfficeStore((s) => s.layout);
 
   const filteredItems = useMemo(() => {
     const q = search.toLowerCase().trim();
     return CATALOG.filter((item) => {
       const matchesTab = item.category === activeTab;
-      const matchesSearch = !q || item.label.toLowerCase().includes(q) || item.type.includes(q);
+      const matchesSearch =
+        !q || item.label.toLowerCase().includes(q) || item.type.includes(q);
       return matchesTab && matchesSearch;
     });
   }, [activeTab, search]);
@@ -82,19 +95,23 @@ export default function FurnitureLibrary({ open, onClose }: {
         width: item.defaultWidth,
         height: item.defaultHeight,
       };
+
+      pushEditorUndo();
       addFurniture(newFurniture);
     },
-    [addFurniture, layout.gridCols, layout.gridRows]
+    [addFurniture, pushEditorUndo, layout.gridCols, layout.gridRows],
   );
 
   return (
     <AnimatePresence>
       {open && (
         <motion.div
-          className="absolute right-4 top-4 z-50 flex w-64 flex-col rounded-2xl border border-white/15 shadow-xl"
+          className="absolute right-4 top-14 z-50 flex w-64 flex-col rounded-2xl shadow-xl"
           style={{
-            backgroundColor: "rgba(30, 25, 20, 0.85)",
+            backgroundColor: tokens.glass,
+            border: `1px solid ${tokens.glassBorder}`,
             backdropFilter: "blur(24px) saturate(180%)",
+            boxShadow: tokens.shadowLg,
           }}
           initial={{ opacity: 0, x: 40, scale: 0.96 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -102,11 +119,20 @@ export default function FurnitureLibrary({ open, onClose }: {
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <h3 className="text-sm font-semibold text-white/90">Furniture</h3>
+          <div
+            className="flex items-center justify-between px-4 py-3"
+            style={{ borderBottom: `1px solid ${tokens.border}` }}
+          >
+            <h3
+              className="text-sm font-semibold"
+              style={{ color: tokens.text }}
+            >
+              Furniture
+            </h3>
             <button
               onClick={onClose}
-              className="flex h-6 w-6 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/10 hover:text-white/70"
+              className="flex h-6 w-6 items-center justify-center rounded-md transition-colors"
+              style={{ color: tokens.textMuted }}
               aria-label="Close furniture library"
             >
               <X size={14} />
@@ -115,14 +141,23 @@ export default function FurnitureLibrary({ open, onClose }: {
 
           {/* Search */}
           <div className="px-3 pt-3">
-            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-              <Search size={12} className="text-white/30" />
+            <div
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5"
+              style={{
+                backgroundColor: tokens.accentSoft,
+                border: `1px solid ${tokens.border}`,
+              }}
+            >
+              <Search size={12} style={{ color: tokens.textMuted }} />
               <input
                 type="text"
                 placeholder="Search..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 bg-transparent text-xs text-white/80 placeholder-white/30 outline-none"
+                className="flex-1 bg-transparent text-xs outline-none"
+                style={{
+                  color: tokens.text,
+                }}
               />
             </div>
           </div>
@@ -135,8 +170,10 @@ export default function FurnitureLibrary({ open, onClose }: {
                 onClick={() => setActiveTab(tab.id)}
                 className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors"
                 style={{
-                  backgroundColor: activeTab === tab.id ? "rgba(255,107,0,0.2)" : "transparent",
-                  color: activeTab === tab.id ? "#FF6B00" : "rgba(255,255,255,0.5)",
+                  backgroundColor:
+                    activeTab === tab.id ? tokens.accentSoft : "transparent",
+                  color:
+                    activeTab === tab.id ? tokens.accent : tokens.textMuted,
                 }}
               >
                 <tab.icon size={11} />
@@ -151,18 +188,33 @@ export default function FurnitureLibrary({ open, onClose }: {
               <button
                 key={item.type}
                 onClick={() => handlePlace(item)}
-                className="flex flex-col items-center gap-1 rounded-xl border border-white/8 bg-white/5 px-2 py-3 transition-colors hover:border-[#FF6B00]/30 hover:bg-[#FF6B00]/10"
-                title={`Place ${item.label}`}
+                className="flex flex-col items-center gap-1 rounded-xl px-2 py-3 transition-colors"
+                style={{
+                  backgroundColor: tokens.accentSoft,
+                  border: `1px solid ${tokens.borderSubtle}`,
+                }}
+                title={`Place ${item.label} at center`}
               >
                 <span className="text-xl">{item.emoji}</span>
-                <span className="text-[10px] font-medium text-white/60">{item.label}</span>
-                <span className="text-[8px] text-white/30">
+                <span
+                  className="text-[10px] font-medium"
+                  style={{ color: tokens.textSecondary }}
+                >
+                  {item.label}
+                </span>
+                <span
+                  className="text-[8px]"
+                  style={{ color: tokens.textMuted }}
+                >
                   {item.defaultWidth}x{item.defaultHeight}
                 </span>
               </button>
             ))}
             {filteredItems.length === 0 && (
-              <p className="col-span-2 py-4 text-center text-xs text-white/30">
+              <p
+                className="col-span-2 py-4 text-center text-xs"
+                style={{ color: tokens.textMuted }}
+              >
                 No items found
               </p>
             )}

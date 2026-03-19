@@ -1,6 +1,7 @@
 /**
  * Keyboard shortcuts help overlay — triggered by pressing "?".
  * Glass panel with organized shortcut list.
+ * Themed via useOfficeTheme.
  */
 
 "use client";
@@ -8,6 +9,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 
 interface Shortcut {
   readonly keys: readonly string[];
@@ -60,6 +62,7 @@ const SHORTCUT_GROUPS: readonly {
 ];
 
 export default function KeyboardShortcutsOverlay() {
+  const { tokens } = useOfficeTheme();
   const [open, setOpen] = useState(false);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -95,10 +98,11 @@ export default function KeyboardShortcutsOverlay() {
 
           {/* Panel */}
           <motion.div
-            className="fixed left-1/2 top-1/2 z-50 w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/15 p-5 shadow-2xl"
+            className="fixed left-1/2 top-1/2 z-50 w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-2xl p-5 shadow-2xl"
             style={{
-              backgroundColor: "rgba(30, 25, 20, 0.92)",
+              backgroundColor: tokens.glass,
               backdropFilter: "blur(24px) saturate(180%)",
+              border: `1px solid ${tokens.glassBorder}`,
             }}
             initial={{ opacity: 0, scale: 0.92, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -107,12 +111,16 @@ export default function KeyboardShortcutsOverlay() {
           >
             {/* Header */}
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white/90">
+              <h2
+                className="text-sm font-semibold"
+                style={{ color: tokens.text }}
+              >
                 Keyboard Shortcuts
               </h2>
               <button
                 onClick={() => setOpen(false)}
-                className="flex h-6 w-6 items-center justify-center rounded-md text-white/40 hover:bg-white/10 hover:text-white/70"
+                className="flex h-6 w-6 items-center justify-center rounded-md transition-colors"
+                style={{ color: tokens.textMuted }}
                 aria-label="Close shortcuts"
               >
                 <X size={14} />
@@ -123,7 +131,10 @@ export default function KeyboardShortcutsOverlay() {
             <div className="space-y-4">
               {SHORTCUT_GROUPS.map((group) => (
                 <div key={group.label}>
-                  <h3 className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-white/30">
+                  <h3
+                    className="mb-1.5 text-[10px] font-medium uppercase tracking-wider"
+                    style={{ color: tokens.textMuted }}
+                  >
                     {group.label}
                   </h3>
                   <div className="space-y-1">
@@ -132,14 +143,22 @@ export default function KeyboardShortcutsOverlay() {
                         key={shortcut.description}
                         className="flex items-center justify-between py-0.5"
                       >
-                        <span className="text-xs text-white/60">
+                        <span
+                          className="text-xs"
+                          style={{ color: tokens.textSecondary }}
+                        >
                           {shortcut.description}
                         </span>
                         <div className="flex gap-1">
                           {shortcut.keys.map((key) => (
                             <kbd
                               key={key}
-                              className="flex min-w-[22px] items-center justify-center rounded border border-white/15 bg-white/8 px-1.5 py-0.5 text-[10px] font-medium text-white/70"
+                              className="flex min-w-[22px] items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-medium"
+                              style={{
+                                border: `1px solid ${tokens.borderSubtle}`,
+                                backgroundColor: tokens.accentSoft,
+                                color: tokens.text,
+                              }}
                             >
                               {key}
                             </kbd>
