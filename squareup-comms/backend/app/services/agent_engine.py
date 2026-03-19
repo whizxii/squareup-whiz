@@ -29,6 +29,7 @@ from app.services.llm_service import (
     calculate_cost,
     get_fallback_client,
     get_llm_client,
+    resolve_model_for_client,
 )
 from app.services.tools import tool_registry
 from app.services.tools.registry import ToolContext
@@ -248,12 +249,13 @@ async def run_agent(
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            # Stream LLM response
+            # Stream LLM response (resolve model to match the selected provider)
+            resolved_model = resolve_model_for_client(llm, agent.model)
             async for event in llm.stream_with_tools(
                 system=system_prompt,
                 messages=messages,
                 tools=tool_schemas if tool_schemas else None,
-                model=agent.model,
+                model=resolved_model,
                 max_tokens=4096,
                 temperature=temperature,
             ):
@@ -269,6 +271,13 @@ async def run_agent(
                     total_output_tokens += event.output_tokens
 
             full_text = "".join(text_parts)
+
+            if not full_text and not tool_use_blocks:
+                logger.warning(
+                    "Agent %s: LLM stream produced no text and no tool calls "
+                    "(provider=%s, model=%s, iteration=%d)",
+                    agent.id, llm.PROVIDER, resolved_model, iteration,
+                )
 
             # No tool calls → done
             if not tool_use_blocks:
@@ -592,11 +601,12 @@ async def invoke_agent_sync(
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
+            resolved_model = resolve_model_for_client(llm, agent.model)
             async for event in llm.stream_with_tools(
                 system=system_prompt,
                 messages=messages,
                 tools=tool_schemas if tool_schemas else None,
-                model=agent.model,
+                model=resolved_model,
                 max_tokens=4096,
                 temperature=temperature,
             ):
@@ -609,6 +619,13 @@ async def invoke_agent_sync(
                     total_output_tokens += event.output_tokens
 
             full_text = "".join(text_parts)
+
+            if not full_text and not tool_use_blocks:
+                logger.warning(
+                    "Agent %s sync: LLM stream produced no text and no tool calls "
+                    "(provider=%s, model=%s, iteration=%d)",
+                    agent.id, llm.PROVIDER, resolved_model, iteration,
+                )
 
             if not tool_use_blocks:
                 final_text = full_text

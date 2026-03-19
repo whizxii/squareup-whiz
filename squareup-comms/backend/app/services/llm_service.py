@@ -238,6 +238,10 @@ class GeminiLLMClient:
                 continue
 
             for part in candidate.content.parts:
+                # Skip Gemini 2.5 "thinking" parts (internal reasoning)
+                if getattr(part, "thought", False):
+                    continue
+
                 fn_call = getattr(part, "function_call", None)
                 if fn_call and fn_call.name:
                     # Generate unique IDs — Gemini FunctionCall has no .id field
@@ -699,6 +703,25 @@ def get_fallback_client(exclude_provider: str) -> LLMClient | None:
             return client_cls(api_key)
 
     return None
+
+
+def resolve_model_for_client(client: "LLMClient", requested_model: str | None) -> str:
+    """Return a model name that is compatible with the given LLM client.
+
+    If the requested model belongs to the client's provider, use it as-is.
+    Otherwise, fall back to the client's DEFAULT_MODEL so that, e.g.,
+    a GroqLLMClient never receives "gemini-2.5-flash".
+    """
+    if not requested_model:
+        return client.DEFAULT_MODEL
+
+    provider = client.PROVIDER  # "gemini" | "groq" | "anthropic"
+    prefix_map = {"gemini": "gemini", "groq": "llama", "anthropic": "claude"}
+    expected_prefix = prefix_map.get(provider, "")
+
+    if requested_model.startswith(expected_prefix):
+        return requested_model
+    return client.DEFAULT_MODEL
 
 
 def get_available_providers() -> list[dict[str, str]]:
