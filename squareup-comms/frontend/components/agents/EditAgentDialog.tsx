@@ -27,6 +27,7 @@ const ICON_OPTIONS = [
 ] as const;
 
 const MODEL_OPTIONS = [
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "Free tier — fastest response" },
   { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", desc: "Best balance of speed and quality" },
   { id: "claude-opus-4-6", label: "Claude Opus 4.6", desc: "Maximum reasoning depth" },
   { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", desc: "Fast and cost-effective" },

@@ -75,7 +75,7 @@ const INITIAL_FORM: WizardFormData = {
   selectedMcpServers: [],
   systemPrompt: "",
   triggerMode: "mention",
-  model: "claude-sonnet-4-6",
+  model: "gemini-2.5-flash",
   autonomyLevel: 2,
   maxIterations: 5,
   temperature: 0.7,
@@ -97,6 +97,7 @@ const TRIGGER_MODES = [
 ] as const;
 
 const MODEL_OPTIONS = [
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "Free tier — fastest response" },
   { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", desc: "Best balance of speed and quality" },
   { id: "claude-opus-4-6", label: "Claude Opus 4.6", desc: "Maximum reasoning depth" },
   { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", desc: "Fast and cost-effective" },

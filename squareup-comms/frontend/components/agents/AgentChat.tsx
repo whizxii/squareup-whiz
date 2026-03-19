@@ -123,9 +123,9 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
         parsedTools = [];
       }
       updateChatMessage(agent.id, agentMsgId, {
-        content: data.response_text || "Done!",
+        content: data.response_text || (parsedTools.length > 0 ? "Completed." : "I couldn't generate a response. Please try again."),
         toolCalls: parsedTools,
-        status: "done",
+        status: data.response_text ? "done" : "error",
       });
       updateAgent(agent.id, { status: "idle", current_task: undefined });
       setSending(false);

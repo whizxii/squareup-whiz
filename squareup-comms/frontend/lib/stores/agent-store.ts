@@ -350,12 +350,16 @@ export const useAgentStore = create<AgentState>((set) => ({
         ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
         : { "X-User-Id": getCurrentUserId(), "Content-Type": "application/json" };
 
-      await fetch(`${API_URL}/api/agents/${id}`, {
+      const res = await fetch(`${API_URL}/api/agents/${id}`, {
         method: "DELETE",
         headers,
       });
+      if (!res.ok) {
+        // Delete failed on server — re-fetch to restore accurate state
+        useAgentStore.getState().fetchAgents();
+      }
     } catch {
-      // If delete fails, re-fetch to restore accurate state
+      // Network error — re-fetch to restore accurate state
       useAgentStore.getState().fetchAgents();
     }
   },

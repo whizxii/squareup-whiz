@@ -39,20 +39,27 @@ export function AgentCard({ agent, onClick, onEdit, onDelete }: AgentCardProps) 
         setConfirmDelete(false);
       } else {
         setConfirmDelete(true);
-        // Auto-reset after 3 seconds
-        setTimeout(() => setConfirmDelete(false), 3000);
       }
     },
     [agent, confirmDelete, onDelete]
   );
 
+  // Reset confirm state when mouse leaves the card
+  const handleMouseLeave = useCallback(() => {
+    if (confirmDelete) setConfirmDelete(false);
+  }, [confirmDelete]);
+
   return (
     <button
       onClick={onClick}
+      onMouseLeave={handleMouseLeave}
       className="w-full text-left p-4 rounded-2xl border border-border bg-card hover:shadow-md hover:border-sq-agent/30 transition-all duration-200 space-y-3 group relative"
     >
-      {/* Action buttons — visible on hover */}
-      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Action buttons — always visible when confirming, otherwise on hover */}
+      <div className={cn(
+        "absolute top-3 right-3 flex items-center gap-1 transition-opacity",
+        confirmDelete ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+      )}>
         {onEdit && (
           <span
             role="button"
