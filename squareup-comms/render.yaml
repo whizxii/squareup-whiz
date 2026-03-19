@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: squareup-comms-api
+    name: squareup-whiz
     runtime: python
     region: oregon
     rootDir: backend
@@ -18,13 +18,21 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
       - key: FIREBASE_CREDENTIALS_JSON
+        sync: false
+      - key: FIREBASE_STORAGE_BUCKET
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
         sync: false
       - key: GROQ_API_KEY
         sync: false

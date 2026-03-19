@@ -30,6 +30,9 @@ from app.models.crm_smart_list import CRMSmartList  # noqa: F401
 from app.models.files import File  # noqa: F401
 from app.models.notifications import Notification  # noqa: F401
 from app.models.integrations import IntegrationConfig  # noqa: F401
+from app.models.custom_tools import CustomTool  # noqa: F401
+from app.models.reminders import Reminder  # noqa: F401
+from app.models.tasks import Task  # noqa: F401
 
 from sqlmodel import SQLModel
 

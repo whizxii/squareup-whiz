@@ -1,0 +1,38 @@
+# Secrets — NEVER include in Docker image
+.env
+.env.*
+firebase-credentials.json
+*.pem
+*.key
+
+# Python artifacts
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Dev/test files
+.coverage
+htmlcov/
+.pytest_cache/
+dev.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Alembic versions are needed — do NOT ignore migrations/
