@@ -3,6 +3,7 @@
 import {
   useAgentStore,
   AgentChatMessage,
+  ToolCall,
 } from "@/lib/stores/agent-store";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/auth-store";
@@ -113,10 +114,11 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
 
       const data = await res.json();
       // Backend returns tools_called as a JSON string — parse it safely
-      let parsedTools: unknown[] = [];
+      let parsedTools: ToolCall[] = [];
       try {
         const raw = data.tools_called;
-        parsedTools = Array.isArray(raw) ? raw : JSON.parse(raw || "[]");
+        const arr = Array.isArray(raw) ? raw : JSON.parse(raw || "[]");
+        parsedTools = Array.isArray(arr) ? arr : [];
       } catch {
         parsedTools = [];
       }
