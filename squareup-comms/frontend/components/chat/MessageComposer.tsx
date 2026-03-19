@@ -63,7 +63,15 @@ export function MessageComposer({ onTypingChange }: MessageComposerProps) {
   const activeChannelId = useChatStore((s) => s.activeChannelId);
   const addMessage = useChatStore((s) => s.addMessage);
   const agents = useAgentStore((s) => s.agents);
+  const fetchAgents = useAgentStore((s) => s.fetchAgents);
   const { users } = useUsers();
+
+  // Ensure agents are loaded for @ mention suggestions
+  useEffect(() => {
+    if (agents.length === 0) {
+      fetchAgents();
+    }
+  }, [agents.length, fetchAgents]);
 
   // Build mention suggestions from real users + agents
   const mentionSuggestions = useMemo<MentionSuggestion[]>(() => {
