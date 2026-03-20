@@ -9,7 +9,9 @@ import {
   useUpdateContact,
   useUploadRecording,
   useContact,
+  useContacts,
 } from "@/lib/hooks/use-crm-queries";
+import type { Contact } from "@/lib/types/crm";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/stores/toast-store";
 import { useAuthStore } from "@/lib/stores/auth-store";
@@ -54,12 +56,79 @@ const MORE_TYPES: { value: ActivityType; label: string }[] = [
   { value: "note",    label: "Other" },
 ];
 
+// ─── Inline contact picker (used when no contactId provided) ──
+
+interface InlinePickerProps {
+  value: string;
+  displayName: string;
+  onSelect: (id: string, name: string) => void;
+  inputCls: string;
+}
+
+function InlineContactPicker({ value, displayName, onSelect, inputCls }: InlinePickerProps) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const { data } = useContacts(query ? { search: query } : undefined, { limit: 10 });
+  const contacts = ((data as { items?: Contact[] })?.items ?? []) as Contact[];
+
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <input
+        type="text"
+        value={displayName || query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          if (value) onSelect("", "");
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="Search contacts by name or company…"
+        className={inputCls}
+        autoComplete="off"
+      />
+      {open && contacts.length > 0 && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 border border-border rounded-lg bg-background shadow-lg max-h-44 overflow-auto">
+          {contacts.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onSelect(c.id, c.name);
+                setQuery("");
+                setOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors"
+            >
+              <span className="font-medium">{c.name}</span>
+              {c.company && <span className="text-muted-foreground text-xs">at {c.company}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Props ────────────────────────────────────────────────────
 
 interface LogActivityDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  contactId: string;
+  /** Pass when opening from a specific contact's profile. Omit to show a contact picker inside the dialog. */
+  contactId?: string | null;
 }
 
 // ─── Component ────────────────────────────────────────────────
@@ -67,14 +136,20 @@ interface LogActivityDialogProps {
 export function LogActivityDialog({
   open,
   onOpenChange,
-  contactId,
+  contactId: contactIdProp,
 }: LogActivityDialogProps) {
   const createActivity   = useCreateActivity();
   const createCalendar   = useCreateCalendarEvent();
   const updateContact    = useUpdateContact();
   const uploadRecording  = useUploadRecording();
-  const { data: contact } = useContact(contactId, { enabled: !!contactId });
-  const contactName = contact?.name ?? "Contact";
+
+  // When no contactId is passed in (e.g. opened from global shortcut), let the user pick one
+  const [pickedContactId, setPickedContactId]     = useState("");
+  const [pickedContactName, setPickedContactName] = useState("");
+
+  const contactId   = contactIdProp || pickedContactId;
+  const { data: contact } = useContact(contactId ?? "", { enabled: !!contactId });
+  const contactName = contact?.name ?? pickedContactName ?? "Contact";
 
   // Form state
   const [type, setType]                 = useState<ActivityType>("call");
@@ -112,8 +187,12 @@ export function LogActivityDialog({
       setRecordingFile(null);
       setFileError(null);
       setSubmitError(null);
+      if (!contactIdProp) {
+        setPickedContactId("");
+        setPickedContactName("");
+      }
     }
-  }, [open]);
+  }, [open, contactIdProp]);
 
   const selectType = useCallback((val: ActivityType, label?: string) => {
     setType(val);
@@ -146,7 +225,7 @@ export function LogActivityDialog({
     ? `${followUpDate}T${followUpTime}:00`
     : "";
 
-  const canSubmit = !!title.trim() && !submitting;
+  const canSubmit = !!title.trim() && !!contactId && !submitting;
 
   async function handleSubmit() {
     if (!canSubmit || !contactId) return;
@@ -245,14 +324,32 @@ export function LogActivityDialog({
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 overflow-y-auto max-h-[90vh]">
           <Dialog.Title className="text-lg font-display font-bold mb-4">
             Log Activity
-            {contact && (
+            {contactName !== "Contact" && (
               <span className="ml-2 text-sm font-normal text-muted-foreground">
-                with {contact.name}
+                with {contactName}
               </span>
             )}
           </Dialog.Title>
 
           <div className="space-y-4">
+            {/* ── Contact picker (only when no contactId provided) ── */}
+            {!contactIdProp && (
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Contact *
+                </label>
+                <InlineContactPicker
+                  value={pickedContactId}
+                  displayName={pickedContactName}
+                  onSelect={(id, name) => {
+                    setPickedContactId(id);
+                    setPickedContactName(name);
+                  }}
+                  inputCls={inputCls}
+                />
+              </div>
+            )}
+
             {/* ── Type pills ───────────────────────────────────── */}
             <div className="flex items-center gap-1.5 flex-wrap">
               {PRIMARY_TYPES.map(({ value, label, icon: Icon }) => (

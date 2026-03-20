@@ -218,6 +218,18 @@ async def get_contact_360(
         result["company"] = None
 
     result["tags"] = [{"id": t.id, "name": t.name, "color": t.color} for t in data.get("tags", [])]
+    import json as _json
+
+    def _parse_metadata(raw: object) -> dict:
+        if not raw:
+            return {}
+        if isinstance(raw, dict):
+            return raw
+        try:
+            return _json.loads(raw)
+        except Exception:
+            return {}
+
     result["activities"] = [
         {
             "id": a.id,
@@ -226,6 +238,7 @@ async def get_contact_360(
             "content": a.content,
             "created_at": a.created_at.isoformat() if a.created_at else None,
             "performed_by": a.performed_by,
+            "activity_metadata": _parse_metadata(a.activity_metadata),
         }
         for a in data.get("activities", [])
     ]

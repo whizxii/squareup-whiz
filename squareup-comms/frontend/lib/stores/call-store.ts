@@ -49,6 +49,10 @@ export interface CallState {
   // Incoming call notification
   readonly incomingCall: IncomingCall | null;
 
+  // Circuit breaker — prevents infinite reconnect loops on auth failures
+  readonly consecutiveFailures: number;
+  readonly callDisabledUntil: number; // Unix ms timestamp; 0 = not disabled
+
   // Actions
   readonly joinCall: (roomName: string, participantName?: string) => Promise<void>;
   readonly leaveCall: () => void;
@@ -60,6 +64,8 @@ export interface CallState {
   readonly acceptIncomingCall: () => Promise<void>;
   readonly rejectIncomingCall: () => void;
   readonly clearError: () => void;
+  readonly recordCallFailure: () => void;
+  readonly recordCallSuccess: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,8 +96,12 @@ export const useCallStore = create<CallState>((set, get) => ({
   isScreenSharing: false,
   participants: [],
   incomingCall: null,
+  consecutiveFailures: 0,
+  callDisabledUntil: 0,
 
   joinCall: async (roomName: string, participantName?: string) => {
+    // Circuit breaker: skip silently if too many recent failures
+    if (Date.now() < get().callDisabledUntil) return;
     set({ loading: true, error: null });
     try {
       const res = await fetch(`${API_URL}/api/calls/token`, {
@@ -120,6 +130,7 @@ export const useCallStore = create<CallState>((set, get) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to join call";
       set({ error: message, loading: false });
+      get().recordCallFailure();
     }
   },
 
@@ -152,4 +163,15 @@ export const useCallStore = create<CallState>((set, get) => ({
   rejectIncomingCall: () => set({ incomingCall: null }),
 
   clearError: () => set({ error: null }),
+
+  recordCallFailure: () =>
+    set((s) => {
+      const next = s.consecutiveFailures + 1;
+      return {
+        consecutiveFailures: next,
+        callDisabledUntil: next >= 3 ? Date.now() + 60_000 : s.callDisabledUntil,
+      };
+    }),
+
+  recordCallSuccess: () => set({ consecutiveFailures: 0, callDisabledUntil: 0 }),
 }));

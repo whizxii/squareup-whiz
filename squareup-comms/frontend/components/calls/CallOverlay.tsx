@@ -13,12 +13,13 @@ import { useCallStore } from "@/lib/stores/call-store";
 import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 import {
   LiveKitRoom,
+  useConnectionState,
   useLocalParticipant,
   useRemoteParticipants,
   useTracks,
   VideoTrack,
 } from "@livekit/components-react";
-import { Track } from "livekit-client";
+import { ConnectionState, Track } from "livekit-client";
 import {
   Phone,
   PhoneOff,
@@ -50,15 +51,18 @@ function ActiveCallUI() {
 
   const { localParticipant } = useLocalParticipant();
   const remoteParticipants = useRemoteParticipants();
+  const connectionState = useConnectionState();
 
-  // Sync store mute/video state with actual LiveKit tracks
+  // Sync store mute/video state with actual LiveKit tracks — only when connected
   useEffect(() => {
+    if (connectionState !== ConnectionState.Connected) return;
     localParticipant.setMicrophoneEnabled(!isMuted);
-  }, [isMuted, localParticipant]);
+  }, [isMuted, localParticipant, connectionState]);
 
   useEffect(() => {
+    if (connectionState !== ConnectionState.Connected) return;
     localParticipant.setCameraEnabled(!isVideoOff);
-  }, [isVideoOff, localParticipant]);
+  }, [isVideoOff, localParticipant, connectionState]);
 
   // Sync LiveKit remote participants into call store so other components can read them
   useEffect(() => {
@@ -295,6 +299,15 @@ export function CallOverlay() {
     useCallStore.getState().leaveCall();
   }, []);
 
+  const handleError = useCallback(() => {
+    useCallStore.getState().recordCallFailure();
+    useCallStore.getState().leaveCall();
+  }, []);
+
+  const handleConnected = useCallback(() => {
+    useCallStore.getState().recordCallSuccess();
+  }, []);
+
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
       {/* Error toast */}
@@ -342,6 +355,13 @@ export function CallOverlay() {
           audio={true}
           video={false}
           onDisconnected={handleDisconnected}
+          onError={handleError}
+          onConnected={handleConnected}
+          options={{
+            reconnectPolicy: {
+              nextRetryDelayInMs: (ctx) => (ctx.retryCount >= 1 ? null : 5000),
+            },
+          }}
         >
           {/* Spatial audio (renders nothing visible) */}
           <SpatialAudioManager />

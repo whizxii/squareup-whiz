@@ -66,8 +66,9 @@ export function useProximityCall(opts: { readonly userId: string; readonly enabl
         // Entered a meeting zone → auto-join zone call
         if (currentZoneId && currentZoneId !== lastZoneRef.current) {
           const zoneRoomName = `zone-${currentZoneId}`;
-          // Don't interrupt an existing non-zone call
-          if (!stillInCall) {
+          // Don't interrupt an existing non-zone call; respect circuit breaker
+          const { callDisabledUntil } = useCallStore.getState();
+          if (!stillInCall && Date.now() >= callDisabledUntil) {
             useCallStore.getState().joinCall(zoneRoomName);
           }
         }

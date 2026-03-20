@@ -25,6 +25,7 @@ import {
   Trash2,
   GitMerge,
   ChevronDown,
+  ClipboardList,
 } from "lucide-react";
 
 // ─── Stage selector colors ──────────────────────────────────────
@@ -279,6 +280,15 @@ export function ContactHeader({
               <Phone className="w-4 h-4" />
             </a>
           )}
+          <button
+            onClick={() =>
+              openDialog("log-activity", { contact_id: contact.id, contact_name: contact.name })
+            }
+            className="p-2 rounded-lg border border-border hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            title="Log activity"
+          >
+            <ClipboardList className="w-4 h-4" />
+          </button>
           <button
             onClick={() =>
               openDialog("create-event", { contact_id: contact.id })
