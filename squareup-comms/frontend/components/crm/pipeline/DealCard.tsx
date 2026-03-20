@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Calendar, Trophy, XCircle, Pencil } from "lucide-react";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
 import { useWinDeal } from "@/lib/hooks/use-crm-queries";
+import { useRouter } from "next/navigation";
 
 interface DealCardProps {
   deal: Deal;
@@ -15,12 +16,16 @@ interface DealCardProps {
 }
 
 export function DealCard({ deal, isDragging = false }: DealCardProps) {
+  const router = useRouter();
   const setSelectedDealId = useCRMUIStore((s) => s.setSelectedDealId);
   const openDialog = useCRMUIStore((s) => s.openDialog);
   const winDeal = useWinDeal();
 
   const handleClick = () => {
     setSelectedDealId(deal.id);
+    if (deal.contact_id) {
+      router.push(`/crm/contacts/${deal.contact_id}`);
+    }
   };
 
   const handleWin = (e: React.MouseEvent) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/format";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
@@ -90,9 +91,9 @@ function hiddenClass(below?: "md" | "lg" | "xl"): string {
 // ─── Component ──────────────────────────────────────────────────────
 
 export function TableView() {
+  const router = useRouter();
   const searchQuery = useCRMUIStore((s) => s.searchQuery);
   const filters = useCRMUIStore((s) => s.filters);
-  const openDialog = useCRMUIStore((s) => s.openDialog);
   const setSelectedContactId = useCRMUIStore((s) => s.setSelectedContactId);
 
   // Selection state
@@ -157,8 +158,8 @@ export function TableView() {
 
   const handleRowClick = useCallback((contact: Contact) => {
     setSelectedContactId(contact.id);
-    openDialog("edit-contact", { contact_id: contact.id });
-  }, [setSelectedContactId, openDialog]);
+    router.push(`/crm/contacts/${contact.id}`);
+  }, [router, setSelectedContactId]);
 
   const allOnPageSelected =
     pageContacts.length > 0 && selectedIds.size === pageContacts.length;
