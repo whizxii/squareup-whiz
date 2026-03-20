@@ -222,9 +222,9 @@ function EnrichmentPanel({ enrichment }: { enrichment: ContactEnrichment }) {
       )}
 
       {/* Skills */}
-      {enrichment.skills.length > 0 && (
+      {(enrichment.skills ?? []).length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {enrichment.skills.slice(0, 6).map((skill) => (
+          {(enrichment.skills ?? []).slice(0, 6).map((skill) => (
             <span
               key={skill}
               className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
@@ -232,9 +232,9 @@ function EnrichmentPanel({ enrichment }: { enrichment: ContactEnrichment }) {
               {skill}
             </span>
           ))}
-          {enrichment.skills.length > 6 && (
+          {(enrichment.skills ?? []).length > 6 && (
             <span className="text-[10px] px-1.5 py-0.5 text-muted-foreground">
-              +{enrichment.skills.length - 6}
+              +{(enrichment.skills ?? []).length - 6}
             </span>
           )}
         </div>

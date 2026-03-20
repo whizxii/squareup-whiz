@@ -129,7 +129,21 @@ export function Contact360Page({ contactId, onBack }: Contact360PageProps) {
     );
   }
 
-  const c360 = data;
+  // Normalize: backend may return null for array fields despite TypeScript types
+  const c360 = {
+    ...data,
+    notes: data.notes ?? [],
+    deals: data.deals ?? [],
+    activities: data.activities ?? [],
+    recordings: data.recordings ?? [],
+    calendar_events: data.calendar_events ?? [],
+    follow_up_suggestions: data.follow_up_suggestions ?? [],
+    contact: {
+      ...data.contact,
+      tags: data.contact.tags ?? [],
+      custom_fields: data.contact.custom_fields ?? {},
+    },
+  };
 
   return (
     <div className="h-full flex flex-col bg-background">
