@@ -296,6 +296,11 @@ export function CallOverlay() {
   const incomingCall = useCallStore((s) => s.incomingCall);
 
   const handleDisconnected = useCallback(() => {
+    // If still in call state, this was an unexpected disconnect (e.g. 401 on initial connect),
+    // not a user-initiated hang-up. Count it against the circuit breaker.
+    if (useCallStore.getState().isInCall) {
+      useCallStore.getState().recordCallFailure();
+    }
     useCallStore.getState().leaveCall();
   }, []);
 

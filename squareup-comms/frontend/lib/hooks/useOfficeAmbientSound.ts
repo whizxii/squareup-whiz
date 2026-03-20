@@ -202,13 +202,34 @@ export function useOfficeAmbientSound(config: AmbientSoundConfig = {}): AmbientS
     }
   }, []);
 
-  // Auto-resume on user interaction (autoplay compliance)
+  // Auto-resume on user interaction (autoplay compliance).
+  // Also lazily creates the AudioContext on first gesture so we never call
+  // `new AudioContext()` before a user interaction (Chrome autoplay policy).
   useEffect(() => {
     const resume = () => {
-      if (ctxRef.current?.state === "suspended") {
-        ctxRef.current.resume().catch(() => undefined);
-      } else if (!ctxRef.current) {
-        // Don't force-create context here — let it be lazy
+      if (ctxRef.current) {
+        if (ctxRef.current.state === "suspended") {
+          ctxRef.current.resume().catch(() => undefined);
+        }
+        return;
+      }
+
+      // First gesture — create the context now that we have permission
+      try {
+        const ctx = new AudioContext();
+        const master = ctx.createGain();
+        master.gain.value = volumeRef.current;
+        master.connect(ctx.destination);
+        ctxRef.current = ctx;
+        masterGainRef.current = master;
+
+        // Start the hum if it was requested but couldn't start yet (context was missing)
+        if (enableHum && !stopHumRef.current) {
+          const stop = createAmbientHum(ctx, master);
+          stopHumRef.current = stop;
+        }
+      } catch {
+        // AudioContext not available
       }
     };
 
@@ -219,9 +240,11 @@ export function useOfficeAmbientSound(config: AmbientSoundConfig = {}): AmbientS
       window.removeEventListener("pointerdown", resume);
       window.removeEventListener("keydown", resume);
     };
-  }, []);
+  }, [enableHum]);
 
-  // Start/stop background hum when enableHum changes
+  // Start/stop background hum when enableHum changes.
+  // Does NOT create an AudioContext — that only happens on first user gesture
+  // (see the gesture listener effect above) to comply with autoplay policy.
   useEffect(() => {
     if (!enableHum) {
       stopHumRef.current?.();
@@ -229,9 +252,10 @@ export function useOfficeAmbientSound(config: AmbientSoundConfig = {}): AmbientS
       return;
     }
 
-    const ctx = ensureContext();
-    if (!ctx || !masterGainRef.current) return;
-    if (ctx.state === "suspended") return; // will start on next gesture
+    // Context may not exist yet (waiting for first gesture) — if so, the
+    // gesture handler will start the hum once the context is created.
+    const ctx = ctxRef.current;
+    if (!ctx || !masterGainRef.current || ctx.state !== "running") return;
 
     const stop = createAmbientHum(ctx, masterGainRef.current);
     stopHumRef.current = stop;
@@ -240,7 +264,7 @@ export function useOfficeAmbientSound(config: AmbientSoundConfig = {}): AmbientS
       stop();
       stopHumRef.current = null;
     };
-  }, [enableHum, ensureContext]);
+  }, [enableHum]);
 
   // Adjust hum character based on zone type
   useEffect(() => {
