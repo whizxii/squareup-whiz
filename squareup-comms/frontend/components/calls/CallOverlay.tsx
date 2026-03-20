@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useCallStore } from "@/lib/stores/call-store";
 import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 import {
@@ -34,6 +34,9 @@ import {
   X,
 } from "lucide-react";
 import SpatialAudioManager from "./SpatialAudioManager";
+
+// Stable reference — prevents useTracks from re-running on every render
+const CAMERA_TRACK_SOURCES = [{ source: Track.Source.Camera, withPlaceholder: false }];
 
 // ---------------------------------------------------------------------------
 // Active call UI — rendered inside <LiveKitRoom> context
@@ -98,11 +101,8 @@ function ActiveCallUI() {
   const seconds = elapsed % 60;
   const timeStr = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 
-  // Remote video tracks
-  const allTracks = useTracks(
-    [{ source: Track.Source.Camera, withPlaceholder: false }],
-    { onlySubscribed: true },
-  );
+  // Remote video tracks — sources array is stable (defined outside to avoid new ref each render)
+  const allTracks = useTracks(CAMERA_TRACK_SOURCES, { onlySubscribed: true });
   const videoTracks = allTracks.filter(
     (t): t is typeof t & { readonly publication: NonNullable<typeof t.publication> } =>
       !t.participant.isLocal && t.publication != null && t.publication.track != null,
@@ -295,9 +295,36 @@ export function CallOverlay() {
   const clearError = useCallStore((s) => s.clearError);
   const incomingCall = useCallStore((s) => s.incomingCall);
 
+  // shouldConnect is a local gate that is set to false SYNCHRONOUSLY on any
+  // disconnect/error — before React's async re-render can process the store
+  // update. This prevents LiveKit's 5 s reconnect timer from firing a second
+  // connection attempt while <LiveKitRoom> is still mounted.
+  const [shouldConnect, setShouldConnect] = useState(false);
+
+  // Enable connect only once we have a fresh token+url from the store.
+  useEffect(() => {
+    if (isInCall && token && livekitUrl) {
+      setShouldConnect(true);
+    } else {
+      setShouldConnect(false);
+    }
+  }, [isInCall, token, livekitUrl]);
+
+  // Zero-retry reconnect policy — stable reference via useMemo.
+  // For our demo backend (invalid credentials), reconnects are pointless and
+  // cause the spam loop. We rely on the circuit breaker instead.
+  const livekitOptions = useMemo(
+    () => ({ reconnectPolicy: { nextRetryDelayInMs: () => null as null } }),
+    [],
+  );
+
   const handleDisconnected = useCallback(() => {
-    // If still in call state, this was an unexpected disconnect (e.g. 401 on initial connect),
-    // not a user-initiated hang-up. Count it against the circuit breaker.
+    // Kill the connect gate immediately — this fires synchronously inside
+    // LiveKit's event loop, before React has processed the leaveCall() update.
+    setShouldConnect(false);
+    // If still in call state, this was an unexpected disconnect (e.g. 401 on
+    // initial connect), not a user-initiated hang-up — count it against the
+    // circuit breaker.
     if (useCallStore.getState().isInCall) {
       useCallStore.getState().recordCallFailure();
     }
@@ -305,6 +332,7 @@ export function CallOverlay() {
   }, []);
 
   const handleError = useCallback(() => {
+    setShouldConnect(false);
     useCallStore.getState().recordCallFailure();
     useCallStore.getState().leaveCall();
   }, []);
@@ -356,17 +384,13 @@ export function CallOverlay() {
         <LiveKitRoom
           serverUrl={livekitUrl}
           token={token}
-          connect={true}
+          connect={shouldConnect}
           audio={true}
           video={false}
           onDisconnected={handleDisconnected}
           onError={handleError}
           onConnected={handleConnected}
-          options={{
-            reconnectPolicy: {
-              nextRetryDelayInMs: (ctx) => (ctx.retryCount >= 1 ? null : 5000),
-            },
-          }}
+          options={livekitOptions}
         >
           {/* Spatial audio (renders nothing visible) */}
           <SpatialAudioManager />
