@@ -66,6 +66,12 @@ export interface AgentPersonality {
   readonly idleQuirk: "stretches" | "sips_coffee" | "checks_phone";
 }
 
+export interface OfficeReaction {
+  readonly id: string;
+  readonly emoji: string;
+  readonly createdAt: number;
+}
+
 export interface OfficeUser {
   readonly id: string;
   readonly name: string;
@@ -79,6 +85,8 @@ export interface OfficeUser {
   readonly direction: Direction;
   readonly animationState: AnimationState;
   readonly appearance: CharacterAppearance;
+  readonly isTyping?: boolean;
+  readonly reactions?: readonly OfficeReaction[];
 }
 
 export interface OfficeAgent {
@@ -314,6 +322,11 @@ interface OfficeState {
   readonly addChatBubble: (senderId: string, text: string) => void;
   readonly clearOldChatBubbles: () => void;
   readonly setInteractionPanelOpen: (open: boolean) => void;
+
+  // Typing indicators & reactions
+  readonly setUserTyping: (userId: string, isTyping: boolean) => void;
+  readonly addUserReaction: (userId: string, emoji: string) => void;
+  readonly clearOldUserReactions: () => void;
 }
 
 export const useOfficeStore = create<OfficeState>((set) => ({
@@ -612,4 +625,41 @@ export const useOfficeStore = create<OfficeState>((set) => ({
       ),
     })),
   setInteractionPanelOpen: (open) => set({ interactionPanelOpen: open }),
+
+  // Typing indicators & reactions
+  setUserTyping: (userId, isTyping) =>
+    set((s) => ({
+      users: s.users.map((u) =>
+        u.id === userId ? { ...u, isTyping } : u
+      ),
+    })),
+  addUserReaction: (userId, emoji) =>
+    set((s) => ({
+      users: s.users.map((u) =>
+        u.id === userId
+          ? {
+              ...u,
+              reactions: [
+                ...(u.reactions ?? []),
+                {
+                  id: `rxn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  emoji,
+                  createdAt: Date.now(),
+                },
+              ],
+            }
+          : u
+      ),
+    })),
+  clearOldUserReactions: () =>
+    set((s) => ({
+      users: s.users.map((u) =>
+        u.reactions && u.reactions.some((r) => Date.now() - r.createdAt > 3_500)
+          ? {
+              ...u,
+              reactions: u.reactions.filter((r) => Date.now() - r.createdAt <= 3_500),
+            }
+          : u
+      ),
+    })),
 }));

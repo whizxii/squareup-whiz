@@ -60,6 +60,24 @@ function ActiveCallUI() {
     localParticipant.setCameraEnabled(!isVideoOff);
   }, [isVideoOff, localParticipant]);
 
+  // Sync LiveKit remote participants into call store so other components can read them
+  useEffect(() => {
+    useCallStore.getState().setParticipants(
+      remoteParticipants.map((p) => ({
+        id: p.identity,
+        name: p.name ?? p.identity,
+        isMuted: !p.isMicrophoneEnabled,
+        isVideoOff: !p.isCameraEnabled,
+        isSpeaking: p.isSpeaking,
+      })),
+    );
+  }, [remoteParticipants]);
+
+  // Clear participants when this component unmounts (call ended)
+  useEffect(() => {
+    return () => { useCallStore.getState().setParticipants([]); };
+  }, []);
+
   // Elapsed timer
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);

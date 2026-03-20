@@ -242,6 +242,52 @@ export default function OfficeCharacter({ user, isMe }: OfficeCharacterProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Typing indicator — animated dots */}
+      <AnimatePresence>
+        {user.isTyping && !prefersReduced && (
+          <motion.div
+            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full px-2 py-1"
+            style={{
+              bottom: TOTAL_H - 2,
+              backgroundColor: tokens.glass,
+              border: `1px solid ${tokens.glassBorder}`,
+              backdropFilter: "blur(8px)",
+              pointerEvents: "none",
+            }}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+          >
+            {[0, 1, 2].map((i) => (
+              <motion.span
+                key={i}
+                className="block rounded-full"
+                style={{ width: 4, height: 4, backgroundColor: tokens.textSecondary }}
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating emoji reactions */}
+      <AnimatePresence>
+        {user.reactions?.map((reaction) => (
+          <motion.div
+            key={reaction.id}
+            className="absolute left-1/2 -translate-x-1/2 text-xl select-none"
+            style={{ bottom: TOTAL_H + 4, pointerEvents: "none" }}
+            initial={{ opacity: 1, y: 0, scale: 0.8 }}
+            animate={{ opacity: 0, y: -48, scale: 1.2 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.8, ease: "easeOut" }}
+          >
+            {reaction.emoji}
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </motion.div>
   );
 }

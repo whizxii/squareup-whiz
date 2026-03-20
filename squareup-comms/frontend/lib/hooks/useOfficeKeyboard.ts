@@ -17,6 +17,7 @@ interface KeyboardConfig {
   readonly onToggleMinimap?: () => void;
   readonly onToggleEditMode?: () => void;
   readonly onToggleListView?: () => void;
+  readonly onMove?: (x: number, y: number, direction: Direction) => void;
 }
 
 const KEY_TO_DIRECTION: Record<string, Direction> = {
@@ -52,6 +53,10 @@ export function useOfficeKeyboard(config: KeyboardConfig): void {
   const setMyPosition = useOfficeStore((s) => s.setMyPosition);
   const setZoom = useOfficeStore((s) => s.setZoom);
 
+  // Keep onMove in a ref so move() stays stable (no deps needed)
+  const onMoveRef = useRef(config.onMove);
+  useEffect(() => { onMoveRef.current = config.onMove; }, [config.onMove]);
+
   const move = useCallback(
     (direction: Direction) => {
       const state = useOfficeStore.getState();
@@ -75,6 +80,8 @@ export function useOfficeKeyboard(config: KeyboardConfig): void {
       // Use getState() for actions to avoid dependency cycles that trigger the useEffect
       state.moveUser(getCurrentUserId(), nx, ny, direction);
       state.setMyPosition(nx, ny);
+      // Broadcast movement via WS (callback kept in ref for stability)
+      onMoveRef.current?.(nx, ny, direction);
     },
     [] // stable — no deps needed
   );

@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Users, Bot, MapPin, Lock } from "lucide-react";
+import { X, Users, Bot, MapPin, Lock, Search } from "lucide-react";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import type { OfficeUser, OfficeAgent, OfficeZone } from "@/lib/stores/office-store";
 
@@ -240,6 +240,42 @@ export default function OfficeListView() {
     [setSelectedEntity]
   );
 
+  const [search, setSearch] = useState("");
+  const q = search.toLowerCase().trim();
+
+  const filteredUsers = q === "" ? users : users.filter((u) => {
+    if (u.name.toLowerCase().includes(q)) return true;
+    return zones.some(
+      (z) =>
+        z.name.toLowerCase().includes(q) &&
+        u.x >= z.x && u.x < z.x + z.width &&
+        u.y >= z.y && u.y < z.y + z.height
+    );
+  });
+
+  const filteredAgents = q === "" ? agents : agents.filter((a) => {
+    if (a.name.toLowerCase().includes(q)) return true;
+    return zones.some(
+      (z) =>
+        z.name.toLowerCase().includes(q) &&
+        a.x >= z.x && a.x < z.x + z.width &&
+        a.y >= z.y && a.y < z.y + z.height
+    );
+  });
+
+  const visibleZones = q === ""
+    ? zones
+    : zones.filter((zone) => {
+        if (zone.name.toLowerCase().includes(q)) return true;
+        const hasUsers = filteredUsers.some(
+          (u) => u.x >= zone.x && u.x < zone.x + zone.width && u.y >= zone.y && u.y < zone.y + zone.height
+        );
+        const hasAgents = filteredAgents.some(
+          (a) => a.x >= zone.x && a.x < zone.x + zone.width && a.y >= zone.y && a.y < zone.y + zone.height
+        );
+        return hasUsers || hasAgents;
+      });
+
   return (
     <AnimatePresence>
       {open && (
@@ -283,29 +319,53 @@ export default function OfficeListView() {
               </button>
             </div>
 
+            {/* Search */}
+            <div className="shrink-0 border-b border-white/10 px-4 py-2">
+              <div className="flex items-center gap-2 rounded-lg bg-white/6 px-2.5 py-1.5">
+                <Search size={12} className="shrink-0 text-white/30" />
+                <input
+                  type="text"
+                  placeholder="Search by name or zone…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="flex-1 bg-transparent text-xs text-white/80 placeholder:text-white/25 focus:outline-none"
+                  aria-label="Search office directory"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="text-white/30 hover:text-white/60"
+                    aria-label="Clear search"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Scrollable body */}
             <div className="overflow-y-auto px-4 py-3">
-              {zones.map((zone) => (
+              {visibleZones.map((zone) => (
                 <ZoneSection
                   key={zone.id}
                   zone={zone}
-                  users={users}
-                  agents={agents}
+                  users={filteredUsers}
+                  agents={filteredAgents}
                   onSelectEntity={handleSelectEntity}
                 />
               ))}
 
               <UnzonedSection
-                users={users}
-                agents={agents}
+                users={filteredUsers}
+                agents={filteredAgents}
                 zones={zones}
                 onSelectEntity={handleSelectEntity}
               />
 
-              {users.length === 0 &&
-                agents.filter((a) => a.status !== "offline").length === 0 && (
+              {filteredUsers.length === 0 &&
+                filteredAgents.filter((a) => a.status !== "offline").length === 0 && (
                   <p className="py-8 text-center text-xs text-white/30">
-                    Your office is quiet. Invite your team!
+                    {q ? "No results found." : "Your office is quiet. Invite your team!"}
                   </p>
                 )}
             </div>

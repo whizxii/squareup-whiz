@@ -44,6 +44,12 @@ async def handle_ws_message(user_id: str, data: dict):
     elif msg_type == "office.status":
         await handle_office_status(user_id, data)
 
+    elif msg_type == "office.presence":
+        await handle_office_presence(user_id, data)
+
+    elif msg_type == "office.reaction":
+        await handle_office_reaction(user_id, data)
+
     elif msg_type == "call.invite":
         await handle_call_invite(user_id, data)
 
@@ -246,6 +252,7 @@ async def handle_office_move(user_id: str, data: dict):
     """Handle avatar movement — persist position and broadcast."""
     x = data.get("x", 0)
     y = data.get("y", 0)
+    direction = data.get("direction", "down")
 
     async with async_session() as session:
         profile = await session.get(UserProfile, user_id)
@@ -256,7 +263,7 @@ async def handle_office_move(user_id: str, data: dict):
             await session.commit()
 
     await hub_manager.broadcast_all(
-        {"type": "office.user_moved", "user_id": user_id, "x": x, "y": y},
+        {"type": "office.user_moved", "user_id": user_id, "x": x, "y": y, "direction": direction},
         exclude=user_id,
     )
 
@@ -280,6 +287,50 @@ async def handle_office_status(user_id: str, data: dict):
             "user_id": user_id,
             "status": status,
             "status_message": status_message,
+        },
+        exclude=user_id,
+    )
+
+
+async def handle_office_presence(user_id: str, data: dict):
+    """Handle idle/active presence broadcast — persist status and broadcast to others."""
+    status = data.get("status", "online")
+    status_message = data.get("status_message")
+
+    try:
+        async with async_session() as session:
+            profile = await session.get(UserProfile, user_id)
+            if profile is not None:
+                profile.status = status
+                if status_message is not None:
+                    profile.status_message = status_message
+                session.add(profile)
+                await session.commit()
+    except Exception:
+        logger.warning("Failed to persist presence for %s", user_id, exc_info=True)
+
+    await hub_manager.broadcast_all(
+        {
+            "type": "office.presence_updated",
+            "user_id": user_id,
+            "status": status,
+            "status_message": status_message,
+        },
+        exclude=user_id,
+    )
+
+
+async def handle_office_reaction(user_id: str, data: dict):
+    """Handle emoji reaction — broadcast to all other users."""
+    emoji = data.get("emoji", "")
+    if not emoji:
+        return
+
+    await hub_manager.broadcast_all(
+        {
+            "type": "office.reaction",
+            "user_id": user_id,
+            "emoji": emoji,
         },
         exclude=user_id,
     )

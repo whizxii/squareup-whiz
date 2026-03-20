@@ -6,7 +6,9 @@
 "use client";
 
 import { useRef, useCallback, useMemo, useEffect } from "react";
+import type { Direction, UserStatus } from "@/lib/stores/office-store";
 import { useOfficeStore } from "@/lib/stores/office-store";
+import { useOfficeAmbientSound } from "@/lib/hooks/useOfficeAmbientSound";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -122,6 +124,7 @@ export default function OfficePage() {
   const moveUser = useOfficeStore((s) => s.moveUser);
   const updateUserAnimation = useOfficeStore((s) => s.updateUserAnimation);
   const setMyPosition = useOfficeStore((s) => s.setMyPosition);
+  const updateUserStatus = useOfficeStore((s) => s.updateUserStatus);
 
   // Load persisted layout from backend API (fallback: localStorage)
   useEffect(() => {
@@ -171,12 +174,37 @@ export default function OfficePage() {
     return wsOn("office.user_moved", (data) => {
       const userId = data.user_id as string;
       if (userId === myUserId) return;
-      moveUser(userId, data.x as number, data.y as number, "down");
+      moveUser(
+        userId,
+        data.x as number,
+        data.y as number,
+        (data.direction as Direction) ?? "down",
+      );
     });
   }, [wsOn, moveUser, myUserId]);
 
-  // Idle detection & presence broadcasting
-  useOfficePresence({ userId: myUserId, enabled: true });
+  // Real-time: update other users' presence/status
+  useEffect(() => {
+    return wsOn("office.presence_updated", (data) => {
+      const userId = data.user_id as string;
+      if (userId === myUserId) return;
+      updateUserStatus(
+        userId,
+        (data.status as UserStatus) ?? "online",
+        data.status_message as string | undefined,
+      );
+    });
+  }, [wsOn, updateUserStatus, myUserId]);
+
+  // Idle detection & presence broadcasting (status changes broadcast via WS)
+  useOfficePresence({
+    userId: myUserId,
+    enabled: true,
+    onStatusChange: useCallback(
+      (status: UserStatus) => wsSend({ type: "office.presence", status }),
+      [wsSend],
+    ),
+  });
 
   // Zone-based auto-join/leave for meeting rooms
   useProximityCall({ userId: myUserId, enabled: true });
@@ -204,6 +232,98 @@ export default function OfficePage() {
     };
   }, [wsOn]);
 
+  // Phase G: Typing indicators — wire chat.typing WS events to avatar dots
+  useEffect(() => {
+    return wsOn("chat.typing", (data) => {
+      const userId = data.user_id as string;
+      if (userId === myUserId) return;
+      const isTyping = data.is_typing as boolean;
+      useOfficeStore.getState().setUserTyping(userId, isTyping);
+      // Auto-clear after 5s in case leave event is missed
+      if (isTyping) {
+        setTimeout(() => {
+          useOfficeStore.getState().setUserTyping(userId, false);
+        }, 5_000);
+      }
+    });
+  }, [wsOn, myUserId]);
+
+  // Phase G: Emoji reactions — wire office.reaction WS events to floating emojis
+  useEffect(() => {
+    return wsOn("office.reaction", (data) => {
+      const userId = data.user_id as string;
+      const emoji = data.emoji as string;
+      if (emoji) {
+        useOfficeStore.getState().addUserReaction(userId, emoji);
+      }
+    });
+  }, [wsOn]);
+
+  // Phase G: Periodically clean up expired reactions (> 3.5s old)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      useOfficeStore.getState().clearOldUserReactions();
+    }, 1_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Phase F: Ambient sound engine
+  const ambientZone = zones.find((z) =>
+    users.find((u) => u.id === myUserId && u.x >= z.x && u.x < z.x + z.width && u.y >= z.y && u.y < z.y + z.height)
+  );
+  const currentZoneType = (ambientZone?.type === "focus"
+    ? "focus"
+    : ambientZone?.type === "meeting"
+      ? "meeting"
+      : ambientZone
+        ? "open"
+        : null) as "open" | "meeting" | "focus" | "social" | null;
+
+  const ambientSound = useOfficeAmbientSound({ masterVolume: 0.12, enableHum: true, currentZoneType });
+
+  // Phase F: Trigger join chime when users array grows, leave chime when it shrinks
+  const prevUserCountRef = useRef(users.length);
+  useEffect(() => {
+    const prev = prevUserCountRef.current;
+    const curr = users.length;
+    if (curr > prev) ambientSound.triggerJoin();
+    else if (curr < prev) ambientSound.triggerLeave();
+    prevUserCountRef.current = curr;
+  }, [users.length, ambientSound]);
+
+  // Phase F: Trigger message pop on new chat messages from others
+  useEffect(() => {
+    return wsOn("chat.message", () => {
+      ambientSound.triggerMessage();
+    });
+  }, [wsOn, ambientSound]);
+
+  // Phase F: Trigger reaction ping on office reactions
+  useEffect(() => {
+    return wsOn("office.reaction", () => {
+      ambientSound.triggerReaction();
+    });
+  }, [wsOn, ambientSound]);
+
+  // Phase I: Pathfinding grid memoized on furniture reference (avoid rebuild per click)
+  const walkableGrid = useMemo(
+    () => buildWalkableGrid(layout.gridCols, layout.gridRows, getBlockedTiles(furniture)),
+    [furniture, layout.gridCols, layout.gridRows],
+  );
+
+  // Phase I: Throttled WS move sender (max 10 updates/sec)
+  const moveSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const throttledMoveSend = useCallback(
+    (x: number, y: number, direction: Direction) => {
+      if (moveSendTimerRef.current) return;
+      wsSend({ type: "office.move", x, y, direction });
+      moveSendTimerRef.current = setTimeout(() => {
+        moveSendTimerRef.current = null;
+      }, 100);
+    },
+    [wsSend],
+  );
+
   // Hooks — day/night cycle, weather, agent routines, keyboard controls, camera follow
   useOfficeTime();
   useWeather();
@@ -211,6 +331,9 @@ export default function OfficePage() {
   useEasterEggs();
   useOfficeKeyboard(useMemo(() => ({
     enabled: true,
+    onMove: (x: number, y: number, direction: Direction) => {
+      throttledMoveSend(x, y, direction);
+    },
     onToggleMinimap: () => {
       const s = useOfficeStore.getState();
       s.setMinimapExpanded(!s.minimapExpanded);
@@ -223,7 +346,7 @@ export default function OfficePage() {
       const s = useOfficeStore.getState();
       s.setEditMode(!s.editMode);
     },
-  }), []));
+  }), [throttledMoveSend]));
 
   const camera = useOfficeCamera(
     useMemo(
@@ -235,7 +358,7 @@ export default function OfficePage() {
     )
   );
 
-  // Click-to-move via A* pathfinding
+  // Click-to-move via A* pathfinding (uses memoized walkable grid — Phase I)
   const handleCanvasClick = useCallback(
     (tileX: number, tileY: number) => {
       if (editMode) return;
@@ -243,9 +366,7 @@ export default function OfficePage() {
       const me = users.find((u) => u.id === myUserId);
       if (!me) return;
 
-      const blocked = getBlockedTiles(furniture);
-      const grid = buildWalkableGrid(layout.gridCols, layout.gridRows, blocked);
-      const path = findPath(grid, me.x, me.y, tileX, tileY);
+      const path = findPath(walkableGrid, me.x, me.y, tileX, tileY);
 
       if (!path || path.length === 0) return;
 
@@ -271,7 +392,7 @@ export default function OfficePage() {
 
         moveUser(myUserId, x, y, dir);
         setMyPosition(x, y);
-        wsSend({ type: "office.move", x, y });
+        throttledMoveSend(x, y, dir);
         step += 1;
         setTimeout(walkStep, 150);
       };
@@ -280,15 +401,13 @@ export default function OfficePage() {
     },
     [
       editMode,
-      furniture,
+      walkableGrid,
       users,
-      layout.gridCols,
-      layout.gridRows,
       moveUser,
       updateUserAnimation,
       setMyPosition,
       myUserId,
-      wsSend,
+      throttledMoveSend,
     ]
   );
 
