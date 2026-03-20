@@ -379,12 +379,18 @@ export function CallOverlay() {
       {/* Incoming call notification */}
       {!isInCall && <IncomingCallBanner />}
 
-      {/* Active call with LiveKit Room */}
-      {isInCall && token && livekitUrl && (
+      {/* Active call with LiveKit Room.
+          Mounted on shouldConnect (not isInCall) so that setting shouldConnect=false
+          in handleDisconnected UNMOUNTS the component entirely. LiveKit's own cleanup
+          effect `() => { room.disconnect(); }` then fires, killing all internal
+          reconnect timers before React can schedule another render. Passing
+          connect={true} unconditionally is safe because we only mount when
+          shouldConnect is already true. */}
+      {shouldConnect && token && livekitUrl && (
         <LiveKitRoom
           serverUrl={livekitUrl}
           token={token}
-          connect={shouldConnect}
+          connect={true}
           audio={true}
           video={false}
           onDisconnected={handleDisconnected}
