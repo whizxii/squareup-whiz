@@ -197,13 +197,11 @@ export default function CRMPage() {
         contactId={editContactId}
       />
 
-      {logActivityContactId && (
-        <LogActivityDialog
-          open={dialog.type === "log-activity"}
-          onOpenChange={(open) => { if (!open) closeDialog(); }}
-          contactId={logActivityContactId}
-        />
-      )}
+      <LogActivityDialog
+        open={dialog.type === "log-activity"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+        contactId={logActivityContactId}
+      />
 
       <CreateEventDialog
         open={dialog.type === "create-event"}

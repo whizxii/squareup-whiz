@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import {
   LayoutGrid,
   LayoutDashboard,
-  Table,
   Plus,
   Search,
   BarChart3,
@@ -35,7 +34,7 @@ interface ViewConfig {
 const VIEWS: ViewConfig[] = [
   { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
   { id: "pipeline", label: "Pipeline", icon: <LayoutGrid className="w-4 h-4" /> },
-  { id: "table", label: "Table", icon: <Table className="w-4 h-4" /> },
+  { id: "table", label: "Contacts", icon: <Users className="w-4 h-4" /> },
   { id: "calendar", label: "Calendar", icon: <Calendar className="w-4 h-4" /> },
   { id: "analytics", label: "Analytics", icon: <BarChart3 className="w-4 h-4" /> },
   { id: "leads", label: "Leads", icon: <Target className="w-4 h-4" /> },
