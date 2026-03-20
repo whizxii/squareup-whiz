@@ -81,7 +81,7 @@ function ZoneCard({
 
   return (
     <motion.button
-      className="group relative flex w-full flex-col gap-3 rounded-2xl p-4 text-left transition-all"
+      className="group relative flex w-full flex-col gap-3 rounded-2xl p-4 pl-5 text-left transition-all overflow-hidden"
       style={{
         backgroundColor: tokens.surface,
         border: `1px solid ${tokens.borderSubtle}`,
@@ -96,6 +96,12 @@ function ZoneCard({
       onClick={() => onZoneClick(zone)}
       aria-label={`${zone.name} — ${totalOccupants} ${totalOccupants === 1 ? "person" : "people"}`}
     >
+      {/* Left type-color stripe */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
+        style={{ backgroundColor: accent }}
+      />
+
       {/* Header row */}
       <div className="flex items-center gap-2.5">
         <div
@@ -127,23 +133,21 @@ function ZoneCard({
 
         {/* Capacity badge */}
         <div className="flex items-center gap-1.5">
-          {zone.capacity != null && (
-            <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-              style={{
-                backgroundColor:
-                  totalOccupants >= (zone.capacity ?? Infinity)
-                    ? STATUS_COLORS.busy + "15"
-                    : accent + "10",
-                color:
-                  totalOccupants >= (zone.capacity ?? Infinity)
-                    ? STATUS_COLORS.busy
-                    : accent,
-              }}
-            >
-              {totalOccupants}/{zone.capacity}
-            </span>
-          )}
+          {zone.capacity != null && (() => {
+            const isFull = totalOccupants >= (zone.capacity ?? Infinity);
+            const badgeColor = isFull ? "#F59E0B" : accent;
+            return (
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                style={{
+                  backgroundColor: badgeColor + "18",
+                  color: badgeColor,
+                }}
+              >
+                {totalOccupants}/{zone.capacity}
+              </span>
+            );
+          })()}
           <ArrowRight
             size={14}
             className="opacity-0 transition-opacity group-hover:opacity-60"
@@ -517,6 +521,8 @@ export default function GridOfficeView() {
   );
 
   const onlineCount = users.filter((u) => u.status === "online").length;
+  const awayCount = users.filter((u) => u.status === "away").length;
+  const busyCount = users.filter((u) => u.status === "busy" || u.status === "dnd").length;
 
   return (
     <div className="flex h-full w-full flex-col overflow-auto">
@@ -530,13 +536,27 @@ export default function GridOfficeView() {
             >
               Office Overview
             </h1>
-            <p
-              className="text-xs"
-              style={{ color: tokens.textMuted }}
-            >
-              {onlineCount} {onlineCount === 1 ? "person" : "people"} online
-              &middot; {zones.length} zones
-            </p>
+            <div className="mt-0.5 flex items-center gap-3">
+              <span className="flex items-center gap-1 text-xs" style={{ color: tokens.textMuted }}>
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#22C55E" }} />
+                {onlineCount} online
+              </span>
+              {awayCount > 0 && (
+                <span className="flex items-center gap-1 text-xs" style={{ color: tokens.textMuted }}>
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#EAB308" }} />
+                  {awayCount} away
+                </span>
+              )}
+              {busyCount > 0 && (
+                <span className="flex items-center gap-1 text-xs" style={{ color: tokens.textMuted }}>
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#EF4444" }} />
+                  {busyCount} busy
+                </span>
+              )}
+              <span className="text-xs" style={{ color: tokens.textMuted }}>
+                &middot; {zones.length} zones
+              </span>
+            </div>
           </div>
         </div>
       </div>

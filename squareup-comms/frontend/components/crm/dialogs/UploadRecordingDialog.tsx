@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
-import { useUploadRecording } from "@/lib/hooks/use-crm-queries";
+import { useUploadRecording, useContacts, useContact } from "@/lib/hooks/use-crm-queries";
+import type { Contact } from "@/lib/types/crm";
 import {
   X,
   Mic,
@@ -43,7 +44,79 @@ const ALLOWED_MIME_TYPES = new Set([
   "video/mp4", "video/webm",
 ]);
 
-// ─── Component ──────────────────────────────────────────────────
+// ─── ContactPicker ───────────────────────────────────────────────
+
+interface ContactPickerProps {
+  value: string;
+  displayName: string;
+  onSelect: (id: string, name: string) => void;
+  inputClass: string;
+}
+
+function ContactPicker({ value, displayName, onSelect, inputClass }: ContactPickerProps) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const { data } = useContacts(query ? { search: query } : undefined, { limit: 10 });
+  const contacts = ((data as { items?: Contact[] })?.items ?? []) as Contact[];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const inputValue = displayName || query;
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <input
+        type="text"
+        value={inputValue}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          // Clear selection if user starts typing again
+          if (value) onSelect("", "");
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="Search contacts by name or company…"
+        className={inputClass}
+        autoComplete="off"
+      />
+      {open && contacts.length > 0 && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 border border-border rounded-lg bg-background shadow-lg max-h-44 overflow-auto">
+          {contacts.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault(); // prevent input blur before click registers
+                onSelect(c.id, c.name);
+                setQuery("");
+                setOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 transition-colors"
+            >
+              <span className="font-medium">{c.name}</span>
+              {c.company && (
+                <span className="text-muted-foreground text-xs">at {c.company}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Component ───────────────────────────────────────────────────
 
 export function UploadRecordingDialog({
   open,
@@ -54,20 +127,27 @@ export function UploadRecordingDialog({
   const [form, setForm] = useState<FormState>(() =>
     INITIAL_FORM({ defaultContactId, defaultDealId })
   );
+  const [contactDisplayName, setContactDisplayName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadRecording = useUploadRecording();
 
+  // Pre-load display name for defaultContactId
+  const { data: defaultContact } = useContact(defaultContactId ?? "", {
+    enabled: !!defaultContactId,
+  });
+
   // Reset form when dialog opens or default props change
   useEffect(() => {
     if (open) {
       setForm(INITIAL_FORM({ defaultContactId, defaultDealId }));
+      setContactDisplayName(defaultContact?.name ?? "");
       setSubmitError(null);
       setFileError(null);
     }
-  }, [open, defaultContactId, defaultDealId]);
+  }, [open, defaultContactId, defaultDealId, defaultContact]);
 
   const updateField = useCallback(
     <K extends keyof FormState>(field: K, value: FormState[K]) => {
@@ -239,18 +319,19 @@ export function UploadRecordingDialog({
               />
             </div>
 
-            {/* Contact ID */}
+            {/* Contact Picker */}
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Contact ID *
+                Contact *
               </label>
-              <input
-                type="text"
+              <ContactPicker
                 value={form.contact_id}
-                onChange={(e) => updateField("contact_id", e.target.value)}
-                placeholder="Contact ID"
-                className={inputClass}
-                required
+                displayName={contactDisplayName}
+                onSelect={(id, name) => {
+                  updateField("contact_id", id);
+                  setContactDisplayName(name);
+                }}
+                inputClass={inputClass}
               />
             </div>
 

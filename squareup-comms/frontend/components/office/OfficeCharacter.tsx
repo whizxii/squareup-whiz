@@ -22,8 +22,8 @@ interface OfficeCharacterProps {
   readonly isMe: boolean;
 }
 
-const AVATAR_SIZE = 40;
-const TOTAL_H = AVATAR_SIZE + 18; // avatar + name label space
+const AVATAR_SIZE = 48;
+const TOTAL_H = AVATAR_SIZE + 22; // avatar + name label space
 
 const STATUS_COLORS: Readonly<Record<string, string>> = {
   online: "#22C55E",
@@ -95,16 +95,30 @@ export default function OfficeCharacter({ user, isMe }: OfficeCharacterProps) {
         }
       }}
     >
-      {/* Ground shadow */}
+      {/* Body silhouette — gives the avatar physical presence */}
       <div
         className="absolute left-1/2 -translate-x-1/2"
         style={{
           bottom: 14,
+          width: 20,
+          height: 22,
+          borderRadius: "40% 40% 50% 50%",
+          background: "rgba(0,0,0,0.28)",
+          filter: "blur(2px)",
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Ground shadow */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2"
+        style={{
+          bottom: 12,
           width: AVATAR_SIZE * 0.8,
           height: 8,
           borderRadius: "50%",
           background:
-            "radial-gradient(ellipse, rgba(0,0,0,0.2), transparent 70%)",
+            "radial-gradient(ellipse, rgba(0,0,0,0.25), transparent 70%)",
           pointerEvents: "none",
         }}
       />
@@ -163,7 +177,7 @@ export default function OfficeCharacter({ user, isMe }: OfficeCharacterProps) {
             height: AVATAR_SIZE,
             background: avatarGradient,
             border: `2.5px solid ${statusColor}`,
-            boxShadow: `0 2px 8px rgba(0,0,0,0.15)`,
+            boxShadow: `0 4px 12px rgba(0,0,0,0.35), 0 0 0 3px ${statusColor}22`,
           }}
         >
           {user.avatar ? (

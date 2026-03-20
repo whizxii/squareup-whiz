@@ -64,14 +64,25 @@ export default function OfficeCanvas({ onClick }: OfficeCanvasProps) {
     [canvasW, canvasH]
   );
 
-  // Layer 0: Floor — apply iso transform, then render
+  // Layer 0: Floor — draw sky background first (pre-iso), then apply iso transform and render tiles
   useEffect(() => {
     const ctx = setupCanvas(floorRef.current);
     if (!ctx) return;
+    // Sky gradient fills the entire canvas before iso transform (covers black corners)
+    const sky = ctx.createLinearGradient(0, 0, 0, canvasH);
+    if (isDark) {
+      sky.addColorStop(0, "#0f0c1a");
+      sky.addColorStop(1, "#1a1525");
+    } else {
+      sky.addColorStop(0, "#dce8f5");
+      sky.addColorStop(1, "#f0f4f8");
+    }
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, canvasW, canvasH);
     // Apply isometric projection: fillRect calls become diamond tiles
     ctx.transform(1, 0.5, -1, 0.5, gridRows * TILE, 0);
     renderFloor(ctx, gridCols, gridRows, floorStyle, isDark);
-  }, [setupCanvas, gridCols, gridRows, floorStyle, isDark]);
+  }, [setupCanvas, gridCols, gridRows, floorStyle, isDark, canvasW, canvasH]);
 
   // Layer 1: Content (zones + furniture + grid)
   useEffect(() => {

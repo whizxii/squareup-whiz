@@ -384,7 +384,7 @@ export const useOfficeStore = create<OfficeState>((set) => ({
   cameraOffset: { x: 0, y: 0 },
 
   // UI state
-  viewMode: "simplified",
+  viewMode: "immersive",
   selectedEntity: null,
   editMode: false,
   showGrid: false,

@@ -222,6 +222,7 @@ export function useUpdateContact() {
     },
     onSettled: (_data, _err, { id }) => {
       qc.invalidateQueries({ queryKey: crmKeys.contactDetail(id) });
+      qc.invalidateQueries({ queryKey: crmKeys.contact360(id) });
       qc.invalidateQueries({ queryKey: crmKeys.contacts() });
     },
   });

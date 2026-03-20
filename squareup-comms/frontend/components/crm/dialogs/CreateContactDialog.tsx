@@ -3,8 +3,28 @@
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { useCreateContact } from "@/lib/hooks/use-crm-queries";
+import {
+  useCreateContact,
+  useCreateActivity,
+  useCreateCalendarEvent,
+  useUpdateContact,
+} from "@/lib/hooks/use-crm-queries";
 import type { CRMStage } from "@/lib/types/crm";
+import { toast } from "@/lib/stores/toast-store";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+
+// ─── Constants ───────────────────────────────────────────────────
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+function getHeaders(): Record<string, string> {
+  const token = useAuthStore.getState().token;
+  const base: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) base["Authorization"] = `Bearer ${token}`;
+  else base["X-User-Id"] = getCurrentUserId();
+  return base;
+}
 
 const LEAD_SOURCES = [
   { value: "website", label: "Website" },
@@ -27,17 +47,25 @@ const STAGES: { id: CRMStage; label: string }[] = [
   { id: "lost", label: "Lost" },
 ];
 
+// ─── Props ───────────────────────────────────────────────────────
+
 interface CreateContactDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// ─── Component ───────────────────────────────────────────────────
 
 export function CreateContactDialog({
   open,
   onOpenChange,
 }: CreateContactDialogProps) {
   const createContact = useCreateContact();
+  const createActivity = useCreateActivity();
+  const createCalendar = useCreateCalendarEvent();
+  const updateContact = useUpdateContact();
 
+  // Core fields
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
@@ -46,6 +74,18 @@ export function CreateContactDialog({
   const [source, setSource] = useState("");
   const [stage, setStage] = useState<CRMStage>("lead");
   const [notes, setNotes] = useState("");
+  const [tags, setTags] = useState("");
+
+  // First interaction (collapsible)
+  const [showFirstInteraction, setShowFirstInteraction] = useState(false);
+  const [firstMeetDate, setFirstMeetDate] = useState(
+    () => new Date().toISOString().slice(0, 16)
+  );
+  const [firstMeetTldr, setFirstMeetTldr] = useState("");
+  const [followUpDate, setFollowUpDate] = useState("");
+  const [followUpTime, setFollowUpTime] = useState("09:00");
+  const [followUpNote, setFollowUpNote] = useState("");
+
   const [error, setError] = useState("");
 
   const resetForm = () => {
@@ -57,6 +97,13 @@ export function CreateContactDialog({
     setSource("");
     setStage("lead");
     setNotes("");
+    setTags("");
+    setShowFirstInteraction(false);
+    setFirstMeetDate(new Date().toISOString().slice(0, 16));
+    setFirstMeetTldr("");
+    setFollowUpDate("");
+    setFollowUpTime("09:00");
+    setFollowUpNote("");
     setError("");
   };
 
@@ -65,7 +112,7 @@ export function CreateContactDialog({
     setError("");
 
     try {
-      await createContact.mutateAsync({
+      const contact = await createContact.mutateAsync({
         name: name.trim(),
         email: email.trim() || undefined,
         company: company.trim() || undefined,
@@ -74,7 +121,72 @@ export function CreateContactDialog({
         source: source || undefined,
         stage,
         notes: notes.trim() || undefined,
+        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       });
+
+      const contactId = contact.id;
+      const contactName = name.trim();
+
+      // Log first interaction as an activity
+      if (firstMeetTldr.trim()) {
+        await createActivity.mutateAsync({
+          contact_id: contactId,
+          type: "meeting",
+          title: "First meeting",
+          content: firstMeetTldr.trim(),
+          activity_metadata: {
+            tldr: firstMeetTldr.trim(),
+            activity_date: firstMeetDate,
+          },
+        });
+      }
+
+      // Auto-schedule follow-up
+      if (followUpDate && followUpTime) {
+        const followUpIso = `${followUpDate}T${followUpTime}:00`;
+        const endAt = new Date(new Date(followUpIso).getTime() + 30 * 60_000).toISOString();
+        const remindAt = new Date(new Date(followUpIso).getTime() - 15 * 60_000).toISOString();
+
+        await Promise.all([
+          createCalendar.mutateAsync({
+            contact_id: contactId,
+            title: `Follow-up with ${contactName}`,
+            event_type: "follow_up",
+            start_at: followUpIso,
+            end_at: endAt,
+            reminder_minutes: 15,
+            description: followUpNote.trim() || undefined,
+          }),
+          updateContact.mutateAsync({
+            id: contactId,
+            updates: {
+              next_follow_up_at: followUpIso,
+              follow_up_note: followUpNote.trim() || undefined,
+            },
+          }),
+          fetch(`${API_URL}/api/reminders`, {
+            method: "POST",
+            headers: getHeaders(),
+            body: JSON.stringify({
+              message: `Follow-up with ${contactName}`,
+              remind_at: remindAt,
+            }),
+          }),
+        ]);
+      }
+
+      const followUpLabel = followUpDate && followUpTime
+        ? new Date(`${followUpDate}T${followUpTime}`).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })
+        : null;
+
+      toast.success(
+        `Contact created`,
+        followUpLabel ? `Follow-up scheduled for ${followUpLabel} · Reminder 15 min before` : undefined
+      );
+
       resetForm();
       onOpenChange(false);
     } catch (err) {
@@ -189,6 +301,90 @@ export function CreateContactDialog({
               rows={3}
               className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 resize-none"
             />
+
+            {/* Tags */}
+            <input
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="Tags: investor, warm, B2B (comma-separated)"
+              className={inputCls}
+            />
+
+            {/* First Interaction (collapsible) */}
+            {showFirstInteraction ? (
+              <div className="border border-border rounded-lg p-3 space-y-2 bg-muted/20">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  First Interaction
+                </p>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">
+                    When did you meet?
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={firstMeetDate}
+                    onChange={(e) => setFirstMeetDate(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <input
+                  value={firstMeetTldr}
+                  onChange={(e) => setFirstMeetTldr(e.target.value)}
+                  placeholder="What did you discuss? (TLDR)"
+                  className={inputCls}
+                />
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">
+                    Schedule follow-up
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="date"
+                      value={followUpDate}
+                      onChange={(e) => setFollowUpDate(e.target.value)}
+                      className={inputCls}
+                    />
+                    <input
+                      type="time"
+                      value={followUpTime}
+                      onChange={(e) => setFollowUpTime(e.target.value)}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+                {followUpDate && (
+                  <div className="flex items-center gap-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+                    ✓ Calendar event + 15-min reminder will be auto-created
+                  </div>
+                )}
+                <input
+                  value={followUpNote}
+                  onChange={(e) => setFollowUpNote(e.target.value)}
+                  placeholder="Follow-up note (optional)"
+                  className={inputCls}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowFirstInteraction(false);
+                    setFirstMeetTldr("");
+                    setFollowUpDate("");
+                    setFollowUpNote("");
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  − Remove first interaction
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowFirstInteraction(true)}
+                className="text-xs text-primary hover:underline text-left"
+              >
+                + Add first interaction details
+              </button>
+            )}
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 

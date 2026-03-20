@@ -478,7 +478,9 @@ export default function OfficePage() {
       {/* Layer 4: Glass UI (fixed position, outside zoom transform) */}
       <CallOverlay />
       <OfficeNotifications />
-      <OfficeToolbar />
+      <OfficeToolbar
+        onReaction={(emoji) => wsSend({ type: "office.reaction", emoji })}
+      />
       <OfficeMiniMap />
       <EntityDetailPanel />
       <KeyboardShortcutsOverlay />

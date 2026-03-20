@@ -7,15 +7,15 @@
 
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Maximize2 } from "lucide-react";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
 
-const MAP_W = 160;
-const MAP_H = 128;
+const MAP_W = 200;
+const MAP_H = 160;
 
 export default function OfficeMiniMap() {
   const { tokens } = useOfficeTheme();
@@ -46,10 +46,14 @@ export default function OfficeMiniMap() {
     [scaleX, scaleY, gridCols, gridRows, moveUser, setMyPosition, myUserId]
   );
 
+  const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
+
   const zoneDots = useMemo(
     () =>
       zones.map((z) => ({
         id: z.id,
+        name: z.name,
+        icon: z.icon,
         x: z.x * scaleX,
         y: z.y * scaleY,
         w: z.width * scaleX,
@@ -91,7 +95,7 @@ export default function OfficeMiniMap() {
             transition={{ duration: 0.2 }}
             onClick={handleClick}
           >
-            {/* Zone areas */}
+            {/* Zone areas with hover labels */}
             {zoneDots.map((z) => (
               <div
                 key={z.id}
@@ -101,9 +105,44 @@ export default function OfficeMiniMap() {
                   top: z.y,
                   width: z.w,
                   height: z.h,
-                  backgroundColor: `${z.color}30`,
+                  backgroundColor: hoveredZoneId === z.id ? `${z.color}55` : `${z.color}30`,
+                  border: hoveredZoneId === z.id ? `1px solid ${z.color}80` : "1px solid transparent",
+                  transition: "background-color 0.15s, border-color 0.15s",
                 }}
-              />
+                onMouseEnter={() => setHoveredZoneId(z.id)}
+                onMouseLeave={() => setHoveredZoneId(null)}
+              >
+                {/* Persistent label for large zones */}
+                {z.w >= 24 && z.h >= 16 && (
+                  <div
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                    style={{ opacity: hoveredZoneId === z.id ? 1 : 0.55 }}
+                  >
+                    <span
+                      className="truncate rounded px-1 text-[7px] font-semibold leading-none"
+                      style={{ color: z.color, maxWidth: z.w - 4 }}
+                    >
+                      {z.name}
+                    </span>
+                  </div>
+                )}
+
+                {/* Hover tooltip for small zones */}
+                {hoveredZoneId === z.id && z.w < 24 && (
+                  <div
+                    className="pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded px-1.5 py-0.5 text-[8px] font-semibold leading-none"
+                    style={{
+                      bottom: "calc(100% + 3px)",
+                      backgroundColor: z.color,
+                      color: "#fff",
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                      zIndex: 10,
+                    }}
+                  >
+                    {z.icon} {z.name}
+                  </div>
+                )}
+              </div>
             ))}
 
             {/* Agent dots */}

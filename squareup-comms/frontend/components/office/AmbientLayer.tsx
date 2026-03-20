@@ -8,6 +8,7 @@
 import { useRef, useEffect, useMemo, useCallback } from "react";
 import { useOfficeStore } from "@/lib/stores/office-store";
 import { TILE } from "@/lib/office/office-renderer";
+import { isoCanvasSize } from "@/lib/office/iso-coords";
 
 interface Particle {
   x: number;
@@ -92,8 +93,7 @@ export default function AmbientLayer() {
     []
   );
 
-  const canvasW = layout.gridCols * TILE;
-  const canvasH = layout.gridRows * TILE;
+  const { width: canvasW, height: canvasH } = isoCanvasSize(layout.gridCols, layout.gridRows);
 
   const drawDust = useCallback(
     (ctx: CanvasRenderingContext2D, t: number) => {

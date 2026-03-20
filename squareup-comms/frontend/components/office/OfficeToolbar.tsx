@@ -28,10 +28,17 @@ import {
   X,
 } from "lucide-react";
 import { useOfficeStore } from "@/lib/stores/office-store";
+import { useCallStore } from "@/lib/stores/call-store";
 import { useOfficeTheme } from "@/lib/hooks/useOfficeTheme";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
-export default function OfficeToolbar() {
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "🎉", "😮", "👏", "🔥", "✨"];
+
+interface OfficeToolbarProps {
+  readonly onReaction?: (emoji: string) => void;
+}
+
+export default function OfficeToolbar({ onReaction }: OfficeToolbarProps) {
   const { tokens } = useOfficeTheme();
 
   const zoom = useOfficeStore((s) => s.zoom);
@@ -45,9 +52,28 @@ export default function OfficeToolbar() {
   const users = useOfficeStore((s) => s.users);
   const agents = useOfficeStore((s) => s.agents);
 
-  // Local media toggle state (visual only until LiveKit is wired)
-  const [isMuted, setIsMuted] = useState(true);
-  const [isVideoOff, setIsVideoOff] = useState(true);
+  // Media controls — wired to call store so CallOverlay stays in sync
+  const isMuted = useCallStore((s) => s.isMuted);
+  const isVideoOff = useCallStore((s) => s.isVideoOff);
+  const toggleMute = useCallStore((s) => s.toggleMute);
+  const toggleVideo = useCallStore((s) => s.toggleVideo);
+  const toggleScreenShare = useCallStore((s) => s.toggleScreenShare);
+
+  // Emoji reactions picker
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  // Close emoji picker on outside click
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [showEmojiPicker]);
 
   const followingName = followingEntity
     ? followingEntity.type === "user"
@@ -122,33 +148,61 @@ export default function OfficeToolbar() {
       <Divider color={tokens.border} />
 
       {/* ── Center: Media controls ── */}
-      <div className="flex items-center gap-1 px-2">
+      <div className="relative flex items-center gap-1 px-2">
         <MediaBtn
           icon={isMuted ? MicOff : Mic}
-          onClick={() => setIsMuted(!isMuted)}
+          onClick={toggleMute}
           label={isMuted ? "Unmute" : "Mute"}
           active={!isMuted}
           tokens={tokens}
         />
         <MediaBtn
           icon={isVideoOff ? VideoOff : Video}
-          onClick={() => setIsVideoOff(!isVideoOff)}
+          onClick={toggleVideo}
           label={isVideoOff ? "Start camera" : "Stop camera"}
           active={!isVideoOff}
           tokens={tokens}
         />
         <MediaBtn
           icon={MonitorUp}
-          onClick={() => {}}
+          onClick={toggleScreenShare}
           label="Share screen"
           tokens={tokens}
         />
-        <MediaBtn
-          icon={Smile}
-          onClick={() => {}}
-          label="Reactions"
-          tokens={tokens}
-        />
+        <div ref={emojiPickerRef} className="relative">
+          <MediaBtn
+            icon={Smile}
+            onClick={() => setShowEmojiPicker((v) => !v)}
+            label="Reactions"
+            active={showEmojiPicker}
+            tokens={tokens}
+          />
+          {/* Emoji picker popup */}
+          {showEmojiPicker && (
+            <div
+              className="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-1 rounded-2xl px-3 py-2 shadow-xl"
+              style={{
+                backgroundColor: tokens.glass,
+                backdropFilter: "blur(24px) saturate(180%)",
+                border: `1px solid ${tokens.glassBorder}`,
+              }}
+            >
+              {REACTION_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  className="text-xl transition-transform hover:scale-125 active:scale-90"
+                  onClick={() => {
+                    onReaction?.(emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                  aria-label={`React with ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Divider ── */}
@@ -248,6 +302,7 @@ function ViewToggle({
       }}
       onClick={onClick}
       aria-label={label}
+      title={label}
     >
       <Icon size={13} />
       {label}

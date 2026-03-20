@@ -64,25 +64,26 @@ export default function OnboardingOverlay() {
     <AnimatePresence>
       {visible && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop — pointerEvents none so clicks pass through to canvas */}
           <motion.div
             className="fixed inset-0 z-50"
-            style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+            style={{ backgroundColor: "rgba(0,0,0,0.6)", pointerEvents: "none" }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           />
 
-          {/* Card */}
+          {/* Card — positioned bottom-center so it doesn't block the canvas */}
           <motion.div
-            className="fixed left-1/2 top-1/2 z-50 w-[340px] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/15 p-6 shadow-2xl"
+            className="fixed left-1/2 bottom-24 z-50 w-[340px] -translate-x-1/2 rounded-2xl border border-white/15 p-6 shadow-2xl"
             style={{
               backgroundColor: "rgba(30, 25, 20, 0.95)",
               backdropFilter: "blur(24px) saturate(180%)",
+              pointerEvents: "auto",
             }}
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            initial={{ opacity: 0, scale: 0.9, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            exit={{ opacity: 0, scale: 0.9, y: 10 }}
             transition={{ type: "spring", stiffness: 400, damping: 28 }}
           >
             {/* Skip */}
