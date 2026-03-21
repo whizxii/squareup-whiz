@@ -771,7 +771,11 @@ class CRMApiClient {
   // ─── Email Sequences ─────────────────────────────────────────
 
   async listSequences(): Promise<EmailSequence[]> {
-    return this.request("/api/crm/v2/sequences");
+    const result = await this.request<{ items: EmailSequence[] } | EmailSequence[]>("/api/crm/v2/sequences");
+    if (result && !Array.isArray(result) && "items" in result) {
+      return result.items ?? [];
+    }
+    return (result as EmailSequence[]) ?? [];
   }
 
   async getSequence(id: string): Promise<EmailSequence> {

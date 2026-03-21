@@ -243,8 +243,8 @@ class CopilotService(BaseService):
         "contact": "phone",
         "email": "email",
         "email address": "email",
-        "stage": "lead_stage",
-        "lead stage": "lead_stage",
+        "stage": "stage",
+        "lead stage": "stage",
         "company": "company",
         "title": "title",
         "role": "title",
@@ -313,7 +313,7 @@ class CopilotService(BaseService):
             try:
                 result = await self.session.execute(
                     select(func.count(CRMContact.id)).where(
-                        CRMContact.lead_stage == stage,
+                        CRMContact.stage == stage,
                         CRMContact.is_archived == False,  # noqa: E712
                     )
                 )
@@ -335,9 +335,9 @@ class CopilotService(BaseService):
                 total = result.scalar() or 0
                 # Breakdown by stage
                 stage_result = await self.session.execute(
-                    select(CRMContact.lead_stage, func.count(CRMContact.id))
+                    select(CRMContact.stage, func.count(CRMContact.id))
                     .where(CRMContact.is_archived == False)  # noqa: E712
-                    .group_by(CRMContact.lead_stage)
+                    .group_by(CRMContact.stage)
                     .order_by(func.count(CRMContact.id).desc())
                 )
                 rows = stage_result.all()
@@ -391,6 +391,12 @@ class CopilotService(BaseService):
             rf"what(?:'s|\s+is)\s+(?:the\s+)?({_FIELD_PAT})\s+of\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)",
             normalized,
         )
+        # Pattern C — infix: "what [field] is [name]?" / "what [field] does [name] have/work at?"
+        infix_match = re.search(
+            rf"what\s+({_FIELD_PAT})\s+(?:is|does|did)\s+([A-Za-z0-9]+(?:\s+[A-Za-z0-9]+){{0,5}}?)"
+            rf"\s*(?:work\s+at|work\s+for|at|in|have|listed)?[?.]?\s*$",
+            normalized,
+        )
 
         field_lookup_name: str | None = None
         field_lookup_fields: list[str] = []
@@ -405,11 +411,16 @@ class CopilotService(BaseService):
             resolved = self._resolve_field(of_match.group(1))
             if resolved:
                 field_lookup_fields = [resolved]
+        elif infix_match:
+            field_lookup_name = self._strip_name_stop_words(infix_match.group(2))
+            resolved = self._resolve_field(infix_match.group(1))
+            if resolved:
+                field_lookup_fields = [resolved]
 
         # Multi-field variant: "what is priya patel's stage and company"
         if possessive_match and not field_lookup_fields:
             pass  # handled below as fallthrough
-        elif possessive_match or of_match:
+        elif possessive_match or of_match or infix_match:
             # Also collect additional fields from the remainder of the query
             for raw_key in self._FIELD_MAP:
                 attr = self._FIELD_MAP[raw_key]
@@ -439,7 +450,7 @@ class CopilotService(BaseService):
                     field_labels = {
                         "phone": "Phone",
                         "email": "Email",
-                        "lead_stage": "Stage",
+                        "stage": "Stage",
                         "company": "Company",
                         "title": "Title",
                         "lead_score": "Score",
@@ -486,7 +497,7 @@ class CopilotService(BaseService):
                     if contacts:
                         lines = "\n".join(
                             f"- **{c.name}** — {c.title or 'No title'}, {c.company or 'No company'}, "
-                            f"score={c.lead_score}, stage={c.lead_stage or 'none'}"
+                            f"score={c.lead_score}, stage={c.stage or 'none'}"
                             for c in contacts
                         )
                         return CopilotResponse(
