@@ -329,11 +329,17 @@ export function CallOverlay() {
     }
   }, [isInCall, token, livekitUrl]);
 
-  // Zero-retry reconnect policy — stable reference via useMemo.
-  // For our demo backend (invalid credentials), reconnects are pointless and
-  // cause the spam loop. We rely on the circuit breaker instead.
+  // Zero-retry reconnect policy + force TURN relay.
+  // reconnectPolicy: null disables the application-level reconnect loop (we rely
+  // on the circuit breaker + 5 s disconnect-delay instead).
+  // rtcConfig iceTransportPolicy: "relay" forces all WebRTC traffic through
+  // LiveKit Cloud's TURN servers, bypassing symmetric-NAT / firewall ICE
+  // failures that would otherwise cause `could not establish pc connection`.
   const livekitOptions = useMemo(
-    () => ({ reconnectPolicy: { nextRetryDelayInMs: () => null as null } }),
+    () => ({
+      reconnectPolicy: { nextRetryDelayInMs: () => null as null },
+      rtcConfig: { iceTransportPolicy: "relay" as RTCIceTransportPolicy },
+    }),
     [],
   );
 
