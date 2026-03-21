@@ -316,13 +316,23 @@ export function CallOverlay() {
   // connection attempt while <LiveKitRoom> is still mounted.
   const [shouldConnect, setShouldConnect] = useState(false);
 
-  // Delay timer ref — used to give LiveKit's internal region-retry up to 5 s
-  // to succeed before we tear everything down. Cancelled by handleConnected.
+  // Delay timer ref — used to give LiveKit's internal region-retry time to
+  // succeed before we tear everything down. Cancelled by handleConnected.
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  // Tracks whether handleConnected has fired for the current <LiveKitRoom>
+  // instance. Used to choose the right disconnect delay:
+  //   false → initial connect attempt, never reached Connected state
+  //           → use a 3 s delay so LiveKit's region-retry can land
+  //   true  → we were Connected, then network dropped / signal resumed broken
+  //           → tear down immediately (0 ms) to stop the runaway negotiate loop
+  const wasConnectedRef = useRef(false);
+
   // Enable connect only once we have a fresh token+url from the store.
+  // Also reset wasConnected so the new <LiveKitRoom> starts with a clean slate.
   useEffect(() => {
     if (isInCall && token && livekitUrl) {
+      wasConnectedRef.current = false;
       setShouldConnect(true);
     } else {
       setShouldConnect(false);
@@ -343,21 +353,30 @@ export function CallOverlay() {
   );
 
   const handleDisconnected = useCallback(() => {
-    // Tear down immediately on disconnect. LiveKit's onDisconnected fires only
-    // after the SDK has exhausted all internal region retries — there is no
-    // benefit to waiting. Delaying unmount allows a runaway negotiate →
-    // onMediaSectionsRequirement loop to accumulate event listeners (causing
-    // MaxListenersExceededWarning) when signal WS reconnects after a network
-    // interruption but the WebRTC peer connection stays broken.
     if (disconnectTimerRef.current !== undefined) return; // teardown already scheduled
+
+    // Two-speed disconnect delay based on connection history:
+    //
+    // • wasConnected = false (initial ICE failure, never reached Connected):
+    //   Wait 3 s so LiveKit's internal region-retry can complete and fire
+    //   handleConnected, which will cancel this timer if successful.
+    //
+    // • wasConnected = true (we had a working connection, then signal
+    //   reconnected after a network interruption but WebRTC stayed broken):
+    //   Tear down immediately (0 ms) to stop the runaway
+    //   negotiate → onMediaSectionsRequirement listener-accumulation loop
+    //   that causes MaxListenersExceededWarning.
+    const delay = wasConnectedRef.current ? 0 : 3000;
+
     disconnectTimerRef.current = setTimeout(() => {
       disconnectTimerRef.current = undefined;
+      wasConnectedRef.current = false; // reset for next connection attempt
       setShouldConnect(false);
       if (useCallStore.getState().isInCall) {
         useCallStore.getState().recordCallFailure();
       }
       useCallStore.getState().leaveCall();
-    }, 0);
+    }, delay);
   }, []);
 
   const handleError = useCallback((err?: Error) => {
@@ -376,7 +395,9 @@ export function CallOverlay() {
   }, []);
 
   const handleConnected = useCallback(() => {
-    // Region retry succeeded — cancel the pending disconnect teardown.
+    // Region retry succeeded — cancel the pending disconnect teardown and
+    // record that we are now in a genuinely Connected state.
+    wasConnectedRef.current = true;
     if (disconnectTimerRef.current !== undefined) {
       clearTimeout(disconnectTimerRef.current);
       disconnectTimerRef.current = undefined;
