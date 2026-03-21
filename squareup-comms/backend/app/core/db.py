@@ -10,6 +10,7 @@ if "postgresql" in db_url:
         "pool_size": 5,
         "max_overflow": 10,
         "pool_pre_ping": True,
+        "pool_recycle": 300,
     }
     if "asyncpg" in db_url:
         engine_kwargs["connect_args"] = {
@@ -66,10 +67,18 @@ async def _migrate_new_columns() -> None:
 
     async with engine.begin() as conn:
         if "postgresql" in db_url:
-            await conn.execute(sa_text("SET LOCAL statement_timeout = 0"))
-            for col_name, col_type in _AGENT_COLUMNS:
+            # Check which columns are actually missing before running DDL.
+            # This avoids any ALTER TABLE on normal startups (all columns exist),
+            # preventing statement timeout errors from Supabase's connection-level timeout.
+            result = await conn.execute(sa_text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'agents'"
+            ))
+            existing = {row[0] for row in result.fetchall()}
+            missing = [(n, t) for n, t in _AGENT_COLUMNS if n not in existing]
+            for col_name, col_type in missing:
                 await conn.execute(sa_text(
-                    f"ALTER TABLE agents ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+                    f"ALTER TABLE agents ADD COLUMN {col_name} {col_type}"
                 ))
         else:
             # SQLite: no IF NOT EXISTS — catch the "duplicate column" error
