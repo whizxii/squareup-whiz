@@ -77,7 +77,7 @@ class DealRepository(BaseRepository[CRMDeal]):
         result = await self._session.execute(
             select(CRMDeal)
             .where(
-                CRMDeal.pipeline_id == pipeline_id,
+                or_(CRMDeal.pipeline_id == pipeline_id, CRMDeal.pipeline_id.is_(None)),
                 CRMDeal.status == "open",
             )
             .order_by(CRMDeal.created_at.desc())

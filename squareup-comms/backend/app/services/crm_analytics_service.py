@@ -179,24 +179,25 @@ class AnalyticsService(BaseService):
                 round((count / prev_count) * 100, 1) if prev_count and prev_count > 0 else None
             )
             stages.append({
-                "id": sid,
-                "label": sc.get("label", sid),
+                "stage_id": sid,
+                "stage_label": sc.get("label", sid),
                 "color": sc.get("color", "#6B7280"),
-                "count": count,
-                "value": value,
+                "deal_count": count,
+                "total_value": value,
                 "avg_days_in_stage": avg_days,
                 "conversion_rate": conversion,
             })
             prev_count = count
 
         # Overall pipeline stats
-        total_open = sum(s["count"] for s in stages)
-        total_value = sum(s["value"] for s in stages)
+        total_open = sum(s["deal_count"] for s in stages)
+        total_val = sum(s["total_value"] for s in stages)
 
         result: dict[str, Any] = {
             "stages": stages,
-            "total_open_deals": total_open,
-            "total_pipeline_value": total_value,
+            "total_deals": total_open,
+            "total_value": total_val,
+            "velocity_days": 0,
         }
         self.cache.set(cache_key, result, ttl_seconds=60)
         return result
@@ -400,18 +401,19 @@ class AnalyticsService(BaseService):
         )
         reason_rows = (await self.session.execute(loss_reasons_q)).all()
 
+        won_count = won.count if won else 0
+        lost_count = lost.count if lost else 0
+        total_closed = won_count + lost_count
+        win_rate = round((won_count / total_closed) * 100, 1) if total_closed else 0.0
+
         result: dict[str, Any] = {
-            "period": period,
-            "won": {
-                "count": won.count if won else 0,
-                "value": float(won.value) if won else 0,
-                "avg_cycle_days": round(won.avg_cycle, 1) if won and won.avg_cycle else 0,
-            },
-            "lost": {
-                "count": lost.count if lost else 0,
-                "value": float(lost.value) if lost else 0,
-                "avg_cycle_days": round(lost.avg_cycle, 1) if lost and lost.avg_cycle else 0,
-            },
+            "won_count": won_count,
+            "lost_count": lost_count,
+            "won_value": float(won.value) if won else 0,
+            "lost_value": float(lost.value) if lost else 0,
+            "win_rate": win_rate,
+            "avg_won_cycle_days": round(won.avg_cycle, 1) if won and won.avg_cycle else 0,
+            "avg_lost_cycle_days": round(lost.avg_cycle, 1) if lost and lost.avg_cycle else 0,
             "loss_reasons": [
                 {"reason": r.loss_reason, "count": r.count} for r in reason_rows
             ],
@@ -453,22 +455,23 @@ class AnalyticsService(BaseService):
         )
         rows = (await self.session.execute(stage_q)).all()
 
+        label_map = {s.get("id", s.get("label", "")): s.get("label", "") for s in stages_config}
+
         stages = []
         for r in rows:
             sla = sla_map.get(r.stage)
             avg_d = round(r.avg_days, 1) if r.avg_days else 0
             stages.append({
-                "stage": r.stage,
+                "stage_id": r.stage,
+                "stage_label": label_map.get(r.stage, r.stage),
                 "deal_count": r.count,
                 "avg_days": avg_d,
                 "max_days": round(r.max_days, 1) if r.max_days else 0,
                 "sla_days": sla,
-                "exceeds_sla": avg_d > sla if sla else False,
             })
 
-        result: dict[str, Any] = {"stages": stages}
-        self.cache.set(cache_key, result, ttl_seconds=300)
-        return result
+        self.cache.set(cache_key, stages, ttl_seconds=300)
+        return stages
 
     # ----- Deal Velocity ------------------------------------------------
 
@@ -535,7 +538,7 @@ class AnalyticsService(BaseService):
             "deals_created": created_count,
             "deals_closed": closed_count,
             "win_rate": round(win_rate * 100, 1),
-            "avg_deal_value": round(float(avg_created_value), 2),
+            "avg_value": round(float(avg_created_value), 2),
             "avg_cycle_days": round(avg_cycle, 1),
             "velocity": velocity,
         }
@@ -590,19 +593,14 @@ class AnalyticsService(BaseService):
             sources.append({
                 "source": sr.source,
                 "contacts": sr.contacts,
-                "total_deals": total_deals,
-                "won_deals": won_row.won,
+                "deals": total_deals,
                 "revenue": float(won_row.value),
                 "conversion_rate": round(
                     (won_row.won / total_deals * 100) if total_deals else 0, 1
-                ),
-                "avg_deal_value": round(
-                    (float(won_row.value) / won_row.won) if won_row.won else 0, 2
                 ),
             })
 
         sources.sort(key=lambda s: s["revenue"], reverse=True)
 
-        result: dict[str, Any] = {"period": period, "sources": sources}
-        self.cache.set(cache_key, result, ttl_seconds=300)
-        return result
+        self.cache.set(cache_key, sources, ttl_seconds=300)
+        return sources
