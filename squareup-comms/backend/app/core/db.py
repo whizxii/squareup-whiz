@@ -66,6 +66,7 @@ async def _migrate_new_columns() -> None:
 
     async with engine.begin() as conn:
         if "postgresql" in db_url:
+            await conn.execute(sa_text("SET LOCAL statement_timeout = 0"))
             for col_name, col_type in _AGENT_COLUMNS:
                 await conn.execute(sa_text(
                     f"ALTER TABLE agents ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
