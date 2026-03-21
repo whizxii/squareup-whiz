@@ -4,15 +4,17 @@ import { useState } from "react";
 import { Building2, Globe, Plus } from "lucide-react";
 import { useCompanies, useCreateCompany } from "@/lib/hooks/use-crm-queries";
 import type { Company } from "@/lib/types/crm";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-US", {
+  return new Date(iso).toLocaleDateString(APP_LOCALE, {
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: APP_TIMEZONE,
   });
 }
 

@@ -6,7 +6,7 @@ import { InlineEdit } from "@/components/ui/InlineEdit";
 import { Badge, ScoreBadge } from "@/components/ui/Badge";
 import { useUpdateContact, useNextActions } from "@/lib/hooks/use-crm-queries";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
-import { formatRelativeTime } from "@/lib/format";
+import { formatRelativeTime, APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 import type {
   Contact,
   Company,
@@ -461,9 +461,10 @@ export function ContactHeader({
               <span className="text-[11px] text-muted-foreground">·</span>
               <span className="text-[11px] text-muted-foreground">
                 Next event:{" "}
-                {new Date(nextEvent.start_at).toLocaleDateString("en-US", {
+                {new Date(nextEvent.start_at).toLocaleDateString(APP_LOCALE, {
                   month: "short",
                   day: "numeric",
+                  timeZone: APP_TIMEZONE,
                 })}
               </span>
             </>

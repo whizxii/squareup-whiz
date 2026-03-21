@@ -6,11 +6,15 @@ import json
 from datetime import datetime
 from typing import Any, List, Literal, Optional
 
+import logging
+
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field, model_validator
 
 from app.core.auth import get_current_user
 from app.core.responses import ApiError, success_response
+
+logger = logging.getLogger(__name__)
 from app.api.deps import get_calendar_event_service
 from app.services.crm_calendar_service import VALID_EVENT_TYPES, CalendarEventService
 
@@ -47,8 +51,12 @@ class CreateEventBody(BaseModel):
 
     @model_validator(mode="after")
     def _validate_times(self) -> "CreateEventBody":
-        if not self.is_all_day and self.end_at <= self.start_at:
-            raise ValueError("end_at must be after start_at")
+        if not self.is_all_day:
+            # Normalize timezone awareness for comparison (avoid TypeError)
+            start = self.start_at.replace(tzinfo=None)
+            end = self.end_at.replace(tzinfo=None)
+            if end <= start:
+                raise ValueError("end_at must be after start_at")
         if self.event_type not in VALID_EVENT_TYPES:
             raise ValueError(f"event_type must be one of {VALID_EVENT_TYPES}")
         return self
@@ -155,7 +163,11 @@ async def create_event(
             a.model_dump() if hasattr(a, "model_dump") else a
             for a in body.attendees
         ]
-    event = await svc.create_event(data, user_id)
+    try:
+        event = await svc.create_event(data, user_id)
+    except Exception as exc:
+        logger.error("Failed to create calendar event: %s", exc, exc_info=True)
+        raise ApiError(status_code=500, detail=f"Failed to create calendar event: {exc}") from exc
     return success_response(EventResponse.from_model(event))
 
 

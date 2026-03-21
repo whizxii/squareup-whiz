@@ -15,6 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import type { Task, TaskStatus, TaskPriority } from "@/lib/types/tasks";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 
 // ─── Priority badge config ───────────────────────────────────────
 
@@ -57,7 +58,7 @@ function formatDueDate(dateStr: string | null): { text: string; overdue: boolean
   if (diffDays <= 7) return { text: `In ${diffDays} days`, overdue: false };
 
   return {
-    text: due.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    text: due.toLocaleDateString(APP_LOCALE, { month: "short", day: "numeric", timeZone: APP_TIMEZONE }),
     overdue: false,
   };
 }

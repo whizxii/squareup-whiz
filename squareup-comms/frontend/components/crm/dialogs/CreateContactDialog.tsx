@@ -13,6 +13,7 @@ import type { CRMStage } from "@/lib/types/crm";
 import { toast } from "@/lib/stores/toast-store";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -47,6 +48,11 @@ const STAGES: { id: CRMStage; label: string }[] = [
   { id: "lost", label: "Lost" },
 ];
 
+/** Return current IST wall-clock time as "YYYY-MM-DDTHH:mm" for datetime-local inputs. */
+function nowIstLocal(): string {
+  return new Date().toLocaleString("sv-SE", { timeZone: APP_TIMEZONE }).slice(0, 16);
+}
+
 // ─── Props ───────────────────────────────────────────────────────
 
 interface CreateContactDialogProps {
@@ -79,9 +85,7 @@ export function CreateContactDialog({
 
   // First interaction (collapsible)
   const [showFirstInteraction, setShowFirstInteraction] = useState(false);
-  const [firstMeetDate, setFirstMeetDate] = useState(
-    () => new Date().toISOString().slice(0, 16)
-  );
+  const [firstMeetDate, setFirstMeetDate] = useState(nowIstLocal);
   const [firstMeetTldr, setFirstMeetTldr] = useState("");
   const [followUpDate, setFollowUpDate] = useState("");
   const [followUpTime, setFollowUpTime] = useState("09:00");
@@ -101,7 +105,7 @@ export function CreateContactDialog({
     setTags("");
     setCreateDeal(true);
     setShowFirstInteraction(false);
-    setFirstMeetDate(new Date().toISOString().slice(0, 16));
+    setFirstMeetDate(nowIstLocal());
     setFirstMeetTldr("");
     setFollowUpDate("");
     setFollowUpTime("09:00");
@@ -144,50 +148,67 @@ export function CreateContactDialog({
         });
       }
 
-      // Auto-schedule follow-up
+      // Auto-schedule follow-up (failures here should NOT mask contact creation)
+      let followUpScheduled = false;
       if (followUpDate && followUpTime) {
-        const followUpIso = `${followUpDate}T${followUpTime}:00`;
-        const endAt = new Date(new Date(followUpIso).getTime() + 30 * 60_000).toISOString();
-        const remindAt = new Date(new Date(followUpIso).getTime() - 15 * 60_000).toISOString();
+        try {
+          const followUpIso = `${followUpDate}T${followUpTime}:00`;
+          // Build end_at and remindAt in same naive format (no timezone)
+          const pad = (n: number) => String(n).padStart(2, "0");
+          const toLocalIso = (d: Date) =>
+            `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
-        await Promise.all([
-          createCalendar.mutateAsync({
-            contact_id: contactId,
-            title: `Follow-up with ${contactName}`,
-            event_type: "follow_up",
-            start_at: followUpIso,
-            end_at: endAt,
-            reminder_minutes: 15,
-            description: followUpNote.trim() || undefined,
-          }),
-          updateContact.mutateAsync({
-            id: contactId,
-            updates: {
-              next_follow_up_at: followUpIso,
-              follow_up_note: followUpNote.trim() || undefined,
-            },
-          }),
-          fetch(`${API_URL}/api/reminders`, {
-            method: "POST",
-            headers: getHeaders(),
-            body: JSON.stringify({
-              message: `Follow-up with ${contactName}`,
-              remind_at: remindAt,
+          const startMs = new Date(followUpIso).getTime();
+          const endAt = toLocalIso(new Date(startMs + 30 * 60_000));
+          const remindAt = toLocalIso(new Date(startMs - 15 * 60_000));
+
+          await Promise.all([
+            createCalendar.mutateAsync({
+              contact_id: contactId,
+              title: `Follow-up with ${contactName}`,
+              event_type: "follow_up",
+              start_at: followUpIso,
+              end_at: endAt,
+              reminder_minutes: 15,
+              description: followUpNote.trim() || undefined,
             }),
-          }),
-        ]);
+            updateContact.mutateAsync({
+              id: contactId,
+              updates: {
+                next_follow_up_at: followUpIso,
+                follow_up_note: followUpNote.trim() || undefined,
+              },
+            }),
+            fetch(`${API_URL}/api/reminders/`, {
+              method: "POST",
+              headers: getHeaders(),
+              body: JSON.stringify({
+                message: `Follow-up with ${contactName}`,
+                remind_at: remindAt,
+              }),
+            }),
+          ]);
+          followUpScheduled = true;
+        } catch (followUpErr) {
+          console.error("Follow-up scheduling failed:", followUpErr);
+        }
       }
 
       const followUpLabel = followUpDate && followUpTime
-        ? new Date(`${followUpDate}T${followUpTime}`).toLocaleDateString("en-US", {
+        ? new Date(`${followUpDate}T${followUpTime}`).toLocaleDateString(APP_LOCALE, {
             month: "short",
             day: "numeric",
+            timeZone: APP_TIMEZONE,
           })
         : null;
 
       toast.success(
         `Contact created`,
-        followUpLabel ? `Follow-up scheduled for ${followUpLabel} · Reminder 15 min before` : undefined
+        followUpScheduled && followUpLabel
+          ? `Follow-up scheduled for ${followUpLabel} · Reminder 15 min before`
+          : followUpLabel
+            ? `Contact saved, but follow-up scheduling failed`
+            : undefined
       );
 
       resetForm();

@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useUpdateContact, useContactEmails, useScoreContact } from "@/lib/hooks/use-crm-queries";
 import { toast } from "@/lib/stores/toast-store";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
-import { formatCurrency, formatRelativeTime } from "@/lib/format";
+import { formatCurrency, formatRelativeTime, APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 import type {
   Contact,
   Company,
@@ -454,12 +454,13 @@ function NextUpCard({
       <div>
         <p className="text-xs font-medium">{displayTitle}</p>
         <p className="text-[11px] text-muted-foreground">
-          {displayDate.toLocaleDateString("en-US", {
+          {displayDate.toLocaleDateString(APP_LOCALE, {
             weekday: "short",
             month: "short",
             day: "numeric",
             hour: "numeric",
             minute: "2-digit",
+            timeZone: APP_TIMEZONE,
           })}
         </p>
       </div>

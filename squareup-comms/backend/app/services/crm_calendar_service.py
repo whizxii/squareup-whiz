@@ -90,13 +90,16 @@ class CalendarEventService(BaseService):
         await self.session.commit()
         await self.session.refresh(event)
 
-        await self.events.emit("calendar_event.created", {
-            "event_id": event.id,
-            "contact_id": event.contact_id,
-            "deal_id": event.deal_id,
-            "event_type": event.event_type,
-            "start_at": event.start_at.isoformat(),
-        })
+        try:
+            await self.events.emit("calendar_event.created", {
+                "event_id": event.id,
+                "contact_id": event.contact_id,
+                "deal_id": event.deal_id,
+                "event_type": event.event_type,
+                "start_at": event.start_at.isoformat(),
+            })
+        except Exception:
+            logger.warning("Event bus emit failed for calendar_event.created (non-fatal)", exc_info=True)
 
         logger.info("Calendar event created: %s (%s)", event.id, event.event_type)
         return event

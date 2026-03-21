@@ -75,6 +75,7 @@ function formatDate(iso: string): string {
       month: "short",
       day: "numeric",
       year: "numeric",
+      timeZone: "Asia/Kolkata",
     }).format(new Date(iso));
   } catch {
     return "\u2014";

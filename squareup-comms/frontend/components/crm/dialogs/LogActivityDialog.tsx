@@ -14,6 +14,7 @@ import {
 } from "@/lib/hooks/use-crm-queries";
 import type { Contact } from "@/lib/types/crm";
 import { cn } from "@/lib/utils";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 import { toast } from "@/lib/stores/toast-store";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
@@ -317,7 +318,7 @@ export function LogActivityDialog({
 
       // ── Step 4: Success toast ─────────────────────────────────
       const followUpLabel = followUpIso
-        ? new Date(followUpIso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        ? new Date(followUpIso).toLocaleDateString(APP_LOCALE, { month: "short", day: "numeric", timeZone: APP_TIMEZONE })
         : null;
       toast.success(
         "Activity logged",

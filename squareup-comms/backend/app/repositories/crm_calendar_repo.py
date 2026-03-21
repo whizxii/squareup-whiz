@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Sequence
 
+from app.core.timezone import now_ist_naive
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,7 +68,7 @@ class CalendarEventRepository(BaseRepository[CRMCalendarEvent]):
         limit: int = 20,
     ) -> Sequence[CRMCalendarEvent]:
         """Get upcoming events (scheduled, starting from now)."""
-        now = datetime.utcnow()
+        now = now_ist_naive()
         result = await self._session.execute(
             select(CRMCalendarEvent)
             .where(
@@ -84,7 +86,7 @@ class CalendarEventRepository(BaseRepository[CRMCalendarEvent]):
         limit: int = 50,
     ) -> Sequence[CRMCalendarEvent]:
         """Get overdue follow-ups (scheduled events past their start_at)."""
-        now = datetime.utcnow()
+        now = now_ist_naive()
         result = await self._session.execute(
             select(CRMCalendarEvent)
             .where(

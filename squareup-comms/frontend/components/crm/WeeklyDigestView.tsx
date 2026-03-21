@@ -12,6 +12,7 @@ import {
   BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 
@@ -124,7 +125,7 @@ function DateRange({
 }) {
   if (!start || !end) return null;
   const fmt = (d: string) =>
-    new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    new Date(d).toLocaleDateString(APP_LOCALE, { month: "short", day: "numeric", timeZone: APP_TIMEZONE });
   return (
     <span className="text-[11px] text-muted-foreground">
       {fmt(start)} – {fmt(end)}

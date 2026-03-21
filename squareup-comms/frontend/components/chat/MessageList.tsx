@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { MessageSquare, Sparkles, ArrowDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { parseUtcDate } from "@/lib/format";
+import { parseUtcDate, APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 import { usePrefersReducedMotion } from "@/hooks/use-keyboard-shortcuts";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCurrentUserId } from "@/lib/hooks/useCurrentUserId";
@@ -40,12 +40,13 @@ function formatDateLabel(date: Date): string {
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) {
-    return date.toLocaleDateString("en-US", { weekday: "long" });
+    return date.toLocaleDateString(APP_LOCALE, { weekday: "long", timeZone: APP_TIMEZONE });
   }
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(APP_LOCALE, {
     month: "long",
     day: "numeric",
     year: now.getFullYear() !== date.getFullYear() ? "numeric" : undefined,
+    timeZone: APP_TIMEZONE,
   });
 }
 

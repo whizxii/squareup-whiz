@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Bell, BellOff, Bot, X } from "lucide-react";
 import type { Reminder, ReminderStatus } from "@/lib/types/tasks";
+import { APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 
 // ─── Status badge config ─────────────────────────────────────────
 
@@ -38,11 +39,12 @@ function formatRemindAt(dateStr: string): string {
     if (absMins < 60) return `${absMins}m ago`;
     const absHours = Math.abs(diffHours);
     if (absHours < 24) return `${absHours}h ago`;
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString(APP_LOCALE, {
       month: "short",
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
+      timeZone: APP_TIMEZONE,
     });
   }
 
@@ -50,15 +52,16 @@ function formatRemindAt(dateStr: string): string {
   if (diffMins < 60) return `in ${diffMins}m`;
   if (diffHours < 24) return `in ${diffHours}h`;
   if (diffDays === 1) {
-    return `Tomorrow at ${date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+    return `Tomorrow at ${date.toLocaleTimeString(APP_LOCALE, { hour: "numeric", minute: "2-digit", timeZone: APP_TIMEZONE })}`;
   }
   if (diffDays <= 7) return `in ${diffDays} days`;
 
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(APP_LOCALE, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: APP_TIMEZONE,
   });
 }
 

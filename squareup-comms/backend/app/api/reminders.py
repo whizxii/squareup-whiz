@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import get_current_user
 from app.core.db import get_session
 from app.core.responses import ApiError, success_response
+from app.core.timezone import now_ist_naive
 from app.models.reminders import Reminder
 
 router = APIRouter(prefix="/api/reminders", tags=["reminders"])
@@ -61,7 +62,8 @@ class ReminderResponse(BaseModel):
 # Routes
 # ---------------------------------------------------------------------------
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_reminder(
     body: ReminderCreateBody,
     session: AsyncSession = Depends(get_session),
@@ -71,7 +73,9 @@ async def create_reminder(
     remind_at = _parse_datetime(body.remind_at)
     if not remind_at:
         raise ApiError(status_code=400, detail="remind_at must be a valid ISO datetime")
-    if remind_at <= datetime.utcnow():
+    # Strip timezone for comparison (avoid TypeError with naive utcnow)
+    remind_at_naive = remind_at.replace(tzinfo=None)
+    if remind_at_naive <= now_ist_naive():
         raise ApiError(status_code=400, detail="remind_at must be in the future")
 
     reminder = Reminder(
@@ -81,7 +85,7 @@ async def create_reminder(
         channel_id=body.channel_id,
         recurrence=body.recurrence,
         status="pending",
-        created_at=datetime.utcnow(),
+        created_at=now_ist_naive(),
     )
     session.add(reminder)
     await session.commit()
@@ -89,7 +93,8 @@ async def create_reminder(
     return success_response(ReminderResponse.from_model(reminder).model_dump(mode="json"))
 
 
-@router.get("/")
+@router.get("")
+@router.get("/", include_in_schema=False)
 async def list_reminders(
     reminder_status: Optional[str] = Query(default=None, alias="status"),
     limit: int = Query(default=50, ge=1, le=200),

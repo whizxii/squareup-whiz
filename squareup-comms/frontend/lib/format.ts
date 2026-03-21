@@ -1,18 +1,23 @@
 /**
  * Shared formatting utilities used across the app.
  * Centralised here to avoid duplication in individual components.
+ *
+ * All dates are displayed in Indian Standard Time (IST — Asia/Kolkata).
  */
 
+/** IANA timezone identifier for the app. */
+export const APP_TIMEZONE = "Asia/Kolkata";
+
+/** Locale used for date / number formatting. */
+export const APP_LOCALE = "en-IN";
+
 /**
- * Parse a date string treating timezone-naive ISO strings as UTC.
+ * Parse a date string treating timezone-naive ISO strings as UTC,
+ * then return a JS Date (which is always UTC internally).
  *
- * The backend stores datetimes with `datetime.utcnow()` which produces
- * naive ISO strings like "2026-03-18T10:00:00" (no "Z" suffix).
- * JavaScript's `new Date()` treats those as *local time*, creating a
- * timezone offset that shows fresh messages as "6 hours ago" etc.
- *
- * This helper appends "Z" when no timezone indicator is present so the
- * string is correctly parsed as UTC.
+ * The backend stores datetimes as naive ISO strings (no "Z").
+ * We append "Z" so JS parses them as UTC, then display functions
+ * convert to IST via `timeZone: "Asia/Kolkata"`.
  */
 export function parseUtcDate(iso: string): Date {
   if (!iso) return new Date();
@@ -34,10 +39,11 @@ export function formatBytes(bytes: number): string {
 export function formatDate(iso: string): string {
   try {
     const d = parseUtcDate(iso);
-    return d.toLocaleDateString("en-US", {
+    return d.toLocaleDateString(APP_LOCALE, {
       month: "short",
       day: "numeric",
       year: "numeric",
+      timeZone: APP_TIMEZONE,
     });
   } catch {
     return "";
@@ -47,14 +53,34 @@ export function formatDate(iso: string): string {
 export function formatTime(iso: string): string {
   try {
     const d = parseUtcDate(iso);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString(APP_LOCALE, {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: APP_TIMEZONE,
+    });
+  } catch {
+    return "";
+  }
+}
+
+export function formatDateTime(iso: string): string {
+  try {
+    const d = parseUtcDate(iso);
+    return d.toLocaleString(APP_LOCALE, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: APP_TIMEZONE,
+    });
   } catch {
     return "";
   }
 }
 
 export function formatCurrency(value: number, currency = "INR"): string {
-  return new Intl.NumberFormat("en-IN", {
+  return new Intl.NumberFormat(APP_LOCALE, {
     style: "currency",
     currency,
     maximumFractionDigits: 0,

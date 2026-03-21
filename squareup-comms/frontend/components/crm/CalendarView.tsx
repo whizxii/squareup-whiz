@@ -9,7 +9,7 @@ import {
   useUpcomingEvents,
 } from "@/lib/hooks/use-crm-queries";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
-import { formatDate, formatTime } from "@/lib/format";
+import { formatDate, formatTime, APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 import { EVENT_TYPE_CONFIG, STATUS_BADGES } from "./calendar-constants";
 import type { CalendarEvent } from "@/lib/types/crm";
 import { MeetingPrepPanel } from "@/components/crm/MeetingPrepPanel";
@@ -316,7 +316,7 @@ function DayDetail({
     <div className="w-80 border-l border-border bg-card p-4 overflow-y-auto scrollbar-thin">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold">
-          {date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+          {date.toLocaleDateString(APP_LOCALE, { weekday: "long", month: "short", day: "numeric", timeZone: APP_TIMEZONE })}
         </h3>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <XCircle className="w-4 h-4" />

@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     # Encryption
     ENCRYPTION_KEY: Optional[str] = None  # Fernet key for OAuth tokens
 
+    # Timezone (IANA identifier)
+    TIMEZONE: str = "Asia/Kolkata"
+
     # Logging
     LOG_LEVEL: str = "INFO"
 
