@@ -113,7 +113,7 @@ export function TableView() {
   const { data, isLoading } = useContacts(
     contactFilters,
     { limit: 200 },
-    { sort_by: sortField, sort_order: sortDir }
+    { sort_by: sortField, sort_dir: sortDir }
   );
   const allContacts = data?.items ?? [];
 

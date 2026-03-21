@@ -235,6 +235,125 @@ class CopilotService(BaseService):
             f"At-risk deals:\n{risk_text}"
         )
 
+    async def _handle_db_intent(self, query: str) -> CopilotResponse | None:
+        """Try to answer common CRM queries directly from the DB. Returns None if no intent matched."""
+        from sqlalchemy import select, func
+        from app.models.crm import CRMContact
+        from app.models.crm_deal import CRMDeal
+
+        normalized = query.lower().strip()
+
+        # Intent: count contacts by stage — "how many leads in qualified"
+        stage_count_match = re.search(
+            r"how many (?:leads?|contacts?).*?(?:in|at|with)\s+(\w+)\s*(?:stage)?",
+            normalized,
+        )
+        if not stage_count_match:
+            stage_count_match = re.search(
+                r"(?:leads?|contacts?)\s+in\s+(\w+)\s*(?:stage)?",
+                normalized,
+            )
+        if stage_count_match:
+            stage = stage_count_match.group(1)
+            try:
+                result = await self.session.execute(
+                    select(func.count(CRMContact.id)).where(
+                        CRMContact.lead_stage == stage,
+                        CRMContact.is_archived == False,  # noqa: E712
+                    )
+                )
+                count = result.scalar() or 0
+                return CopilotResponse(
+                    type="answer",
+                    message=f"There are **{count} contact{'s' if count != 1 else ''}** in the **{stage}** stage.",
+                    data={"stage": stage, "count": count},
+                )
+            except Exception:
+                pass
+
+        # Intent: total contacts — "how many contacts do I have"
+        if re.search(r"how many (?:total\s+)?(?:leads?|contacts?)", normalized):
+            try:
+                result = await self.session.execute(
+                    select(func.count(CRMContact.id)).where(CRMContact.is_archived == False)  # noqa: E712
+                )
+                total = result.scalar() or 0
+                # Breakdown by stage
+                stage_result = await self.session.execute(
+                    select(CRMContact.lead_stage, func.count(CRMContact.id))
+                    .where(CRMContact.is_archived == False)  # noqa: E712
+                    .group_by(CRMContact.lead_stage)
+                    .order_by(func.count(CRMContact.id).desc())
+                )
+                rows = stage_result.all()
+                breakdown = "\n".join(f"  - **{r[0] or 'none'}**: {r[1]}" for r in rows)
+                return CopilotResponse(
+                    type="answer",
+                    message=f"You have **{total} total contacts** in your CRM.\n\n**By stage:**\n{breakdown}",
+                    data={"total": total},
+                )
+            except Exception:
+                pass
+
+        # Intent: deals summary / pipeline — "show me my pipeline", "deals summary"
+        if re.search(r"(?:pipeline|deal)\s*(?:summary|overview|status|health)?$|my\s+pipeline", normalized):
+            try:
+                deal_result = await self.session.execute(
+                    select(CRMDeal).where(CRMDeal.status == "open")
+                )
+                deals = deal_result.scalars().all()
+                total_value = sum(d.value or 0 for d in deals)
+                at_risk = [d for d in deals if d.deal_health in ("yellow", "red")]
+                by_stage: dict[str, list[CRMDeal]] = {}
+                for d in deals:
+                    by_stage.setdefault(d.stage or "Unknown", []).append(d)
+                stage_lines = "\n".join(
+                    f"  - **{s}**: {len(ds)} deal{'s' if len(ds) != 1 else ''} (${sum(x.value or 0 for x in ds):,.0f})"
+                    for s, ds in sorted(by_stage.items())
+                )
+                msg = (
+                    f"**Pipeline overview** — {len(deals)} open deals worth **${total_value:,.0f}**\n\n"
+                    f"{stage_lines}\n\n"
+                )
+                if at_risk:
+                    msg += f"⚠️ **{len(at_risk)} at-risk deal{'s' if len(at_risk) != 1 else ''}** need attention."
+                return CopilotResponse(type="answer", message=msg, data={"open_deals": len(deals), "total_value": total_value})
+            except Exception:
+                pass
+
+        # Intent: find/show contact — "show me [name]", "find [name]", "who is [name]"
+        contact_match = re.search(
+            r"(?:show\s+me|find|who\s+is|tell\s+me\s+about|info\s+on)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)",
+            normalized,
+        )
+        if contact_match:
+            name_query = contact_match.group(1).strip()
+            try:
+                result = await self.session.execute(
+                    select(CRMContact)
+                    .where(
+                        CRMContact.name.ilike(f"%{name_query}%"),
+                        CRMContact.is_archived == False,  # noqa: E712
+                    )
+                    .limit(3)
+                )
+                contacts = result.scalars().all()
+                if contacts:
+                    lines = "\n".join(
+                        f"- **{c.name}** — {c.title or 'No title'}, {c.company or 'No company'}, "
+                        f"score={c.lead_score}, stage={c.lead_stage or 'none'}"
+                        for c in contacts
+                    )
+                    return CopilotResponse(
+                        type="answer",
+                        message=f"Found {len(contacts)} contact{'s' if len(contacts) != 1 else ''} matching **{name_query}**:\n\n{lines}",
+                        data=None,
+                    )
+            except Exception:
+                pass
+
+        return None
+
     async def ask(self, query: str) -> dict[str, Any]:
         """Process a natural language query and return a response."""
         if not query or not query.strip():
@@ -243,6 +362,15 @@ class CopilotService(BaseService):
                 "message": "Please ask a question about your CRM data.",
                 "data": None,
             }
+
+        # Try DB-powered intent matching first (works even without LLM key)
+        try:
+            db_result = await self._handle_db_intent(query)
+            if db_result is not None:
+                logger.info("Copilot query (DB intent): %s → type: %s", query[:80], db_result.type)
+                return {"type": db_result.type, "message": db_result.message, "data": db_result.data}
+        except Exception:
+            logger.warning("DB intent handler failed, continuing to LLM/mock")
 
         try:
             context = await self._build_context()

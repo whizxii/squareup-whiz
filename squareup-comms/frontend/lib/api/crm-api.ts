@@ -85,8 +85,6 @@ export interface DealFilters {
   owner_id?: string;
   value_min?: number;
   value_max?: number;
-  expected_close_from?: string;
-  expected_close_to?: string;
 }
 
 export interface PaginationParams {
@@ -96,7 +94,7 @@ export interface PaginationParams {
 
 export interface SortParams {
   sort_by?: string;
-  sort_order?: "asc" | "desc";
+  sort_dir?: "asc" | "desc";
 }
 
 // ─── CRM API Client ─────────────────────────────────────────────
@@ -439,7 +437,7 @@ class CRMApiClient {
   ): Promise<Deal> {
     return this.request(`/api/crm/v2/deals/${id}/lose`, {
       method: "PUT",
-      body: JSON.stringify({ loss_reason: reason, loss_reason_detail: detail }),
+      body: JSON.stringify({ reason, detail }),
     });
   }
 

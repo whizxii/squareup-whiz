@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
-import { CRMLayout } from "@/components/crm/CRMLayout";
 import { CRMHeader } from "@/components/crm/CRMHeader";
 import { PipelineView } from "@/components/crm/PipelineView";
 import { TableView } from "@/components/crm/TableView";
@@ -119,7 +118,7 @@ export default function CRMPage() {
   }
 
   return (
-    <CRMLayout>
+    <>
       <CRMHeader />
 
       {/* Floating AI Copilot toggle */}
@@ -164,6 +163,6 @@ export default function CRMPage() {
         </div>
       </div>
 
-    </CRMLayout>
+    </>
   );
 }
