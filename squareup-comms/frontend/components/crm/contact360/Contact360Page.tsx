@@ -153,6 +153,9 @@ export function Contact360Page({ contactId, onBack }: Contact360PageProps) {
         company={c360.company}
         leadScore={c360.lead_score}
         relationship={c360.relationship}
+        activities={c360.activities}
+        recordings={c360.recordings}
+        calendarEvents={c360.calendar_events}
         onBack={onBack}
       />
 
@@ -205,17 +208,22 @@ export function Contact360Page({ contactId, onBack }: Contact360PageProps) {
             company={c360.company}
             deals={c360.deals}
             activities={c360.activities}
+            recordings={c360.recordings}
             leadScore={c360.lead_score}
             relationship={c360.relationship}
             enrichment={c360.enrichment}
             followUpSuggestions={c360.follow_up_suggestions}
             calendarEvents={c360.calendar_events}
+            contactId={contactId}
           />
         )}
 
         {activeTab === "timeline" && (
           <TimelineTab
             activities={c360.activities}
+            recordings={c360.recordings}
+            calendarEvents={c360.calendar_events}
+            notes={c360.notes}
             contactId={contactId}
           />
         )}

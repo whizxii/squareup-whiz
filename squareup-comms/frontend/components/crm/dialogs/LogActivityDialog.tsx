@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Phone, Mail, Users, FileText, Calendar, Paperclip, Upload, FileAudio, CheckCircle2, ChevronDown } from "lucide-react";
+import { X, Phone, Mail, Users, FileText, Calendar, Paperclip, Upload, FileAudio, CheckCircle2, ChevronDown, Sparkles } from "lucide-react";
 import {
   useCreateActivity,
   useCreateCalendarEvent,
@@ -10,6 +10,7 @@ import {
   useUploadRecording,
   useContact,
   useContacts,
+  useAICopilot,
 } from "@/lib/hooks/use-crm-queries";
 import type { Contact } from "@/lib/types/crm";
 import { cn } from "@/lib/utils";
@@ -142,6 +143,8 @@ export function LogActivityDialog({
   const createCalendar   = useCreateCalendarEvent();
   const updateContact    = useUpdateContact();
   const uploadRecording  = useUploadRecording();
+  const aiCopilot        = useAICopilot();
+  const [aiExtracting, setAiExtracting] = useState(false);
 
   // When no contactId is passed in (e.g. opened from global shortcut), let the user pick one
   const [pickedContactId, setPickedContactId]     = useState("");
@@ -187,12 +190,31 @@ export function LogActivityDialog({
       setRecordingFile(null);
       setFileError(null);
       setSubmitError(null);
+      setAiExtracting(false);
       if (!contactIdProp) {
         setPickedContactId("");
         setPickedContactName("");
       }
     }
   }, [open, contactIdProp]);
+
+  const handleAIExtract = useCallback(async () => {
+    if (!notes.trim() || aiExtracting) return;
+    setAiExtracting(true);
+    try {
+      const result = await aiCopilot.mutateAsync(
+        `Summarize this transcript in 2 sentences and list action items:\n\n${notes.trim()}`
+      );
+      if (result.message) {
+        setTldr(result.message);
+        toast.success("AI filled TLDR — edit as needed");
+      }
+    } catch {
+      toast.error("AI extraction failed — please fill TLDR manually");
+    } finally {
+      setAiExtracting(false);
+    }
+  }, [notes, aiExtracting, aiCopilot]);
 
   const selectType = useCallback((val: ActivityType, label?: string) => {
     setType(val);
@@ -465,6 +487,17 @@ export function LogActivityDialog({
                 rows={3}
                 className={cn(inputCls, "resize-none")}
               />
+              {notes.length > 200 && (
+                <button
+                  type="button"
+                  onClick={handleAIExtract}
+                  disabled={aiExtracting}
+                  className="mt-1.5 flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {aiExtracting ? "Extracting…" : "✨ Auto-summarize → Extract TLDR + Action Items"}
+                </button>
+              )}
             </div>
 
             {/* ── Recording upload ──────────────────────────────── */}

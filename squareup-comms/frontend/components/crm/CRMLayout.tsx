@@ -6,6 +6,100 @@ import {
   createKeyboardHandler,
   type KeyboardShortcut,
 } from "@/lib/crm-keyboard";
+import { CreateContactDialog } from "@/components/crm/dialogs/CreateContactDialog";
+import { EditContactDialog } from "@/components/crm/dialogs/EditContactDialog";
+import { LogActivityDialog } from "@/components/crm/dialogs/LogActivityDialog";
+import { CreateDealDialog } from "@/components/crm/dialogs/CreateDealDialog";
+import { LoseDealDialog } from "@/components/crm/dialogs/LoseDealDialog";
+import { CreateEventDialog } from "@/components/crm/dialogs/CreateEventDialog";
+import { UploadRecordingDialog } from "@/components/crm/dialogs/UploadRecordingDialog";
+import { ImportDialog } from "@/components/crm/dialogs/ImportDialog";
+import { ExportDialog } from "@/components/crm/dialogs/ExportDialog";
+import { MergeContactsDialog } from "@/components/crm/dialogs/MergeContactsDialog";
+import { CommandPalette } from "@/components/crm/CommandPalette";
+
+// ─── Dialog Manager — mounted on ALL CRM routes ──────────────────
+
+function CRMDialogManager() {
+  const dialog = useCRMUIStore((s) => s.dialog);
+  const closeDialog = useCRMUIStore((s) => s.closeDialog);
+
+  const editContactId =
+    dialog.type === "edit-contact"
+      ? (dialog.data?.contact_id as string | undefined) ?? null
+      : null;
+  const logActivityContactId =
+    dialog.type === "log-activity"
+      ? (dialog.data?.contact_id as string | undefined) ?? null
+      : null;
+  const createEventData = dialog.type === "create-event" ? dialog.data : null;
+  const uploadRecordingData =
+    dialog.type === "upload-recording" ? dialog.data : null;
+  const mergeData = dialog.type === "merge-contacts" ? dialog.data : null;
+
+  return (
+    <>
+      <CreateContactDialog
+        open={dialog.type === "create-contact"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+      />
+
+      <EditContactDialog
+        open={dialog.type === "edit-contact"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+        contactId={editContactId}
+      />
+
+      <LogActivityDialog
+        open={dialog.type === "log-activity"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+        contactId={logActivityContactId}
+      />
+
+      <CreateDealDialog
+        open={dialog.type === "create-deal"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+      />
+
+      <LoseDealDialog
+        open={dialog.type === "lose-deal"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+      />
+
+      <CreateEventDialog
+        open={dialog.type === "create-event"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+        defaultContactId={createEventData?.contact_id as string | undefined}
+        defaultDealId={createEventData?.deal_id as string | undefined}
+        defaultDate={createEventData?.date as string | undefined}
+      />
+
+      <UploadRecordingDialog
+        open={dialog.type === "upload-recording"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+        defaultContactId={uploadRecordingData?.contact_id as string | undefined}
+        defaultDealId={uploadRecordingData?.deal_id as string | undefined}
+      />
+
+      <ImportDialog
+        open={dialog.type === "import"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+      />
+
+      <ExportDialog
+        open={dialog.type === "export"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+      />
+
+      <MergeContactsDialog
+        open={dialog.type === "merge-contacts"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
+        primaryId={(mergeData?.primary_id as string) ?? null}
+        secondaryId={(mergeData?.secondary_id as string) ?? null}
+      />
+    </>
+  );
+}
 
 // ─── Error Boundary ──────────────────────────────────────────────
 
@@ -139,6 +233,8 @@ export function CRMLayout({ children }: CRMLayoutProps) {
     <CRMErrorBoundary>
       <div className="flex h-full flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
         {children}
+        <CRMDialogManager />
+        <CommandPalette />
       </div>
     </CRMErrorBoundary>
   );

@@ -4,8 +4,9 @@ import { useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
 import { InlineEdit } from "@/components/ui/InlineEdit";
 import { Badge, ScoreBadge } from "@/components/ui/Badge";
-import { useUpdateContact } from "@/lib/hooks/use-crm-queries";
+import { useUpdateContact, useNextActions } from "@/lib/hooks/use-crm-queries";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
+import { formatRelativeTime } from "@/lib/format";
 import type {
   Contact,
   Company,
@@ -13,6 +14,10 @@ import type {
   RelationshipStrength,
   CRMStage,
   STAGES,
+  Activity,
+  CallRecording,
+  CalendarEvent,
+  FollowUpSuggestion,
 } from "@/lib/types/crm";
 import {
   ArrowLeft,
@@ -26,6 +31,8 @@ import {
   GitMerge,
   ChevronDown,
   ClipboardList,
+  Sparkles,
+  X,
 } from "lucide-react";
 
 // ─── Stage selector colors ──────────────────────────────────────
@@ -99,6 +106,65 @@ function RelationshipRing({
   );
 }
 
+// ─── AI Next-Actions Banner ─────────────────────────────────────
+
+function AIActionsBanner({
+  suggestion,
+  onLogCall,
+  onSchedule,
+  onDismiss,
+}: {
+  suggestion: FollowUpSuggestion;
+  onLogCall: () => void;
+  onSchedule: () => void;
+  onDismiss: () => void;
+}) {
+  const priorityColor =
+    suggestion.priority === "high"
+      ? "border-amber-400/50 bg-amber-50/80 dark:bg-amber-950/30"
+      : "border-blue-400/50 bg-blue-50/80 dark:bg-blue-950/30";
+
+  return (
+    <div
+      className={cn(
+        "mt-3 rounded-lg border px-3 py-2 flex items-start gap-2",
+        priorityColor
+      )}
+    >
+      <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-foreground leading-snug">
+          {suggestion.action}
+        </p>
+        <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+          {suggestion.reasoning}
+        </p>
+        <div className="flex items-center gap-2 mt-1.5">
+          <button
+            onClick={onLogCall}
+            className="text-[11px] text-primary font-medium hover:underline"
+          >
+            📞 Log Call
+          </button>
+          <span className="text-muted-foreground text-[11px]">·</span>
+          <button
+            onClick={onSchedule}
+            className="text-[11px] text-primary font-medium hover:underline"
+          >
+            📅 Schedule
+          </button>
+        </div>
+      </div>
+      <button
+        onClick={onDismiss}
+        className="p-0.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
 // ─── Contact Header ─────────────────────────────────────────────
 
 interface ContactHeaderProps {
@@ -106,6 +172,9 @@ interface ContactHeaderProps {
   company?: Company;
   leadScore?: LeadScore;
   relationship?: RelationshipStrength;
+  activities: Activity[];
+  recordings: CallRecording[];
+  calendarEvents: CalendarEvent[];
   onBack: () => void;
 }
 
@@ -114,12 +183,19 @@ export function ContactHeader({
   company,
   leadScore,
   relationship,
+  activities,
+  recordings,
+  calendarEvents,
   onBack,
 }: ContactHeaderProps) {
   const updateContact = useUpdateContact();
   const openDialog = useCRMUIStore((s) => s.openDialog);
   const [stageOpen, setStageOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  const { data: nextActions } = useNextActions(contact.id);
+  const topAction = !bannerDismissed ? (nextActions?.[0] ?? null) : null;
 
   const handleUpdateField = useCallback(
     (field: string, value: string) => {
@@ -144,6 +220,11 @@ export function ContactHeader({
     },
     [contact.id, updateContact]
   );
+
+  const lastActivityTime = contact.last_activity_at ?? activities[0]?.created_at;
+  const nextEvent = calendarEvents
+    .filter((e) => e.status === "scheduled" && new Date(e.start_at) > new Date())
+    .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())[0];
 
   return (
     <div className="border-b border-border bg-background px-6 py-4">
@@ -285,7 +366,7 @@ export function ContactHeader({
               openDialog("log-activity", { contact_id: contact.id, contact_name: contact.name })
             }
             className="p-2 rounded-lg border border-border hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-            title="Log activity"
+            title="Log activity (⌘⇧A)"
           >
             <ClipboardList className="w-4 h-4" />
           </button>
@@ -350,6 +431,54 @@ export function ContactHeader({
           </div>
         </div>
       </div>
+
+      {/* AI next-actions banner */}
+      {topAction && (
+        <AIActionsBanner
+          suggestion={topAction}
+          onLogCall={() => {
+            openDialog("log-activity", { contact_id: contact.id, contact_name: contact.name });
+            setBannerDismissed(true);
+          }}
+          onSchedule={() => {
+            openDialog("create-event", { contact_id: contact.id });
+            setBannerDismissed(true);
+          }}
+          onDismiss={() => setBannerDismissed(true)}
+        />
+      )}
+
+      {/* Live status strip */}
+      {(lastActivityTime || nextEvent || recordings.length > 0) && (
+        <div className="mt-3 pt-3 border-t border-border flex items-center gap-2 flex-wrap">
+          {lastActivityTime && (
+            <span className="text-[11px] text-muted-foreground">
+              Last activity: {formatRelativeTime(lastActivityTime)}
+            </span>
+          )}
+          {nextEvent && (
+            <>
+              <span className="text-[11px] text-muted-foreground">·</span>
+              <span className="text-[11px] text-muted-foreground">
+                Next event:{" "}
+                {new Date(nextEvent.start_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
+            </>
+          )}
+          {recordings.length > 0 && (
+            <>
+              <span className="text-[11px] text-muted-foreground">·</span>
+              <span className="text-[11px] text-muted-foreground">
+                {recordings.length} recording
+                {recordings.length !== 1 ? "s" : ""}
+              </span>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

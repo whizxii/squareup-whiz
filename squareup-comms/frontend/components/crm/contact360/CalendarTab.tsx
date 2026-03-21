@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { useCalendarEvents } from "@/lib/hooks/use-crm-queries";
+import { useCalendarEvents, useMeetingPrep } from "@/lib/hooks/use-crm-queries";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
 import { formatDate, formatTime, formatRelativeTime } from "@/lib/format";
 import { EVENT_TYPE_CONFIG, STATUS_BADGES } from "../calendar-constants";
@@ -17,16 +17,125 @@ import {
   Plus,
   AlertCircle,
   AlertTriangle,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Lightbulb,
+  MessageSquare,
+  Shield,
 } from "lucide-react";
+
+// ─── Meeting Prep Panel ─────────────────────────────────────────
+
+function MeetingPrepPanel({ eventId }: { eventId: string }) {
+  const { data: prep, isLoading, error } = useMeetingPrep(eventId, { enabled: true });
+
+  if (isLoading) {
+    return (
+      <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} height={12} className="rounded" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error || !prep) {
+    return (
+      <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3">
+        <p className="text-[11px] text-muted-foreground">Could not load meeting prep. Try again.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-3">
+      {/* Contact context */}
+      {prep.contact_summary && (
+        <div>
+          <p className="text-[10px] font-semibold text-foreground mb-0.5">Contact Context</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{prep.contact_summary}</p>
+        </div>
+      )}
+
+      {/* Recent interactions */}
+      {prep.recent_interactions.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-foreground mb-1">Recent Interactions</p>
+          <ul className="space-y-0.5">
+            {prep.recent_interactions.map((interaction, i) => (
+              <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1">
+                <span className="text-muted-foreground/50 shrink-0">·</span>
+                {interaction}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Talking points */}
+      {prep.talking_points.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-foreground mb-1 flex items-center gap-1">
+            <Lightbulb className="w-2.5 h-2.5 text-primary" /> Talking Points
+          </p>
+          <ul className="space-y-0.5">
+            {prep.talking_points.map((point, i) => (
+              <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1">
+                <span className="text-primary shrink-0">{i + 1}.</span>
+                {point}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Potential objections */}
+      {prep.potential_objections.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-foreground mb-1 flex items-center gap-1">
+            <Shield className="w-2.5 h-2.5 text-amber-500" /> Potential Objections
+          </p>
+          <ul className="space-y-0.5">
+            {prep.potential_objections.map((obj, i) => (
+              <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1">
+                <span className="text-amber-500 shrink-0">·</span>
+                {obj}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Open action items */}
+      {prep.open_action_items.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-foreground mb-1 flex items-center gap-1">
+            <MessageSquare className="w-2.5 h-2.5 text-blue-500" /> Open Action Items
+          </p>
+          <ul className="space-y-0.5">
+            {prep.open_action_items.map((item, i) => (
+              <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1">
+                <span className="text-blue-500 shrink-0">·</span>
+                {item.text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Event Row ──────────────────────────────────────────────────
 
-function ContactEventRow({ event }: { event: CalendarEvent }) {
+function ContactEventRow({ event, showPrep }: { event: CalendarEvent; showPrep?: boolean }) {
   const config = EVENT_TYPE_CONFIG[event.event_type] || EVENT_TYPE_CONFIG.meeting;
   const Icon = config.icon;
   const statusBadge = STATUS_BADGES[event.status];
   const isPast = new Date(event.start_at) < new Date();
   const isOverdue = event.status === "scheduled" && isPast;
+  const [prepOpen, setPrepOpen] = useState(false);
 
   return (
     <div
@@ -107,7 +216,23 @@ function ContactEventRow({ event }: { event: CalendarEvent }) {
                 <Video className="w-3 h-3" /> Join
               </a>
             )}
+            {showPrep && (
+              <button
+                onClick={() => setPrepOpen((v) => !v)}
+                className="ml-auto flex items-center gap-0.5 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors"
+                title="AI meeting prep"
+              >
+                <Sparkles className="w-2.5 h-2.5" />
+                {prepOpen ? (
+                  <>Hide prep <ChevronUp className="w-2.5 h-2.5" /></>
+                ) : (
+                  <>✨ Prep <ChevronDown className="w-2.5 h-2.5" /></>
+                )}
+              </button>
+            )}
           </div>
+
+          {prepOpen && <MeetingPrepPanel eventId={event.id} />}
         </div>
 
         <span className="text-[10px] text-muted-foreground shrink-0">
@@ -203,7 +328,7 @@ export function CalendarTab({ contactId }: CalendarTabProps) {
           </h3>
           <div className="space-y-2">
             {upcoming.map((ev) => (
-              <ContactEventRow key={ev.id} event={ev} />
+              <ContactEventRow key={ev.id} event={ev} showPrep />
             ))}
           </div>
         </div>

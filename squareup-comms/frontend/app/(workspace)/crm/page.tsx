@@ -8,20 +8,12 @@ import { PipelineView } from "@/components/crm/PipelineView";
 import { TableView } from "@/components/crm/TableView";
 import { LeadScoringView } from "@/components/crm/LeadScoringView";
 import { AICopilotPanel } from "@/components/crm/AICopilotPanel";
-import { CreateContactDialog } from "@/components/crm/dialogs/CreateContactDialog";
-import { EditContactDialog } from "@/components/crm/dialogs/EditContactDialog";
-import { LogActivityDialog } from "@/components/crm/dialogs/LogActivityDialog";
 import { SequencesView } from "@/components/crm/sequences/SequencesView";
 import { WorkflowsView } from "@/components/crm/WorkflowBuilder";
 import { SmartListsView } from "@/components/crm/SmartListView";
 import { CalendarView } from "@/components/crm/CalendarView";
 import { DashboardView } from "@/components/crm/DashboardView";
 import { AnalyticsView } from "@/components/crm/AnalyticsView";
-import { CreateEventDialog } from "@/components/crm/dialogs/CreateEventDialog";
-import { UploadRecordingDialog } from "@/components/crm/dialogs/UploadRecordingDialog";
-import { ImportDialog } from "@/components/crm/dialogs/ImportDialog";
-import { ExportDialog } from "@/components/crm/dialogs/ExportDialog";
-import { MergeContactsDialog } from "@/components/crm/dialogs/MergeContactsDialog";
 import AutomationFeed from "@/components/crm/AutomationFeed";
 import WeeklyDigestView from "@/components/crm/WeeklyDigestView";
 import { CompaniesView } from "@/components/crm/CompaniesView";
@@ -100,8 +92,6 @@ function ActiveView({ view }: { view: CRMView }) {
 
 export default function CRMPage() {
   const activeView = useCRMUIStore((s) => s.activeView);
-  const dialog = useCRMUIStore((s) => s.dialog);
-  const closeDialog = useCRMUIStore((s) => s.closeDialog);
   const openDialog = useCRMUIStore((s) => s.openDialog);
   const searchQuery = useCRMUIStore((s) => s.searchQuery);
   const [copilotOpen, setCopilotOpen] = useState(false);
@@ -127,17 +117,6 @@ export default function CRMPage() {
       setSeeding(false);
     }
   }
-
-  // Dialog data helpers
-  const editContactId = dialog.type === "edit-contact"
-    ? (dialog.data?.contact_id as string | undefined) ?? null
-    : null;
-  const logActivityContactId = dialog.type === "log-activity"
-    ? (dialog.data?.contact_id as string | undefined) ?? null
-    : null;
-  const createEventData = dialog.type === "create-event" ? dialog.data : null;
-  const uploadRecordingData = dialog.type === "upload-recording" ? dialog.data : null;
-  const mergeData = dialog.type === "merge-contacts" ? dialog.data : null;
 
   return (
     <CRMLayout>
@@ -185,55 +164,6 @@ export default function CRMPage() {
         </div>
       </div>
 
-      {/* Dialogs driven by UI store */}
-      <CreateContactDialog
-        open={dialog.type === "create-contact"}
-        onOpenChange={(open) => { if (!open) closeDialog(); }}
-      />
-
-      <EditContactDialog
-        open={dialog.type === "edit-contact"}
-        onOpenChange={(open) => { if (!open) closeDialog(); }}
-        contactId={editContactId}
-      />
-
-      <LogActivityDialog
-        open={dialog.type === "log-activity"}
-        onOpenChange={(open) => { if (!open) closeDialog(); }}
-        contactId={logActivityContactId}
-      />
-
-      <CreateEventDialog
-        open={dialog.type === "create-event"}
-        onOpenChange={(open) => { if (!open) closeDialog(); }}
-        defaultContactId={createEventData?.contact_id as string | undefined}
-        defaultDealId={createEventData?.deal_id as string | undefined}
-        defaultDate={createEventData?.date as string | undefined}
-      />
-
-      <UploadRecordingDialog
-        open={dialog.type === "upload-recording"}
-        onOpenChange={(open) => { if (!open) closeDialog(); }}
-        defaultContactId={uploadRecordingData?.contact_id as string | undefined}
-        defaultDealId={uploadRecordingData?.deal_id as string | undefined}
-      />
-
-      <ImportDialog
-        open={dialog.type === "import"}
-        onOpenChange={(open) => { if (!open) closeDialog(); }}
-      />
-
-      <ExportDialog
-        open={dialog.type === "export"}
-        onOpenChange={(open) => { if (!open) closeDialog(); }}
-      />
-
-      <MergeContactsDialog
-        open={dialog.type === "merge-contacts"}
-        onOpenChange={(open) => { if (!open) closeDialog(); }}
-        primaryId={(mergeData?.primary_id as string) ?? null}
-        secondaryId={(mergeData?.secondary_id as string) ?? null}
-      />
     </CRMLayout>
   );
 }

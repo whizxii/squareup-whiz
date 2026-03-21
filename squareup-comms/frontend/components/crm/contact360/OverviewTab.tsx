@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 import { InlineEdit } from "@/components/ui/InlineEdit";
 import { Badge, ScoreBadge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { useUpdateContact } from "@/lib/hooks/use-crm-queries";
+import { useUpdateContact, useContactEmails, useScoreContact } from "@/lib/hooks/use-crm-queries";
+import { toast } from "@/lib/stores/toast-store";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
 import { formatCurrency, formatRelativeTime } from "@/lib/format";
 import type {
@@ -18,6 +19,8 @@ import type {
   ContactEnrichment,
   FollowUpSuggestion,
   CalendarEvent,
+  CallRecording,
+  Email,
 } from "@/lib/types/crm";
 import {
   Mail,
@@ -41,6 +44,7 @@ import {
   FileText,
   Bot,
   Clock,
+  Mic,
 } from "lucide-react";
 
 // ─── Contact Info Card ──────────────────────────────────────────
@@ -84,7 +88,9 @@ function InfoRow({
 
 // ─── Lead Score Widget ──────────────────────────────────────────
 
-function LeadScoreWidget({ score }: { score: LeadScore }) {
+function LeadScoreWidget({ score, contactId }: { score: LeadScore; contactId: string }) {
+  const scoreContact = useScoreContact();
+
   const trendIcon =
     score.score_trend === "rising" ? (
       <TrendingUp className="w-3.5 h-3.5 text-green-500" />
@@ -101,6 +107,13 @@ function LeadScoreWidget({ score }: { score: LeadScore }) {
         ? "text-yellow-600"
         : "text-red-600";
 
+  const scoreLabel =
+    score.overall_score >= 70
+      ? "Hot Lead"
+      : score.overall_score >= 40
+        ? "Warm Lead"
+        : "Cold Lead";
+
   return (
     <div className="rounded-xl border border-border p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -108,11 +121,25 @@ function LeadScoreWidget({ score }: { score: LeadScore }) {
           <Sparkles className="w-3.5 h-3.5 text-primary" />
           Lead Score
         </h4>
-        <div className="flex items-center gap-1">
-          {trendIcon}
-          <span className="text-[10px] text-muted-foreground capitalize">
-            {score.score_trend}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            {trendIcon}
+            <span className="text-[10px] text-muted-foreground capitalize">
+              {score.score_trend}
+            </span>
+          </div>
+          <button
+            onClick={() => scoreContact.mutate(contactId, {
+              onSuccess: () => toast.success("Lead score updated"),
+              onError: () => toast.error("Failed to recalculate score"),
+            })}
+            disabled={scoreContact.isPending}
+            className="text-[10px] text-primary hover:text-primary/80 font-medium flex items-center gap-0.5 disabled:opacity-50 transition-opacity"
+            title="Recalculate lead score"
+          >
+            <Sparkles className="w-2.5 h-2.5" />
+            {scoreContact.isPending ? "…" : "Recalculate"}
+          </button>
         </div>
       </div>
 
@@ -120,7 +147,10 @@ function LeadScoreWidget({ score }: { score: LeadScore }) {
         <span className={cn("text-3xl font-bold font-mono", scoreColor)}>
           {score.overall_score}
         </span>
-        <span className="text-xs text-muted-foreground">/100</span>
+        <div className="flex flex-col">
+          <span className="text-xs text-muted-foreground">/100</span>
+          <span className={cn("text-[10px] font-semibold", scoreColor)}>{scoreLabel}</span>
+        </div>
       </div>
 
       {/* Breakdown bars */}
@@ -334,6 +364,223 @@ function RecentActivities({ activities }: { activities: Activity[] }) {
   );
 }
 
+// ─── Last Interaction Card ──────────────────────────────────────
+
+function LastInteractionCard({
+  activities,
+  onViewTimeline,
+}: {
+  activities: Activity[];
+  onViewTimeline: () => void;
+}) {
+  const latest = activities[0];
+  if (!latest) return null;
+
+  const icon = ACTIVITY_ICON_MAP[latest.type] ?? <Zap className="w-3 h-3" />;
+
+  return (
+    <div className="rounded-xl border border-border p-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-primary" />
+          Last Interaction
+        </h4>
+        <span className="text-[10px] text-muted-foreground">
+          {formatRelativeTime(latest.created_at)}
+        </span>
+      </div>
+      <div className="flex items-start gap-2">
+        <div className="w-6 h-6 rounded-md bg-muted/50 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium truncate capitalize">
+            {latest.title || latest.type}
+          </p>
+          {latest.content && (
+            <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">
+              {latest.content}
+            </p>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={onViewTimeline}
+        className="text-[11px] text-primary font-medium hover:underline"
+      >
+        View full timeline →
+      </button>
+    </div>
+  );
+}
+
+// ─── Next Up Card ────────────────────────────────────────────────
+
+function NextUpCard({
+  contact,
+  calendarEvents,
+  onPrepMeeting,
+  onReschedule,
+}: {
+  contact: Contact;
+  calendarEvents: CalendarEvent[];
+  onPrepMeeting: (eventId: string) => void;
+  onReschedule: () => void;
+}) {
+  const nextEvent = calendarEvents
+    .filter((e) => e.status === "scheduled" && new Date(e.start_at) > new Date())
+    .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())[0];
+
+  const followUpDate = contact.next_follow_up_at
+    ? new Date(contact.next_follow_up_at)
+    : null;
+
+  const hasFollowUp = followUpDate && followUpDate > new Date();
+
+  if (!nextEvent && !hasFollowUp) return null;
+
+  const displayDate = nextEvent ? new Date(nextEvent.start_at) : followUpDate!;
+  const displayTitle = nextEvent
+    ? nextEvent.title
+    : (contact.follow_up_note ?? "Follow-up");
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+      <h4 className="text-xs font-semibold flex items-center gap-1.5">
+        <Calendar className="w-3.5 h-3.5 text-primary" />
+        Next Up
+      </h4>
+      <div>
+        <p className="text-xs font-medium">{displayTitle}</p>
+        <p className="text-[11px] text-muted-foreground">
+          {displayDate.toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        {nextEvent && (
+          <button
+            onClick={() => onPrepMeeting(nextEvent.id)}
+            className="text-[11px] px-2 py-1 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+          >
+            ✨ Prep for meeting
+          </button>
+        )}
+        <button
+          onClick={onReschedule}
+          className="text-[11px] text-muted-foreground hover:text-foreground font-medium"
+        >
+          Reschedule
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Recordings Summary Card ─────────────────────────────────────
+
+function RecordingsSummaryCard({
+  recordings,
+  onViewRecordings,
+}: {
+  recordings: CallRecording[];
+  onViewRecordings: () => void;
+}) {
+  const latest = recordings[0];
+  if (!latest) return null;
+
+  const sentimentColor =
+    latest.ai_sentiment === "positive"
+      ? "text-green-600"
+      : latest.ai_sentiment === "negative"
+        ? "text-red-600"
+        : latest.ai_sentiment === "mixed"
+          ? "text-yellow-600"
+          : "text-muted-foreground";
+
+  return (
+    <div className="rounded-xl border border-border p-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold flex items-center gap-1.5">
+          <Mic className="w-3.5 h-3.5 text-primary" />
+          Latest Recording
+        </h4>
+        <span className="text-[10px] text-muted-foreground">
+          {formatRelativeTime(latest.created_at)}
+        </span>
+      </div>
+      <p className="text-xs font-medium truncate">{latest.title}</p>
+      {latest.ai_summary && (
+        <p className={cn("text-[11px] line-clamp-2", sentimentColor)}>
+          {latest.ai_summary}
+        </p>
+      )}
+      {latest.ai_action_items.length > 0 && (
+        <p className="text-[10px] text-muted-foreground">
+          {latest.ai_action_items.length} action item
+          {latest.ai_action_items.length !== 1 ? "s" : ""}
+        </p>
+      )}
+      <button
+        onClick={onViewRecordings}
+        className="text-[11px] text-primary font-medium hover:underline"
+      >
+        View recordings →
+      </button>
+    </div>
+  );
+}
+
+// ─── Email Engagement Card ───────────────────────────────────────
+
+function EmailEngagementCard({
+  emails,
+  onViewEmails,
+}: {
+  emails: Email[];
+  onViewEmails: () => void;
+}) {
+  if (emails.length === 0) return null;
+
+  const sent = emails.filter((e) => e.direction === "outbound").length;
+  const opened = emails.filter((e) => e.opened_at != null).length;
+  const replied = emails.filter((e) => e.status === "replied").length;
+
+  return (
+    <div className="rounded-xl border border-border p-4 space-y-2">
+      <h4 className="text-xs font-semibold flex items-center gap-1.5">
+        <Mail className="w-3.5 h-3.5 text-primary" />
+        Email Engagement
+      </h4>
+      <div className="flex items-center gap-4">
+        <div className="text-center">
+          <p className="text-base font-bold font-mono">{sent}</p>
+          <p className="text-[10px] text-muted-foreground">sent</p>
+        </div>
+        <div className="text-center">
+          <p className="text-base font-bold font-mono">{opened}</p>
+          <p className="text-[10px] text-muted-foreground">opened</p>
+        </div>
+        <div className="text-center">
+          <p className="text-base font-bold font-mono">{replied}</p>
+          <p className="text-[10px] text-muted-foreground">replied</p>
+        </div>
+      </div>
+      <button
+        onClick={onViewEmails}
+        className="text-[11px] text-primary font-medium hover:underline"
+      >
+        View emails →
+      </button>
+    </div>
+  );
+}
+
 // ─── Overview Tab ───────────────────────────────────────────────
 
 interface OverviewTabProps {
@@ -341,11 +588,13 @@ interface OverviewTabProps {
   company?: Company;
   deals: Deal[];
   activities: Activity[];
+  recordings: CallRecording[];
   leadScore?: LeadScore;
   relationship?: RelationshipStrength;
   enrichment?: ContactEnrichment;
   followUpSuggestions: FollowUpSuggestion[];
   calendarEvents: CalendarEvent[];
+  contactId: string;
 }
 
 export function OverviewTab({
@@ -353,14 +602,20 @@ export function OverviewTab({
   company,
   deals,
   activities,
+  recordings,
   leadScore,
   relationship,
   enrichment,
   followUpSuggestions,
   calendarEvents,
+  contactId,
 }: OverviewTabProps) {
   const updateContact = useUpdateContact();
   const openDialog = useCRMUIStore((s) => s.openDialog);
+  const setActiveTab = useCRMUIStore((s) => s.setActiveTab);
+
+  const { data: emailsData } = useContactEmails(contactId);
+  const emails: Email[] = emailsData ?? [];
 
   const handleUpdateField = useCallback(
     (field: string, value: string) => {
@@ -372,14 +627,34 @@ export function OverviewTab({
     [contact.id, updateContact]
   );
 
-  const nextEvent = calendarEvents
-    .filter((e) => e.status === "scheduled" && new Date(e.start_at) > new Date())
-    .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())[0];
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 p-6">
       {/* Left column — Contact info */}
       <div className="lg:col-span-3 space-y-5">
+        {/* Cross-tab summary cards */}
+        <LastInteractionCard
+          activities={activities}
+          onViewTimeline={() => setActiveTab("timeline")}
+        />
+        <NextUpCard
+          contact={contact}
+          calendarEvents={calendarEvents}
+          onPrepMeeting={(eventId) =>
+            openDialog("create-event", { contact_id: contact.id, event_id: eventId })
+          }
+          onReschedule={() =>
+            openDialog("create-event", { contact_id: contact.id })
+          }
+        />
+        <RecordingsSummaryCard
+          recordings={recordings}
+          onViewRecordings={() => setActiveTab("recordings")}
+        />
+        <EmailEngagementCard
+          emails={emails}
+          onViewEmails={() => setActiveTab("emails")}
+        />
+
         {/* Contact details card */}
         <div className="rounded-xl border border-border p-4 space-y-1">
           <h4 className="text-xs font-semibold mb-2">Contact Information</h4>
@@ -526,43 +801,10 @@ export function OverviewTab({
       {/* Right column — AI insights */}
       <div className="lg:col-span-2 space-y-5">
         {/* Lead Score */}
-        {leadScore && <LeadScoreWidget score={leadScore} />}
+        {leadScore && <LeadScoreWidget score={leadScore} contactId={contactId} />}
 
         {/* Enrichment */}
         {enrichment && <EnrichmentPanel enrichment={enrichment} />}
-
-        {/* Next scheduled event */}
-        {nextEvent && (
-          <div className="rounded-xl border border-border p-4 space-y-2">
-            <h4 className="text-xs font-semibold flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-primary" />
-              Next Event
-            </h4>
-            <div>
-              <p className="text-xs font-medium">{nextEvent.title}</p>
-              <p className="text-[11px] text-muted-foreground">
-                {new Date(nextEvent.start_at).toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </p>
-              {nextEvent.meeting_url && (
-                <a
-                  href={nextEvent.meeting_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] text-primary hover:underline flex items-center gap-1 mt-1"
-                >
-                  Join Meeting
-                  <ExternalLink className="w-2.5 h-2.5" />
-                </a>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Follow-up suggestions */}
         {followUpSuggestions.length > 0 && (
