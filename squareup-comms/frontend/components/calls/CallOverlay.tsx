@@ -329,16 +329,15 @@ export function CallOverlay() {
     }
   }, [isInCall, token, livekitUrl]);
 
-  // Zero-retry reconnect policy + force TURN relay.
-  // reconnectPolicy: null disables the application-level reconnect loop (we rely
-  // on the circuit breaker + 5 s disconnect-delay instead).
-  // rtcConfig iceTransportPolicy: "relay" forces all WebRTC traffic through
-  // LiveKit Cloud's TURN servers, bypassing symmetric-NAT / firewall ICE
-  // failures that would otherwise cause `could not establish pc connection`.
+  // Zero-retry reconnect policy.
+  // nextRetryDelayInMs returning null disables the application-level reconnect
+  // loop (circuit breaker + 5 s disconnect-delay handle recovery instead).
+  // Do NOT set iceTransportPolicy: "relay" here — forcing relay-only prevents
+  // host/STUN candidates from being tried, which causes guaranteed ICE failure
+  // if LiveKit's TURN is unreachable on the client's network.
   const livekitOptions = useMemo(
     () => ({
       reconnectPolicy: { nextRetryDelayInMs: () => null as null },
-      rtcConfig: { iceTransportPolicy: "relay" as RTCIceTransportPolicy },
     }),
     [],
   );
