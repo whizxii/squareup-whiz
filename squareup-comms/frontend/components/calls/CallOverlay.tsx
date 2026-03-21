@@ -56,15 +56,26 @@ function ActiveCallUI() {
   const remoteParticipants = useRemoteParticipants();
   const connectionState = useConnectionState();
 
-  // Sync store mute/video state with actual LiveKit tracks — only when connected
+  // Sync store mute/video state with actual LiveKit tracks — only when connected.
+  // Catch NotAllowedError (browser mic/camera permission denied) so it doesn't
+  // propagate as an unhandled rejection and trigger the disconnect chain.
   useEffect(() => {
     if (connectionState !== ConnectionState.Connected) return;
-    localParticipant.setMicrophoneEnabled(!isMuted);
+    localParticipant.setMicrophoneEnabled(!isMuted).catch((err: unknown) => {
+      if ((err as { name?: string })?.name === "NotAllowedError") {
+        // Permission denied — force muted state in store so UI stays consistent
+        if (!isMuted) useCallStore.getState().toggleMute();
+      }
+    });
   }, [isMuted, localParticipant, connectionState]);
 
   useEffect(() => {
     if (connectionState !== ConnectionState.Connected) return;
-    localParticipant.setCameraEnabled(!isVideoOff);
+    localParticipant.setCameraEnabled(!isVideoOff).catch((err: unknown) => {
+      if ((err as { name?: string })?.name === "NotAllowedError") {
+        if (!isVideoOff) useCallStore.getState().toggleVideo();
+      }
+    });
   }, [isVideoOff, localParticipant, connectionState]);
 
   // Sync LiveKit remote participants into call store so other components can read them.
@@ -335,9 +346,13 @@ export function CallOverlay() {
     useCallStore.getState().leaveCall();
   }, []);
 
-  const handleError = useCallback(() => {
+  const handleError = useCallback((err?: Error) => {
     setShouldConnect(false);
-    useCallStore.getState().recordCallFailure();
+    // Permission errors (mic/camera denied) are user-side — don't penalise the
+    // circuit breaker, which is intended for server-side auth/network failures.
+    if (err?.name !== "NotAllowedError") {
+      useCallStore.getState().recordCallFailure();
+    }
     useCallStore.getState().leaveCall();
   }, []);
 
@@ -395,7 +410,7 @@ export function CallOverlay() {
           serverUrl={livekitUrl}
           token={token}
           connect={true}
-          audio={true}
+          audio={false}
           video={false}
           onDisconnected={handleDisconnected}
           onError={handleError}
