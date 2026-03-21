@@ -169,7 +169,7 @@ export const useCallStore = create<CallState>((set, get) => ({
       const next = s.consecutiveFailures + 1;
       return {
         consecutiveFailures: next,
-        callDisabledUntil: next >= 3 ? Date.now() + 60_000 : s.callDisabledUntil,
+        callDisabledUntil: next >= 3 ? Date.now() + 600_000 : s.callDisabledUntil,
       };
     }),
 

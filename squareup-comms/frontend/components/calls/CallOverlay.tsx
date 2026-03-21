@@ -67,7 +67,10 @@ function ActiveCallUI() {
     localParticipant.setCameraEnabled(!isVideoOff);
   }, [isVideoOff, localParticipant, connectionState]);
 
-  // Sync LiveKit remote participants into call store so other components can read them
+  // Sync LiveKit remote participants into call store so other components can read them.
+  // Use a stable string key to avoid firing on every render (useRemoteParticipants returns
+  // a new array reference each render even when the participant set hasn't changed).
+  const participantKey = remoteParticipants.map((p) => p.identity).join(",");
   useEffect(() => {
     useCallStore.getState().setParticipants(
       remoteParticipants.map((p) => ({
@@ -78,7 +81,8 @@ function ActiveCallUI() {
         isSpeaking: p.isSpeaking,
       })),
     );
-  }, [remoteParticipants]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participantKey]);
 
   // Clear participants when this component unmounts (call ended)
   useEffect(() => {
