@@ -235,6 +235,46 @@ class CopilotService(BaseService):
             f"At-risk deals:\n{risk_text}"
         )
 
+    # Field map: normalized query keyword → CRMContact attribute name
+    _FIELD_MAP: dict[str, str] = {
+        "phone": "phone",
+        "phone number": "phone",
+        "number": "phone",
+        "contact": "phone",
+        "email": "email",
+        "email address": "email",
+        "stage": "lead_stage",
+        "lead stage": "lead_stage",
+        "company": "company",
+        "title": "title",
+        "role": "title",
+        "score": "lead_score",
+        "lead score": "lead_score",
+    }
+
+    # Stop words stripped from the end of a captured name
+    _NAME_STOP_WORDS = frozenset(
+        {"in", "at", "from", "the", "for", "by", "on", "contacts", "contact", "and", "or"}
+    )
+
+    def _strip_name_stop_words(self, name: str) -> str:
+        """Remove trailing stop-words from a captured name fragment."""
+        words = name.split()
+        while words and words[-1].lower() in self._NAME_STOP_WORDS:
+            words = words[:-1]
+        return " ".join(words)
+
+    def _resolve_field(self, raw: str) -> str | None:
+        """Return the CRMContact attribute for a raw field string, or None."""
+        key = raw.lower().strip()
+        if key in self._FIELD_MAP:
+            return self._FIELD_MAP[key]
+        # partial match (e.g. "lead stage" captured as two tokens)
+        for k, v in self._FIELD_MAP.items():
+            if k in key:
+                return v
+        return None
+
     async def _handle_db_intent(self, query: str) -> CopilotResponse | None:
         """Try to answer common CRM queries directly from the DB. Returns None if no intent matched."""
         from sqlalchemy import select, func
@@ -242,6 +282,21 @@ class CopilotService(BaseService):
         from app.models.crm_deal import CRMDeal
 
         normalized = query.lower().strip()
+
+        # Guard: pronoun-only references — "what is it's stage?", "what is their email?"
+        _FIELD_KEYWORDS = r"stage|company|title|phone|email|score|pipeline|role|lead"
+        if re.search(r"\b(it|its|it's|them|their|he|she|his|her)\b", normalized) and re.search(
+            _FIELD_KEYWORDS, normalized
+        ):
+            return CopilotResponse(
+                type="clarification",
+                message=(
+                    "Could you specify which contact you mean? For example:\n\n"
+                    "- \"What is **Priya Patel**'s stage?\"\n"
+                    "- \"What is the company of **Vishrut**?\""
+                ),
+                data=None,
+            )
 
         # Intent: count contacts by stage — "how many leads in qualified"
         stage_count_match = re.search(
@@ -321,39 +376,90 @@ class CopilotService(BaseService):
             except Exception:
                 pass
 
-        # Intent: contact field lookup — "what's [name]'s phone number?", "what is [name]'s email?"
-        phone_lookup_match = re.search(
-            r"what(?:'s|\s+is)\s+(\w+(?:\s+\w+)?)'s?\s+(?:phone(?:\s+number)?|email(?:\s+address)?|number|contact)",
+        # Intent: contact field lookup
+        # Pattern A — possessive: "what's [name]'s [field]?" / "what is [name]'s [field]?"
+        _FIELD_PAT = (
+            r"(?:phone(?:\s+number)?|email(?:\s+address)?|number|contact"
+            r"|stage|lead\s+stage|company|title|role|score|lead\s+score)"
+        )
+        possessive_match = re.search(
+            rf"what(?:'s|\s+is)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)'s?\s+({_FIELD_PAT})",
             normalized,
         )
-        if phone_lookup_match:
-            name_query = phone_lookup_match.group(1).strip()
-            field = "email" if "email" in normalized else "phone"
+        # Pattern B — "of" form: "what is the [field] of [name]?"
+        of_match = re.search(
+            rf"what(?:'s|\s+is)\s+(?:the\s+)?({_FIELD_PAT})\s+of\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)",
+            normalized,
+        )
+
+        field_lookup_name: str | None = None
+        field_lookup_fields: list[str] = []
+
+        if possessive_match:
+            field_lookup_name = self._strip_name_stop_words(possessive_match.group(1))
+            resolved = self._resolve_field(possessive_match.group(2))
+            if resolved:
+                field_lookup_fields = [resolved]
+        elif of_match:
+            field_lookup_name = self._strip_name_stop_words(of_match.group(2))
+            resolved = self._resolve_field(of_match.group(1))
+            if resolved:
+                field_lookup_fields = [resolved]
+
+        # Multi-field variant: "what is priya patel's stage and company"
+        if possessive_match and not field_lookup_fields:
+            pass  # handled below as fallthrough
+        elif possessive_match or of_match:
+            # Also collect additional fields from the remainder of the query
+            for raw_key in self._FIELD_MAP:
+                attr = self._FIELD_MAP[raw_key]
+                if raw_key in normalized and attr not in field_lookup_fields:
+                    field_lookup_fields.append(attr)
+            # Deduplicate while preserving order
+            seen: set[str] = set()
+            deduped: list[str] = []
+            for f in field_lookup_fields:
+                if f not in seen:
+                    seen.add(f)
+                    deduped.append(f)
+            field_lookup_fields = deduped
+
+        if field_lookup_name and field_lookup_fields:
             try:
                 result = await self.session.execute(
                     select(CRMContact)
                     .where(
-                        CRMContact.name.ilike(f"%{name_query}%"),
+                        CRMContact.name.ilike(f"%{field_lookup_name}%"),
                         CRMContact.is_archived == False,  # noqa: E712
                     )
                     .limit(3)
                 )
                 contacts = result.scalars().all()
                 if contacts:
+                    field_labels = {
+                        "phone": "Phone",
+                        "email": "Email",
+                        "lead_stage": "Stage",
+                        "company": "Company",
+                        "title": "Title",
+                        "lead_score": "Score",
+                    }
                     lines = []
                     for c in contacts:
-                        val = getattr(c, field, None)
-                        lines.append(
-                            f"- **{c.name}**: {val}" if val else f"- **{c.name}**: no {field} on file"
-                        )
+                        parts = []
+                        for fld in field_lookup_fields:
+                            val = getattr(c, fld, None)
+                            label = field_labels.get(fld, fld.replace("_", " ").title())
+                            parts.append(f"{label}: **{val}**" if val is not None else f"{label}: —")
+                        lines.append(f"- **{c.name}** — " + ", ".join(parts))
                     return CopilotResponse(
                         type="answer",
-                        message=f"**{field.capitalize()}** for contacts matching **{name_query}**:\n\n" + "\n".join(lines),
+                        message=f"Here's what I found for **{field_lookup_name}**:\n\n" + "\n".join(lines),
                         data=None,
                     )
                 return CopilotResponse(
                     type="clarification",
-                    message=f"I couldn't find any contacts matching **{name_query}** in your CRM.",
+                    message=f"I couldn't find any contacts matching **{field_lookup_name}** in your CRM.",
                     data=None,
                 )
             except Exception:
@@ -365,30 +471,31 @@ class CopilotService(BaseService):
             normalized,
         )
         if contact_match:
-            name_query = contact_match.group(1).strip()
-            try:
-                result = await self.session.execute(
-                    select(CRMContact)
-                    .where(
-                        CRMContact.name.ilike(f"%{name_query}%"),
-                        CRMContact.is_archived == False,  # noqa: E712
+            name_query = self._strip_name_stop_words(contact_match.group(1))
+            if name_query:
+                try:
+                    result = await self.session.execute(
+                        select(CRMContact)
+                        .where(
+                            CRMContact.name.ilike(f"%{name_query}%"),
+                            CRMContact.is_archived == False,  # noqa: E712
+                        )
+                        .limit(3)
                     )
-                    .limit(3)
-                )
-                contacts = result.scalars().all()
-                if contacts:
-                    lines = "\n".join(
-                        f"- **{c.name}** — {c.title or 'No title'}, {c.company or 'No company'}, "
-                        f"score={c.lead_score}, stage={c.lead_stage or 'none'}"
-                        for c in contacts
-                    )
-                    return CopilotResponse(
-                        type="answer",
-                        message=f"Found {len(contacts)} contact{'s' if len(contacts) != 1 else ''} matching **{name_query}**:\n\n{lines}",
-                        data=None,
-                    )
-            except Exception:
-                pass
+                    contacts = result.scalars().all()
+                    if contacts:
+                        lines = "\n".join(
+                            f"- **{c.name}** — {c.title or 'No title'}, {c.company or 'No company'}, "
+                            f"score={c.lead_score}, stage={c.lead_stage or 'none'}"
+                            for c in contacts
+                        )
+                        return CopilotResponse(
+                            type="answer",
+                            message=f"Found {len(contacts)} contact{'s' if len(contacts) != 1 else ''} matching **{name_query}**:\n\n{lines}",
+                            data=None,
+                        )
+                except Exception:
+                    pass
 
         return None
 

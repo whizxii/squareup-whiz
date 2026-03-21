@@ -31,9 +31,10 @@ export function CreateDealDialog({ open, onOpenChange }: CreateDealDialogProps) 
     defaultPipeline?.id ??
     "";
   const initialStage = (dialogData as { stage?: string })?.stage ?? "";
+  const initialContactId = (dialogData as { contact_id?: string })?.contact_id ?? "";
 
   const [title, setTitle] = useState("");
-  const [contactId, setContactId] = useState("");
+  const [contactId, setContactId] = useState(initialContactId);
   const [pipelineId, setPipelineId] = useState(initialPipelineId);
   const [stage, setStage] = useState(initialStage);
   const [value, setValue] = useState("");
@@ -49,7 +50,7 @@ export function CreateDealDialog({ open, onOpenChange }: CreateDealDialogProps) 
 
   const resetForm = () => {
     setTitle("");
-    setContactId("");
+    setContactId(initialContactId);
     setPipelineId(initialPipelineId);
     setStage(initialStage);
     setValue("");

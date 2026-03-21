@@ -45,6 +45,7 @@ import {
   Bot,
   Clock,
   Mic,
+  Plus,
 } from "lucide-react";
 
 // ─── Contact Info Card ──────────────────────────────────────────
@@ -763,12 +764,28 @@ export function OverviewTab({
         )}
 
         {/* Deals summary */}
-        {deals.length > 0 && (
-          <div className="rounded-xl border border-border p-4 space-y-2">
+        <div className="rounded-xl border border-border p-4 space-y-2">
+          <div className="flex items-center justify-between">
             <h4 className="text-xs font-semibold flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5 text-primary" />
-              Deals ({deals.length})
+              Deals {deals.length > 0 && `(${deals.length})`}
             </h4>
+            <button
+              onClick={() =>
+                openDialog("create-deal", {
+                  contact_id: contact.id,
+                  stage: contact.lead_stage ?? undefined,
+                })
+              }
+              className="flex items-center gap-1 text-[11px] text-primary font-medium hover:text-primary/80 transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              Add Deal
+            </button>
+          </div>
+          {deals.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground py-1">No deals yet.</p>
+          ) : (
             <div className="space-y-2">
               {deals.slice(0, 3).map((deal) => (
                 <div
@@ -794,8 +811,8 @@ export function OverviewTab({
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Right column — AI insights */}
