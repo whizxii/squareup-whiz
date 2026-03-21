@@ -6,6 +6,7 @@ from app.models.chat import Message, ChannelMember
 from app.models.users import UserProfile
 from app.core.events import EventBus
 from sqlmodel import select
+import asyncio
 import uuid
 import logging
 from datetime import datetime
@@ -20,6 +21,15 @@ def set_event_bus(bus: EventBus) -> None:
     """Called from main.py lifespan to give handlers access to the EventBus."""
     global _event_bus
     _event_bus = bus
+
+
+def _log_task_exception(task: asyncio.Task) -> None:
+    """Callback for asyncio.create_task — logs unhandled exceptions instead of swallowing them."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("Background task %s failed: %s", task.get_name(), exc, exc_info=exc)
 
 
 async def handle_ws_message(user_id: str, data: dict):
@@ -118,9 +128,7 @@ async def handle_chat_send(user_id: str, data: dict):
 
     # Emit event for Chat Intelligence pipeline (async — non-blocking)
     if _event_bus is not None:
-        import asyncio
-
-        asyncio.create_task(
+        task = asyncio.create_task(
             _event_bus.emit(
                 "chat.message_sent",
                 {
@@ -130,8 +138,10 @@ async def handle_chat_send(user_id: str, data: dict):
                     "content": content,
                     "thread_id": thread_id,
                 },
-            )
+            ),
+            name=f"event_bus_emit:{message.id}",
         )
+        task.add_done_callback(_log_task_exception)
 
     # Broadcast to all connected users (simple for 3-person team)
     broadcast_data = {
@@ -162,20 +172,21 @@ async def handle_chat_send(user_id: str, data: dict):
     # If agents were mentioned, route to ReAct engine in the background
     triggered_agent_ids: set[str] = set()
     if agent_mentions:
-        import asyncio
         from app.services.agent_engine import run_agent
 
         for agent in agent_mentions:
             triggered_agent_ids.add(agent.id)
-            asyncio.create_task(
+            task = asyncio.create_task(
                 run_agent(
                     agent_id=agent.id,
                     trigger_message_id=message.id,
                     channel_id=channel_id,
                     user_id=user_id,
                     content=content,
-                )
+                ),
+                name=f"run_agent:{agent.id}:{message.id}",
             )
+            task.add_done_callback(_log_task_exception)
 
     # Auto-respond agents: trigger agents assigned to this channel with trigger_mode="auto"
     async with async_session() as session:
@@ -193,18 +204,19 @@ async def handle_chat_send(user_id: str, data: dict):
             result = await session.execute(agent_stmt)
             auto_agent = result.scalar_one_or_none()
             if auto_agent:
-                import asyncio
                 from app.services.agent_engine import run_agent
 
-                asyncio.create_task(
+                task = asyncio.create_task(
                     run_agent(
                         agent_id=auto_agent.id,
                         trigger_message_id=message.id,
                         channel_id=channel_id,
                         user_id=user_id,
                         content=content,
-                    )
+                    ),
+                    name=f"run_agent_auto:{auto_agent.id}:{message.id}",
                 )
+                task.add_done_callback(_log_task_exception)
 
 
 async def handle_chat_typing(user_id: str, data: dict):

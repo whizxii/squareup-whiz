@@ -6,13 +6,36 @@ import asyncio
 import copy
 import json
 import logging
+import sys
 import time
 import uuid
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 
 # Maximum seconds to wait for a single LLM streaming response before timing out.
 LLM_STREAM_TIMEOUT = 120
+
+
+# Python 3.9 compatibility: asyncio.timeout was added in 3.11
+if sys.version_info >= (3, 11):
+    _async_timeout = asyncio.timeout
+else:
+    @asynccontextmanager
+    async def _async_timeout(delay: float):
+        """Polyfill for asyncio.timeout on Python <3.11.
+
+        Uses asyncio.wait_for semantics by scheduling a cancellation.
+        """
+        loop = asyncio.get_running_loop()
+        task = asyncio.current_task()
+        handle = loop.call_later(delay, task.cancel)
+        try:
+            yield
+        except asyncio.CancelledError:
+            raise asyncio.TimeoutError() from None
+        finally:
+            handle.cancel()
 
 from sqlmodel import select
 from sqlalchemy import func
@@ -285,6 +308,7 @@ async def run_agent(
     final_text = ""
     exec_status = "success"
     error_message: str | None = None
+    failed_providers: set[str] = set()
 
     resolved_model = resolve_model_for_client(llm, agent.model)
     logger.info(
@@ -299,26 +323,74 @@ async def run_agent(
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            # Stream LLM response (with timeout to prevent infinite hangs)
-            async with asyncio.timeout(LLM_STREAM_TIMEOUT):
-                async for event in llm.stream_with_tools(
-                    system=system_prompt,
-                    messages=messages,
-                    tools=tool_schemas if tool_schemas else None,
-                    model=resolved_model,
-                    max_tokens=4096,
-                    temperature=temperature,
-                ):
-                    if isinstance(event, TextDelta):
-                        text_parts.append(event.text)
-                        await _broadcast_text_delta(
-                            channel_id, agent.id, stream_message_id, event.text,
-                        )
-                    elif isinstance(event, ToolUseComplete):
-                        tool_use_blocks.append(event)
-                    elif isinstance(event, UsageUpdate):
-                        total_input_tokens += event.input_tokens
-                        total_output_tokens += event.output_tokens
+            # Stream LLM response (with fallback on provider failure)
+            try:
+                async with _async_timeout(LLM_STREAM_TIMEOUT):
+                    async for event in llm.stream_with_tools(
+                        system=system_prompt,
+                        messages=messages,
+                        tools=tool_schemas if tool_schemas else None,
+                        model=resolved_model,
+                        max_tokens=4096,
+                        temperature=temperature,
+                    ):
+                        if isinstance(event, TextDelta):
+                            text_parts.append(event.text)
+                            await _broadcast_text_delta(
+                                channel_id, agent.id, stream_message_id, event.text,
+                            )
+                        elif isinstance(event, ToolUseComplete):
+                            tool_use_blocks.append(event)
+                        elif isinstance(event, UsageUpdate):
+                            total_input_tokens += event.input_tokens
+                            total_output_tokens += event.output_tokens
+            except (TimeoutError, asyncio.TimeoutError):
+                raise  # Let outer handler deal with timeouts
+            except Exception as stream_exc:
+                failed_providers.add(llm.PROVIDER)
+                fallback = get_fallback_client(failed_providers)
+                if not fallback:
+                    raise RuntimeError(
+                        "All LLM providers are unavailable (rate-limited or misconfigured). "
+                        "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
+                    ) from stream_exc
+                logger.warning(
+                    "Agent %s LLM (%s) failed on iteration %d: %s. Switching to fallback (%s).",
+                    agent.id, llm.PROVIDER, iteration, stream_exc, fallback.PROVIDER,
+                )
+                await _broadcast_status(channel_id, agent.id, "thinking")
+                llm = fallback
+                resolved_model = fallback.DEFAULT_MODEL
+                text_parts = []
+                tool_use_blocks = []
+                try:
+                    async with _async_timeout(LLM_STREAM_TIMEOUT):
+                        async for event in llm.stream_with_tools(
+                            system=system_prompt,
+                            messages=messages,
+                            tools=tool_schemas if tool_schemas else None,
+                            model=resolved_model,
+                            max_tokens=4096,
+                            temperature=temperature,
+                        ):
+                            if isinstance(event, TextDelta):
+                                text_parts.append(event.text)
+                                await _broadcast_text_delta(
+                                    channel_id, agent.id, stream_message_id, event.text,
+                                )
+                            elif isinstance(event, ToolUseComplete):
+                                tool_use_blocks.append(event)
+                            elif isinstance(event, UsageUpdate):
+                                total_input_tokens += event.input_tokens
+                                total_output_tokens += event.output_tokens
+                except (TimeoutError, asyncio.TimeoutError):
+                    raise
+                except Exception as fallback_exc:
+                    failed_providers.add(llm.PROVIDER)
+                    raise RuntimeError(
+                        "All LLM providers are unavailable (rate-limited or misconfigured). "
+                        "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
+                    ) from fallback_exc
 
             full_text = "".join(text_parts)
 
@@ -392,7 +464,7 @@ async def run_agent(
         if not final_text and iteration >= max_iterations:
             final_text = "I've reached my maximum number of reasoning steps. Here's what I found so far."
 
-    except TimeoutError:
+    except (TimeoutError, asyncio.TimeoutError):
         logger.error(
             "Agent %s (%s): LLM stream timed out after %ds (provider=%s, iteration=%d)",
             agent.id, agent.name, LLM_STREAM_TIMEOUT, llm.PROVIDER, iteration,
@@ -403,49 +475,15 @@ async def run_agent(
         await _broadcast_error(channel_id, agent.id, final_text)
 
     except Exception as exc:
-        # Try fallback provider before giving up
-        fallback = get_fallback_client(llm.PROVIDER)
-        if fallback:
-            logger.warning(
-                "Agent %s primary LLM (%s) failed on iteration %d: %s. Trying fallback (%s).",
-                agent.id, llm.PROVIDER, iteration, exc, fallback.PROVIDER,
-            )
-            await _broadcast_status(channel_id, agent.id, "thinking")
-            try:
-                fallback_model = fallback.DEFAULT_MODEL
-                text_parts_fb: list[str] = []
-                async with asyncio.timeout(LLM_STREAM_TIMEOUT):
-                    async for event in fallback.stream_with_tools(
-                        system=system_prompt,
-                        messages=messages,
-                        tools=tool_schemas if tool_schemas else None,
-                        model=fallback_model,
-                        max_tokens=4096,
-                        temperature=temperature,
-                    ):
-                        if isinstance(event, TextDelta):
-                            text_parts_fb.append(event.text)
-                            await _broadcast_text_delta(
-                                channel_id, agent.id, stream_message_id, event.text,
-                            )
-                        elif isinstance(event, UsageUpdate):
-                            total_input_tokens += event.input_tokens
-                            total_output_tokens += event.output_tokens
-
-                final_text = "".join(text_parts_fb)
-                llm = fallback  # Use fallback provider for cost calculation
-            except Exception as fb_exc:
-                exec_status = "error"
-                error_message = f"Primary ({llm.PROVIDER}): {str(exc)[:200]}. Fallback ({fallback.PROVIDER}): {str(fb_exc)[:200]}"
-                final_text = final_text or f"Agent error: both LLM providers failed. {str(exc)[:200]}"
-                logger.error("Agent %s fallback also failed: %s", agent.id, fb_exc)
-                await _broadcast_error(channel_id, agent.id, final_text[:500])
+        exec_status = "error"
+        error_message = str(exc)[:500]
+        exc_str = str(exc)
+        if "All LLM providers are unavailable" in exc_str:
+            final_text = "I can't respond right now — all AI providers are rate-limited. Please try again in a few minutes."
         else:
-            exec_status = "error"
-            error_message = str(exc)[:500]
-            final_text = final_text or f"Agent error: {str(exc)[:300]}"
-            logger.error("Agent %s execution failed: %s", agent.id, exc, exc_info=True)
-            await _broadcast_error(channel_id, agent.id, final_text[:500])
+            final_text = final_text or f"Something went wrong: {exc_str[:200]}"
+        logger.error("Agent %s execution failed: %s", agent.id, exc, exc_info=True)
+        await _broadcast_error(channel_id, agent.id, final_text[:500])
 
     elapsed_ms = int((time.monotonic() - start_time) * 1000)
     # Per-provider cost calculation
@@ -588,6 +626,7 @@ async def invoke_agent_sync(
     agent_id: str,
     user_id: str,
     content: str,
+    channel_id: str | None = None,
 ) -> InvokeResult:
     """Run the ReAct loop synchronously (no WS streaming) and return result.
 
@@ -681,7 +720,7 @@ async def invoke_agent_sync(
             total_cost_usd=0, duration_ms=elapsed_ms, status="error",
             error_message=str(tool_exc)[:500],
         )
-    tool_context = ToolContext(user_id=user_id, channel_id="direct", agent_id=agent.id)
+    tool_context = ToolContext(user_id=user_id, channel_id=channel_id or "direct", agent_id=agent.id)
 
     tool_calls_log: list[dict] = []
     total_input_tokens = 0
@@ -690,6 +729,7 @@ async def invoke_agent_sync(
     final_text = ""
     exec_status = "success"
     error_message: str | None = None
+    failed_providers: set[str] = set()
 
     resolved_model = resolve_model_for_client(llm, agent.model)
     logger.info(
@@ -704,22 +744,67 @@ async def invoke_agent_sync(
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            async with asyncio.timeout(LLM_STREAM_TIMEOUT):
-                async for event in llm.stream_with_tools(
-                    system=system_prompt,
-                    messages=messages,
-                    tools=tool_schemas if tool_schemas else None,
-                    model=resolved_model,
-                    max_tokens=4096,
-                    temperature=temperature,
-                ):
-                    if isinstance(event, TextDelta):
-                        text_parts.append(event.text)
-                    elif isinstance(event, ToolUseComplete):
-                        tool_use_blocks.append(event)
-                    elif isinstance(event, UsageUpdate):
-                        total_input_tokens += event.input_tokens
-                        total_output_tokens += event.output_tokens
+            # Stream LLM response (with fallback on provider failure)
+            try:
+                async with _async_timeout(LLM_STREAM_TIMEOUT):
+                    async for event in llm.stream_with_tools(
+                        system=system_prompt,
+                        messages=messages,
+                        tools=tool_schemas if tool_schemas else None,
+                        model=resolved_model,
+                        max_tokens=4096,
+                        temperature=temperature,
+                    ):
+                        if isinstance(event, TextDelta):
+                            text_parts.append(event.text)
+                        elif isinstance(event, ToolUseComplete):
+                            tool_use_blocks.append(event)
+                        elif isinstance(event, UsageUpdate):
+                            total_input_tokens += event.input_tokens
+                            total_output_tokens += event.output_tokens
+            except (TimeoutError, asyncio.TimeoutError):
+                raise  # Let outer handler deal with timeouts
+            except Exception as stream_exc:
+                failed_providers.add(llm.PROVIDER)
+                fallback = get_fallback_client(failed_providers)
+                if not fallback:
+                    raise RuntimeError(
+                        "All LLM providers are unavailable (rate-limited or misconfigured). "
+                        "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
+                    ) from stream_exc
+                logger.warning(
+                    "Agent %s sync LLM (%s) failed on iteration %d: %s. Switching to fallback (%s).",
+                    agent.id, llm.PROVIDER, iteration, stream_exc, fallback.PROVIDER,
+                )
+                llm = fallback
+                resolved_model = fallback.DEFAULT_MODEL
+                text_parts = []
+                tool_use_blocks = []
+                try:
+                    async with _async_timeout(LLM_STREAM_TIMEOUT):
+                        async for event in llm.stream_with_tools(
+                            system=system_prompt,
+                            messages=messages,
+                            tools=tool_schemas if tool_schemas else None,
+                            model=resolved_model,
+                            max_tokens=4096,
+                            temperature=temperature,
+                        ):
+                            if isinstance(event, TextDelta):
+                                text_parts.append(event.text)
+                            elif isinstance(event, ToolUseComplete):
+                                tool_use_blocks.append(event)
+                            elif isinstance(event, UsageUpdate):
+                                total_input_tokens += event.input_tokens
+                                total_output_tokens += event.output_tokens
+                except (TimeoutError, asyncio.TimeoutError):
+                    raise
+                except Exception as fallback_exc:
+                    failed_providers.add(llm.PROVIDER)
+                    raise RuntimeError(
+                        "All LLM providers are unavailable (rate-limited or misconfigured). "
+                        "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
+                    ) from fallback_exc
 
             full_text = "".join(text_parts)
 
@@ -778,7 +863,7 @@ async def invoke_agent_sync(
         if not final_text and iteration >= max_iterations:
             final_text = "I've reached my maximum number of reasoning steps. Here's what I found so far."
 
-    except TimeoutError:
+    except (TimeoutError, asyncio.TimeoutError):
         logger.error(
             "Agent %s (%s): sync LLM stream timed out after %ds (provider=%s, iteration=%d)",
             agent.id, agent.name, LLM_STREAM_TIMEOUT, llm.PROVIDER, iteration,
@@ -788,42 +873,14 @@ async def invoke_agent_sync(
         final_text = "I'm taking too long to respond. Please try again — if this keeps happening, the request may be too complex for a single message."
 
     except Exception as exc:
-        # Try fallback provider before giving up
-        fallback = get_fallback_client(llm.PROVIDER)
-        if fallback:
-            logger.warning(
-                "Agent %s sync primary (%s) failed on iteration %d: %s. Trying fallback (%s).",
-                agent.id, llm.PROVIDER, iteration, exc, fallback.PROVIDER,
-            )
-            try:
-                fallback_model = fallback.DEFAULT_MODEL
-                text_parts_fb: list[str] = []
-                async with asyncio.timeout(LLM_STREAM_TIMEOUT):
-                    async for event in fallback.stream_with_tools(
-                        system=system_prompt,
-                        messages=messages,
-                        tools=tool_schemas if tool_schemas else None,
-                        model=fallback_model,
-                        max_tokens=4096,
-                        temperature=temperature,
-                    ):
-                        if isinstance(event, TextDelta):
-                            text_parts_fb.append(event.text)
-                        elif isinstance(event, UsageUpdate):
-                            total_input_tokens += event.input_tokens
-                            total_output_tokens += event.output_tokens
-                final_text = "".join(text_parts_fb)
-                llm = fallback
-            except Exception as fb_exc:
-                exec_status = "error"
-                error_message = f"Primary ({llm.PROVIDER}): {str(exc)[:200]}. Fallback ({fallback.PROVIDER}): {str(fb_exc)[:200]}"
-                final_text = final_text or f"Agent error: both LLM providers failed. {str(exc)[:200]}"
-                logger.error("Agent %s sync fallback also failed: %s", agent.id, fb_exc)
+        exec_status = "error"
+        error_message = str(exc)[:500]
+        exc_str = str(exc)
+        if "All LLM providers are unavailable" in exc_str:
+            final_text = "I can't respond right now — all AI providers are rate-limited. Please try again in a few minutes."
         else:
-            exec_status = "error"
-            error_message = str(exc)[:500]
-            final_text = final_text or f"Agent error: {str(exc)[:300]}"
-            logger.error("Agent %s sync invoke failed: %s", agent.id, exc, exc_info=True)
+            final_text = final_text or f"Something went wrong: {exc_str[:200]}"
+        logger.error("Agent %s sync invoke failed: %s", agent.id, exc, exc_info=True)
 
     elapsed_ms = int((time.monotonic() - start_time) * 1000)
     total_cost = calculate_cost(llm.PROVIDER, total_input_tokens, total_output_tokens)

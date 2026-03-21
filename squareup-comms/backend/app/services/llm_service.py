@@ -80,7 +80,7 @@ class GeminiLLMClient:
     """Google Gemini API with native function calling."""
 
     PROVIDER = "gemini"
-    DEFAULT_MODEL = "gemini-2.5-flash"
+    DEFAULT_MODEL = "gemini-3-flash-preview"
 
     def __init__(self, api_key: str) -> None:
         from google import genai
@@ -194,7 +194,7 @@ class GeminiLLMClient:
         system: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-3-flash-preview",
         max_tokens: int = 4096,
         temperature: float = 0.7,
     ) -> AsyncGenerator[StreamEvent, None]:
@@ -270,7 +270,7 @@ class GeminiLLMClient:
         self,
         messages: list[dict],
         system: str = "",
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-3-flash-preview",
         max_tokens: int = 1024,
         temperature: float = 0.7,
     ) -> str:
@@ -694,11 +694,19 @@ def get_llm_client(model: str | None = None) -> LLMClient:
     )
 
 
-def get_fallback_client(exclude_provider: str) -> LLMClient | None:
-    """Return the next available LLM client, excluding the failed provider.
+def get_fallback_client(
+    exclude_providers: "str | set[str]",
+) -> LLMClient | None:
+    """Return the next available LLM client, excluding failed provider(s).
+
+    ``exclude_providers`` can be a single provider name (str) for backwards
+    compatibility, or a set of provider names to skip.
 
     Returns None if no fallback is available.
     """
+    if isinstance(exclude_providers, str):
+        exclude_providers = {exclude_providers}
+
     fallback_order: list[tuple[str, str | None, type]] = [
         ("gemini", settings.GEMINI_API_KEY, GeminiLLMClient),
         ("groq", settings.GROQ_API_KEY, GroqLLMClient),
@@ -706,7 +714,7 @@ def get_fallback_client(exclude_provider: str) -> LLMClient | None:
     ]
 
     for provider_name, api_key, client_cls in fallback_order:
-        if provider_name != exclude_provider and api_key:
+        if provider_name not in exclude_providers and api_key:
             return client_cls(api_key)
 
     return None
@@ -717,7 +725,7 @@ def resolve_model_for_client(client: "LLMClient", requested_model: str | None) -
 
     If the requested model belongs to the client's provider, use it as-is.
     Otherwise, fall back to the client's DEFAULT_MODEL so that, e.g.,
-    a GroqLLMClient never receives "gemini-2.5-flash".
+    a GroqLLMClient never receives "gemini-3-flash-preview".
     """
     if not requested_model:
         return client.DEFAULT_MODEL

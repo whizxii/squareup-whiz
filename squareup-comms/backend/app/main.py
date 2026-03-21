@@ -86,6 +86,25 @@ async def lifespan(application: FastAPI):
     await init_db()
     logger.info("Database initialized.")
 
+    # Reset agents stuck in "working" status from a previous crash
+    try:
+        from app.models.agents import Agent
+        async with async_session() as session:
+            from sqlmodel import select
+            stmt = select(Agent).where(Agent.status == "working")
+            result = await session.execute(stmt)
+            stuck_agents = result.scalars().all()
+            for agent in stuck_agents:
+                logger.warning("Resetting stuck agent %s (%s) from 'working' to 'idle'", agent.id, agent.name)
+                agent.status = "idle"
+                agent.current_task = None
+                session.add(agent)
+            if stuck_agents:
+                await session.commit()
+                logger.info("Reset %d stuck agent(s) to idle.", len(stuck_agents))
+    except Exception:
+        logger.warning("Failed to reset stuck agents (non-fatal)", exc_info=True)
+
     # Register all built-in agent tools at startup
     import app.services.tools  # noqa: F401 — triggers auto-registration
     logger.info("Agent tool registry initialized.")

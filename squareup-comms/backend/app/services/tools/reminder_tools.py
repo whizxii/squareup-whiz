@@ -29,10 +29,16 @@ def _reminder_to_dict(r: Reminder) -> dict:
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
+    """Best-effort ISO datetime parsing.  Always returns a naive UTC datetime."""
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        # Strip timezone info → naive UTC (consistent with created_at)
+        if dt.tzinfo is not None:
+            from datetime import timezone
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
     except (ValueError, AttributeError):
         return None
 
@@ -55,13 +61,22 @@ async def set_reminder(inp: dict, ctx: ToolContext) -> ToolResult:
     if remind_at <= datetime.utcnow():
         return ToolResult(success=False, output=None, error="remind_at must be in the future")
 
+    # Validate channel_id exists before using it as FK
+    resolved_channel_id = None
+    if ctx.channel_id and ctx.channel_id != "direct":
+        async with async_session() as session:
+            from app.models.chat import Channel
+            ch = await session.get(Channel, ctx.channel_id)
+            if ch:
+                resolved_channel_id = ctx.channel_id
+
     reminder = Reminder(
         id=str(uuid.uuid4()),
         user_id=ctx.user_id,
         created_by_agent=ctx.agent_id,
         message=message,
         remind_at=remind_at,
-        channel_id=ctx.channel_id,
+        channel_id=resolved_channel_id,
         recurrence=inp.get("recurrence"),
         status="pending",
         created_at=datetime.utcnow(),

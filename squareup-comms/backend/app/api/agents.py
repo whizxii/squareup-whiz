@@ -110,6 +110,7 @@ class AgentResponse(BaseModel):
 
 class InvokeRequest(BaseModel):
     message: str
+    channel_id: str | None = None
 
 
 class ExecutionResponse(BaseModel):
@@ -485,6 +486,7 @@ async def invoke_agent(
         agent_id=agent_id,
         user_id=user_id,
         content=body.message,
+        channel_id=body.channel_id,
     )
 
     return {
