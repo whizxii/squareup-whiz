@@ -86,8 +86,8 @@ function WinLossPanel({ period }: { period: string }) {
   if (isLoading) return <div className="h-64 rounded-xl bg-muted/40 animate-pulse" />;
   if (!d) return null;
 
-  const lossReasonBars = d.loss_reasons.map((r) => ({
-    label: r.reason.slice(0, 10),
+  const lossReasonBars = (d.loss_reasons ?? []).map((r) => ({
+    label: (r.reason ?? "").slice(0, 10),
     value: r.count,
     color: "#ef4444",
   }));
@@ -97,20 +97,20 @@ function WinLossPanel({ period }: { period: string }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
         <Stat label="Won" value={String(d.won_count)} />
         <Stat label="Lost" value={String(d.lost_count)} />
-        <Stat label="Win Rate" value={`${d.win_rate.toFixed(1)}%`} />
+        <Stat label="Win Rate" value={`${(d.win_rate ?? 0).toFixed(1)}%`} />
         <Stat label="Won Value" value={formatCurrency(d.won_value)} />
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-5">
         <div className="rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-center">
           <div className="text-sm font-medium text-green-600">
-            {d.avg_won_cycle_days.toFixed(0)} days
+            {(d.avg_won_cycle_days ?? 0).toFixed(0)} days
           </div>
           <div className="text-xs text-muted-foreground">Avg won cycle</div>
         </div>
         <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-center">
           <div className="text-sm font-medium text-red-600">
-            {d.avg_lost_cycle_days.toFixed(0)} days
+            {(d.avg_lost_cycle_days ?? 0).toFixed(0)} days
           </div>
           <div className="text-xs text-muted-foreground">Avg lost cycle</div>
         </div>
@@ -151,7 +151,7 @@ function StageDurationPanel() {
                 </span>
                 <span>
                   <span className={overSLA ? "text-amber-500 font-medium" : ""}>
-                    {s.avg_days.toFixed(1)}d
+                    {(s.avg_days ?? 0).toFixed(1)}d
                   </span>
                   {s.sla_days != null && (
                     <span className="text-muted-foreground"> / {s.sla_days}d SLA</span>
@@ -187,11 +187,11 @@ function DealVelocityPanel({ period }: { period: string }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
         <Stat label="Created" value={String(d.deals_created)} />
         <Stat label="Closed" value={String(d.deals_closed)} />
-        <Stat label="Win Rate" value={`${d.win_rate.toFixed(1)}%`} />
+        <Stat label="Win Rate" value={`${(d.win_rate ?? 0).toFixed(1)}%`} />
       </div>
       <div className="grid grid-cols-3 gap-4">
         <Stat label="Avg Value" value={formatCurrency(d.avg_value)} />
-        <Stat label="Avg Cycle" value={`${d.avg_cycle_days.toFixed(0)}d`} />
+        <Stat label="Avg Cycle" value={`${(d.avg_cycle_days ?? 0).toFixed(0)}d`} />
         <Stat label="Velocity" value={formatCurrency(d.velocity)} />
       </div>
       <p className="text-xs text-muted-foreground mt-3 text-center">
@@ -233,7 +233,7 @@ function LeadSourcePanel({ period }: { period: string }) {
                 <td className="text-right py-2">{formatCurrency(s.revenue)}</td>
                 <td className="text-right py-2">
                   <span className={s.conversion_rate > 20 ? "text-green-500" : ""}>
-                    {s.conversion_rate.toFixed(1)}%
+                    {(s.conversion_rate ?? 0).toFixed(1)}%
                   </span>
                 </td>
               </tr>
@@ -255,7 +255,7 @@ function PipelineConversionPanel() {
   if (stages.length === 0) return null;
 
   const conversionBars = stages.map((s, i) => ({
-    label: s.stage_label.slice(0, 8),
+    label: (s.stage_label ?? "").slice(0, 8),
     value: Math.round(s.conversion_rate),
     color: [
       "#6366f1", "#8b5cf6", "#a855f7", "#d946ef",
