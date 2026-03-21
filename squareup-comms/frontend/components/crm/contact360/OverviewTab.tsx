@@ -774,7 +774,7 @@ export function OverviewTab({
               onClick={() =>
                 openDialog("create-deal", {
                   contact_id: contact.id,
-                  stage: contact.lead_stage ?? undefined,
+                  stage: contact.stage ?? undefined,
                 })
               }
               className="flex items-center gap-1 text-[11px] text-primary font-medium hover:text-primary/80 transition-colors"
