@@ -27,18 +27,15 @@ class LiveKitService:
                 "LiveKit is not configured. Set LIVEKIT_API_KEY and LIVEKIT_API_SECRET."
             )
 
-        token = AccessToken(
-            api_key=settings.LIVEKIT_API_KEY,
-            api_secret=settings.LIVEKIT_API_SECRET,
+        token = (
+            AccessToken(
+                api_key=settings.LIVEKIT_API_KEY,
+                api_secret=settings.LIVEKIT_API_SECRET,
+            )
+            .with_identity(participant_identity)
+            .with_name(participant_name or participant_identity)
+            .with_grants(VideoGrants(room_join=True, room=room_name))
         )
-        token.identity = participant_identity
-        token.name = participant_name or participant_identity
-
-        grant = VideoGrants(
-            room_join=True,
-            room=room_name,
-        )
-        token.video_grant = grant
 
         return token.to_jwt()
 
