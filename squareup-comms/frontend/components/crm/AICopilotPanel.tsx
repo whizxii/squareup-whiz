@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { useAICopilot } from "@/lib/hooks/use-crm-queries";
 import {
@@ -13,6 +15,7 @@ import {
   AlertCircle,
   X,
   Loader2,
+  Search,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -31,6 +34,56 @@ const QUICK_PROMPTS = [
   { label: "Priorities", query: "What should I prioritize today?", icon: Lightbulb },
   { label: "Pipeline summary", query: "Give me a summary of my pipeline", icon: MessageSquare },
 ] as const;
+
+// ─── Markdown classes ────────────────────────────────────────────
+
+const markdownComponents = {
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="mb-2 last:mb-0">{children}</p>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li className="text-sm">{children}</li>
+  ),
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="text-base font-bold mb-1">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-sm font-bold mb-1">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-sm font-semibold mb-1">{children}</h3>
+  ),
+  code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+    const isBlock = className?.startsWith("language-");
+    return isBlock ? (
+      <pre className="bg-muted rounded-md p-2 overflow-x-auto text-xs mb-2">
+        <code>{children}</code>
+      </pre>
+    ) : (
+      <code className="bg-muted px-1 py-0.5 rounded text-xs">{children}</code>
+    );
+  },
+  table: ({ children }: { children?: React.ReactNode }) => (
+    <div className="overflow-x-auto mb-2">
+      <table className="text-xs border-collapse w-full">{children}</table>
+    </div>
+  ),
+  th: ({ children }: { children?: React.ReactNode }) => (
+    <th className="border border-border px-2 py-1 bg-muted/50 text-left font-semibold">{children}</th>
+  ),
+  td: ({ children }: { children?: React.ReactNode }) => (
+    <td className="border border-border px-2 py-1">{children}</td>
+  ),
+} as Record<string, React.ComponentType<Record<string, unknown>>>;
 
 // ─── Message Bubble ──────────────────────────────────────────────
 
@@ -52,12 +105,18 @@ function MessageBubble({ message }: { message: CopilotMessage }) {
             : "bg-muted/60 border border-border"
         )}
       >
-        {message.type && !isUser && (
+        {message.type && !isUser && message.type !== "answer" && (
           <span className="inline-block text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
             {message.type}
           </span>
         )}
-        <div className="whitespace-pre-wrap">{message.content}</div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap">{message.content}</div>
+        ) : (
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {message.content}
+          </ReactMarkdown>
+        )}
       </div>
     </div>
   );
@@ -77,6 +136,12 @@ export function AICopilotPanel({ open, onClose }: AICopilotPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const copilotMutation = useAICopilot();
 
+  // Build conversation history for the API (prior messages as context)
+  const buildHistory = useMemo(() => {
+    return (msgs: readonly CopilotMessage[]): Array<{ role: string; content: string }> =>
+      msgs.map((m) => ({ role: m.role, content: m.content }));
+  }, []);
+
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -89,12 +154,14 @@ export function AICopilotPanel({ open, onClose }: AICopilotPanelProps) {
       if (!trimmed || copilotMutation.isPending) return;
 
       const userMessage: CopilotMessage = { role: "user", content: trimmed };
-      setMessages((prev) => [...prev, userMessage]);
+      const updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
       setInput("");
       scrollToBottom();
 
       try {
-        const result = await copilotMutation.mutateAsync(trimmed);
+        const history = buildHistory(messages);
+        const result = await copilotMutation.mutateAsync({ query: trimmed, history });
         const data = result as { type?: string; message?: string } | undefined;
         const assistantMessage: CopilotMessage = {
           role: "assistant",
@@ -113,7 +180,7 @@ export function AICopilotPanel({ open, onClose }: AICopilotPanelProps) {
         scrollToBottom();
       }
     },
-    [copilotMutation, scrollToBottom]
+    [copilotMutation, scrollToBottom, messages, buildHistory]
   );
 
   const handleKeyDown = useCallback(
@@ -154,7 +221,7 @@ export function AICopilotPanel({ open, onClose }: AICopilotPanelProps) {
             <div>
               <p className="text-sm font-medium">CRM AI Assistant</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Ask about leads, deals, pipelines, or get action recommendations.
+                Ask anything — search contacts, view deals, create records, get insights.
               </p>
             </div>
 
@@ -178,8 +245,8 @@ export function AICopilotPanel({ open, onClose }: AICopilotPanelProps) {
 
         {copilotMutation.isPending && (
           <div className="flex gap-2 items-center text-xs text-muted-foreground">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            Thinking...
+            <Search className="w-3.5 h-3.5 animate-pulse" />
+            Searching CRM...
           </div>
         )}
       </div>

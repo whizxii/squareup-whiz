@@ -75,6 +75,7 @@ export function CreateContactDialog({
   const [stage, setStage] = useState<CRMStage>("lead");
   const [notes, setNotes] = useState("");
   const [tags, setTags] = useState("");
+  const [createDeal, setCreateDeal] = useState(true);
 
   // First interaction (collapsible)
   const [showFirstInteraction, setShowFirstInteraction] = useState(false);
@@ -98,6 +99,7 @@ export function CreateContactDialog({
     setStage("lead");
     setNotes("");
     setTags("");
+    setCreateDeal(true);
     setShowFirstInteraction(false);
     setFirstMeetDate(new Date().toISOString().slice(0, 16));
     setFirstMeetTldr("");
@@ -122,7 +124,8 @@ export function CreateContactDialog({
         stage,
         notes: notes.trim() || undefined,
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-      });
+        auto_create_deal: createDeal,
+      } as Record<string, unknown>);
 
       const contactId = contact.id;
       const contactName = name.trim();
@@ -312,6 +315,19 @@ export function CreateContactDialog({
               placeholder="Tags: investor, warm, B2B (comma-separated)"
               className={inputCls}
             />
+
+            {/* Pipeline toggle */}
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={createDeal}
+                onChange={(e) => setCreateDeal(e.target.checked)}
+                className="rounded border-border"
+              />
+              <span className="text-muted-foreground text-xs">
+                Also add to sales pipeline
+              </span>
+            </label>
 
             {/* First Interaction (collapsible) */}
             {showFirstInteraction ? (

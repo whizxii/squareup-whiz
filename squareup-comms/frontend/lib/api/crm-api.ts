@@ -651,11 +651,12 @@ class CRMApiClient {
   }
 
   async aiCopilot(
-    query: string
+    query: string,
+    history?: Array<{ role: string; content: string }>
   ): Promise<{ type: string; message: string; data?: unknown }> {
     return this.request("/api/crm/v2/ai/copilot", {
       method: "POST",
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, history: history ?? null }),
     });
   }
 

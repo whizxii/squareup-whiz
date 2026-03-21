@@ -202,9 +202,9 @@ export function LogActivityDialog({
     if (!notes.trim() || aiExtracting) return;
     setAiExtracting(true);
     try {
-      const result = await aiCopilot.mutateAsync(
-        `Summarize this transcript in 2 sentences and list action items:\n\n${notes.trim()}`
-      );
+      const result = await aiCopilot.mutateAsync({
+        query: `Summarize this transcript in 2 sentences and list action items:\n\n${notes.trim()}`,
+      });
       if (result.message) {
         setTldr(result.message);
         toast.success("AI filled TLDR — edit as needed");

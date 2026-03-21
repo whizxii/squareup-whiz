@@ -36,6 +36,7 @@ router = APIRouter(prefix="/api/crm/v2/ai", tags=["crm-ai"])
 
 class CopilotQuery(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
+    history: list[dict[str, Any]] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -165,13 +166,14 @@ async def get_next_actions(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/copilot", dependencies=[Depends(get_current_user)])
+@router.post("/copilot")
 async def ai_copilot(
     body: CopilotQuery,
+    user_id: str = Depends(get_current_user),
     svc: CopilotService = Depends(get_copilot_service),
 ):
-    """Natural language CRM assistant."""
-    result = await svc.ask(body.query)
+    """Natural language CRM assistant with tool-use and conversation history."""
+    result = await svc.ask(body.query, history=body.history, user_id=user_id)
     return success_response(data=result)
 
 

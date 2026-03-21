@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime
 from typing import Any, Sequence
 
-from sqlalchemy import select, update as sa_update
+from sqlalchemy import func, select, update as sa_update
 
 from app.models.crm import CRMContact, CRMActivity
 from app.models.crm_audit import CRMAuditLog
+from app.models.crm_company import CRMCompany
+from app.models.crm_deal import CRMDeal
+from app.models.crm_pipeline import CRMPipeline
 from app.repositories.crm_contact_repo import ContactRepository
 from app.services.base import BaseService
 
@@ -56,6 +60,56 @@ class ContactService(BaseService):
         )
         contact = await self.repo.create(contact)
 
+        # ── Auto-link or create company ──────────────────────────────
+        company_name = (data.get("company") or "").strip() if isinstance(data.get("company"), str) else ""
+        if company_name and not contact.company_id:
+            result = await self.session.execute(
+                select(CRMCompany).where(
+                    func.lower(CRMCompany.name) == company_name.lower(),
+                    CRMCompany.is_archived == False,  # noqa: E712
+                ).limit(1)
+            )
+            company = result.scalars().first()
+            if not company:
+                company = CRMCompany(
+                    id=str(uuid.uuid4()),
+                    name=company_name,
+                    created_by=user_id,
+                    created_at=now,
+                    updated_at=now,
+                )
+                self.session.add(company)
+                await self.session.flush()
+            contact.company_id = company.id
+            await self.session.flush()
+
+        # ── Auto-create deal for pipeline visibility ─────────────────
+        auto_create_deal = data.get("auto_create_deal", True)
+        if auto_create_deal:
+            pipeline_result = await self.session.execute(
+                select(CRMPipeline).where(
+                    CRMPipeline.is_default == True,  # noqa: E712
+                    CRMPipeline.is_archived == False,  # noqa: E712
+                ).limit(1)
+            )
+            pipeline = pipeline_result.scalars().first()
+            if pipeline:
+                deal = CRMDeal(
+                    id=str(uuid.uuid4()),
+                    title=f"Deal — {contact.name}",
+                    contact_id=contact.id,
+                    company_id=contact.company_id,
+                    pipeline_id=pipeline.id,
+                    stage=contact.stage or "lead",
+                    status="open",
+                    owner_id=user_id,
+                    created_by=user_id,
+                    created_at=now,
+                    updated_at=now,
+                    stage_entered_at=now,
+                )
+                self.session.add(deal)
+
         # Audit log
         audit = CRMAuditLog(
             entity_type="contact",
@@ -72,6 +126,7 @@ class ContactService(BaseService):
             "contact_id": contact.id,
             "name": contact.name,
             "email": contact.email,
+            "company_id": contact.company_id,
         })
 
         return contact

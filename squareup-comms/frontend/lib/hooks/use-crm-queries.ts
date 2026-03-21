@@ -198,6 +198,9 @@ export function useCreateContact() {
     mutationFn: (data: Partial<Contact>) => crmApi.createContact(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: crmKeys.contacts() });
+      qc.invalidateQueries({ queryKey: crmKeys.companies() });
+      qc.invalidateQueries({ queryKey: crmKeys.deals() });
+      qc.invalidateQueries({ queryKey: crmKeys.pipelines() });
     },
   });
 }
@@ -817,7 +820,13 @@ export function useHotLeads() {
 
 export function useAICopilot() {
   return useMutation({
-    mutationFn: (query: string) => crmApi.aiCopilot(query),
+    mutationFn: ({
+      query,
+      history,
+    }: {
+      query: string;
+      history?: Array<{ role: string; content: string }>;
+    }) => crmApi.aiCopilot(query, history),
   });
 }
 

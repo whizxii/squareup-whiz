@@ -42,9 +42,9 @@ export function DealCard({ deal, isDragging = false }: DealCardProps) {
     if (aiAdvice) { setAiAdvice(null); return; }
     setAiLoading(true);
     try {
-      const result = await aiCopilot.mutateAsync(
-        `Give 2–3 sentences of actionable coaching advice for this stale deal: "${deal.title}", ${deal.days_in_stage} days in the "${deal.stage}" stage, ${deal.probability}% probability, value ${deal.value ? formatCurrency(deal.value, deal.currency) : "unknown"}. What should the rep do right now?`
-      );
+      const result = await aiCopilot.mutateAsync({
+        query: `Give 2–3 sentences of actionable coaching advice for this stale deal: "${deal.title}", ${deal.days_in_stage} days in the "${deal.stage}" stage, ${deal.probability}% probability, value ${deal.value ? formatCurrency(deal.value, deal.currency) : "unknown"}. What should the rep do right now?`,
+      });
       setAiAdvice(result.message ?? "No advice available.");
     } catch {
       setAiAdvice("Could not load AI advice. Try again.");
