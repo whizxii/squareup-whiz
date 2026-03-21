@@ -343,11 +343,13 @@ export function CallOverlay() {
   );
 
   const handleDisconnected = useCallback(() => {
-    // Don't tear down immediately. LiveKit may fire onDisconnected during its
-    // own internal region-retry (ICE failure → try alternate region). Give it
-    // up to 5 s to succeed — handleConnected will cancel this timer if the
-    // retry connects. Only act if no reconnection happens within the window.
-    if (disconnectTimerRef.current !== undefined) return; // timer already pending
+    // Tear down immediately on disconnect. LiveKit's onDisconnected fires only
+    // after the SDK has exhausted all internal region retries — there is no
+    // benefit to waiting. Delaying unmount allows a runaway negotiate →
+    // onMediaSectionsRequirement loop to accumulate event listeners (causing
+    // MaxListenersExceededWarning) when signal WS reconnects after a network
+    // interruption but the WebRTC peer connection stays broken.
+    if (disconnectTimerRef.current !== undefined) return; // teardown already scheduled
     disconnectTimerRef.current = setTimeout(() => {
       disconnectTimerRef.current = undefined;
       setShouldConnect(false);
@@ -355,7 +357,7 @@ export function CallOverlay() {
         useCallStore.getState().recordCallFailure();
       }
       useCallStore.getState().leaveCall();
-    }, 5000);
+    }, 0);
   }, []);
 
   const handleError = useCallback((err?: Error) => {
