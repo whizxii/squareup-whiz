@@ -321,6 +321,44 @@ class CopilotService(BaseService):
             except Exception:
                 pass
 
+        # Intent: contact field lookup — "what's [name]'s phone number?", "what is [name]'s email?"
+        phone_lookup_match = re.search(
+            r"what(?:'s|\s+is)\s+(\w+(?:\s+\w+)?)'s?\s+(?:phone(?:\s+number)?|email(?:\s+address)?|number|contact)",
+            normalized,
+        )
+        if phone_lookup_match:
+            name_query = phone_lookup_match.group(1).strip()
+            field = "email" if "email" in normalized else "phone"
+            try:
+                result = await self.session.execute(
+                    select(CRMContact)
+                    .where(
+                        CRMContact.name.ilike(f"%{name_query}%"),
+                        CRMContact.is_archived == False,  # noqa: E712
+                    )
+                    .limit(3)
+                )
+                contacts = result.scalars().all()
+                if contacts:
+                    lines = []
+                    for c in contacts:
+                        val = getattr(c, field, None)
+                        lines.append(
+                            f"- **{c.name}**: {val}" if val else f"- **{c.name}**: no {field} on file"
+                        )
+                    return CopilotResponse(
+                        type="answer",
+                        message=f"**{field.capitalize()}** for contacts matching **{name_query}**:\n\n" + "\n".join(lines),
+                        data=None,
+                    )
+                return CopilotResponse(
+                    type="clarification",
+                    message=f"I couldn't find any contacts matching **{name_query}** in your CRM.",
+                    data=None,
+                )
+            except Exception:
+                pass
+
         # Intent: find/show contact — "show me [name]", "find [name]", "who is [name]"
         contact_match = re.search(
             r"(?:show\s+me|find|who\s+is|tell\s+me\s+about|info\s+on)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)",

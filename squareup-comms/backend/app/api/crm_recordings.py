@@ -252,7 +252,7 @@ async def get_contact_recordings(
         meta={
             "next_cursor": result.next_cursor,
             "has_more": result.has_more,
-            "total": result.total,
+            "total": result.total_count,
         },
     )
 
