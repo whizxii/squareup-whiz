@@ -316,6 +316,10 @@ export function CallOverlay() {
   // connection attempt while <LiveKitRoom> is still mounted.
   const [shouldConnect, setShouldConnect] = useState(false);
 
+  // Delay timer ref — used to give LiveKit's internal region-retry up to 5 s
+  // to succeed before we tear everything down. Cancelled by handleConnected.
+  const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
   // Enable connect only once we have a fresh token+url from the store.
   useEffect(() => {
     if (isInCall && token && livekitUrl) {
@@ -334,19 +338,27 @@ export function CallOverlay() {
   );
 
   const handleDisconnected = useCallback(() => {
-    // Kill the connect gate immediately — this fires synchronously inside
-    // LiveKit's event loop, before React has processed the leaveCall() update.
-    setShouldConnect(false);
-    // If still in call state, this was an unexpected disconnect (e.g. 401 on
-    // initial connect), not a user-initiated hang-up — count it against the
-    // circuit breaker.
-    if (useCallStore.getState().isInCall) {
-      useCallStore.getState().recordCallFailure();
-    }
-    useCallStore.getState().leaveCall();
+    // Don't tear down immediately. LiveKit may fire onDisconnected during its
+    // own internal region-retry (ICE failure → try alternate region). Give it
+    // up to 5 s to succeed — handleConnected will cancel this timer if the
+    // retry connects. Only act if no reconnection happens within the window.
+    if (disconnectTimerRef.current !== undefined) return; // timer already pending
+    disconnectTimerRef.current = setTimeout(() => {
+      disconnectTimerRef.current = undefined;
+      setShouldConnect(false);
+      if (useCallStore.getState().isInCall) {
+        useCallStore.getState().recordCallFailure();
+      }
+      useCallStore.getState().leaveCall();
+    }, 5000);
   }, []);
 
   const handleError = useCallback((err?: Error) => {
+    // Cancel any pending disconnect timer — error is definitive, no retry needed.
+    if (disconnectTimerRef.current !== undefined) {
+      clearTimeout(disconnectTimerRef.current);
+      disconnectTimerRef.current = undefined;
+    }
     setShouldConnect(false);
     // Permission errors (mic/camera denied) are user-side — don't penalise the
     // circuit breaker, which is intended for server-side auth/network failures.
@@ -357,7 +369,21 @@ export function CallOverlay() {
   }, []);
 
   const handleConnected = useCallback(() => {
+    // Region retry succeeded — cancel the pending disconnect teardown.
+    if (disconnectTimerRef.current !== undefined) {
+      clearTimeout(disconnectTimerRef.current);
+      disconnectTimerRef.current = undefined;
+    }
     useCallStore.getState().recordCallSuccess();
+  }, []);
+
+  // Clean up disconnect timer if CallOverlay ever unmounts.
+  useEffect(() => {
+    return () => {
+      if (disconnectTimerRef.current !== undefined) {
+        clearTimeout(disconnectTimerRef.current);
+      }
+    };
   }, []);
 
   return (
