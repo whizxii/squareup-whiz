@@ -462,7 +462,11 @@ export default function OfficePage() {
             ))}
 
           {/* Layer 3: Proximity prompt */}
-          <ProximityPrompt />
+          <ProximityPrompt
+            onCallInvite={(targetUserId, roomName) =>
+              wsSend({ type: "call.invite", target_user_id: targetUserId, room_name: roomName })
+            }
+          />
 
           {/* Layer 3: Wave effect */}
           <WaveEffect />

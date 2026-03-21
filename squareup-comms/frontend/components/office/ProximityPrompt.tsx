@@ -18,7 +18,11 @@ import { tileToIso } from "@/lib/office/iso-coords";
 
 const INTERACT_RANGE = 3;
 
-export default function ProximityPrompt() {
+export default function ProximityPrompt({
+  onCallInvite,
+}: {
+  readonly onCallInvite?: (targetUserId: string, roomName: string) => void;
+}) {
   const { tokens } = useOfficeTheme();
   const myUserId = useCurrentUserId();
   const myPosition = useOfficeStore((s) => s.myPosition);
@@ -70,7 +74,8 @@ export default function ProximityPrompt() {
     const ids = [myUserId, nearest.id].sort();
     const roomName = `call-${ids[0]}-${ids[1]}`;
     joinCall(roomName);
-  }, [nearest, myUserId, joinCall]);
+    onCallInvite?.(nearest.id, roomName);
+  }, [nearest, myUserId, joinCall, onCallInvite]);
 
   if (prefersReduced) return null;
 
