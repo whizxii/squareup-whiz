@@ -16,6 +16,7 @@ import { UploadRecordingDialog } from "@/components/crm/dialogs/UploadRecordingD
 import { ImportDialog } from "@/components/crm/dialogs/ImportDialog";
 import { ExportDialog } from "@/components/crm/dialogs/ExportDialog";
 import { MergeContactsDialog } from "@/components/crm/dialogs/MergeContactsDialog";
+import { KeyboardHelpDialog } from "@/components/crm/dialogs/KeyboardHelpDialog";
 import { CommandPalette } from "@/components/crm/CommandPalette";
 
 // ─── Dialog Manager — mounted on ALL CRM routes ──────────────────
@@ -96,6 +97,11 @@ function CRMDialogManager() {
         onOpenChange={(open) => { if (!open) closeDialog(); }}
         primaryId={(mergeData?.primary_id as string) ?? null}
         secondaryId={(mergeData?.secondary_id as string) ?? null}
+      />
+
+      <KeyboardHelpDialog
+        open={dialog.type === "keyboard-help"}
+        onOpenChange={(open) => { if (!open) closeDialog(); }}
       />
     </>
   );

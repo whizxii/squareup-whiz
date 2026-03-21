@@ -2,7 +2,7 @@
 
 import { Command } from "cmdk";
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Building2,
@@ -39,6 +39,7 @@ export function CommandPalette() {
   const [search, setSearch] = useState("");
   const [nlAgentOpen, setNlAgentOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   const channels = useChatStore((s) => s.channels);
   const setActiveChannel = useChatStore((s) => s.setActiveChannel);
@@ -76,17 +77,18 @@ export function CommandPalette() {
     };
   }, []);
 
-  // Toggle with Cmd+K
+  // Toggle with Cmd+K — defer to CRM's own palette on /crm routes
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        if (pathname.startsWith("/crm")) return;
         e.preventDefault();
         setOpen((o) => !o);
       }
     };
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
-  }, []);
+  }, [pathname]);
 
   // Reset search when closing
   useEffect(() => {

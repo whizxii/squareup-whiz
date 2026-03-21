@@ -344,7 +344,7 @@ export function LogActivityDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 overflow-y-auto max-h-[90vh]">
-          <Dialog.Title className="text-lg font-display font-bold mb-4">
+          <Dialog.Title className="text-lg font-display font-bold mb-1">
             Log Activity
             {contactName !== "Contact" && (
               <span className="ml-2 text-sm font-normal text-muted-foreground">
@@ -352,6 +352,9 @@ export function LogActivityDialog({
               </span>
             )}
           </Dialog.Title>
+          <Dialog.Description className="text-xs text-muted-foreground mb-4">
+            Record a call, email, meeting, or note.
+          </Dialog.Description>
 
           <div className="space-y-4">
             {/* ── Contact picker (only when no contactId provided) ── */}

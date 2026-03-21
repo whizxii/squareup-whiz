@@ -244,7 +244,11 @@ class CopilotService(BaseService):
                 "data": None,
             }
 
-        context = await self._build_context()
+        try:
+            context = await self._build_context()
+        except Exception:
+            logger.warning("Could not build CRM context for copilot, proceeding without it")
+            context = ""
         result = await self._copilot.answer(query, context)
         logger.info("Copilot query: %s → type: %s", query[:80], result.type)
 

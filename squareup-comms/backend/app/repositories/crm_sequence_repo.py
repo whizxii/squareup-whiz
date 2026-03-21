@@ -19,6 +19,7 @@ class SequenceRepository(BaseRepository[CRMEmailSequence]):
     async def search(
         self,
         *,
+        query: str | None = None,
         status: str | None = None,
         cursor: str | None = None,
         limit: int = 50,
@@ -27,6 +28,8 @@ class SequenceRepository(BaseRepository[CRMEmailSequence]):
     ) -> PaginatedResponse[CRMEmailSequence]:
         """Search sequences with filters and cursor pagination."""
         filters: list[Any] = []
+        if query:
+            filters.append(CRMEmailSequence.name.ilike(f"%{query}%"))
         if status:
             filters.append(CRMEmailSequence.status == status)
 
