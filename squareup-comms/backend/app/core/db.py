@@ -1,21 +1,24 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.pool import NullPool
 from sqlmodel import SQLModel
 from app.core.config import settings
 
 db_url = settings.DATABASE_URL
-engine_kwargs = {}
+engine_kwargs: dict = {}
 
 if "postgresql" in db_url:
+    # NullPool: create a fresh connection per-request then close it.
+    # This is the recommended pattern for serverless databases (Neon, Supabase)
+    # which aggressively reclaim idle connections.
     engine_kwargs = {
-        "pool_size": 5,
-        "max_overflow": 10,
-        "pool_pre_ping": True,
-        "pool_recycle": 300,
+        "poolclass": NullPool,
     }
     if "asyncpg" in db_url:
         engine_kwargs["connect_args"] = {
             "prepared_statement_cache_size": 0,
             "statement_cache_size": 0,
+            "command_timeout": 60,
+            "timeout": 30,
         }
 
 engine = create_async_engine(

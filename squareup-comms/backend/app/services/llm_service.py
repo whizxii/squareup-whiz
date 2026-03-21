@@ -39,6 +39,7 @@ class ToolUseComplete:
     tool_use_id: str
     name: str
     input: dict
+    thought_signature: str | None = None  # Gemini 3+ requires echoing this back
 
 
 @dataclass(frozen=True)
@@ -156,12 +157,17 @@ class GeminiLLMClient:
                         block_name = block["name"]
                         if block_id:
                             tool_id_to_name[block_id] = block_name
-                        parts.append(types.Part(
-                            function_call=types.FunctionCall(
+                        part_kwargs: dict[str, Any] = {
+                            "function_call": types.FunctionCall(
                                 name=block_name,
                                 args=block.get("input", {}),
                             ),
-                        ))
+                        }
+                        # Gemini 3+ requires thought_signature echoed back
+                        ts = block.get("thought_signature")
+                        if ts:
+                            part_kwargs["thought_signature"] = ts
+                        parts.append(types.Part(**part_kwargs))
 
                     elif block_type == "tool_result":
                         result_content = block.get("content", "")
@@ -250,11 +256,15 @@ class GeminiLLMClient:
                     # Generate unique IDs — Gemini FunctionCall has no .id field
                     tool_id = f"gemini_{fn_call.name}_{tool_call_counter}"
                     tool_call_counter += 1
+                    # Gemini 3+ models return thought_signature alongside function calls;
+                    # it MUST be echoed back when sending function results.
+                    ts = getattr(part, "thought_signature", None)
                     yield ToolUseStart(tool_use_id=tool_id, name=fn_call.name)
                     yield ToolUseComplete(
                         tool_use_id=tool_id,
                         name=fn_call.name,
                         input=dict(fn_call.args) if fn_call.args else {},
+                        thought_signature=ts,
                     )
                 elif getattr(part, "text", None):
                     yield TextDelta(text=part.text)

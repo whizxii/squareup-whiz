@@ -416,12 +416,16 @@ async def run_agent(
 
             tool_results: list[dict] = []
             for tu in tool_use_blocks:
-                assistant_content.append({
+                tool_block: dict = {
                     "type": "tool_use",
                     "id": tu.tool_use_id,
                     "name": tu.name,
                     "input": tu.input,
-                })
+                }
+                # Gemini 3+ requires thought_signature echoed back on function call parts
+                if getattr(tu, "thought_signature", None):
+                    tool_block["thought_signature"] = tu.thought_signature
+                assistant_content.append(tool_block)
 
                 await _broadcast_tool_start(channel_id, agent.id, tu.name, tu.input)
 
@@ -826,12 +830,16 @@ async def invoke_agent_sync(
 
             tool_results: list[dict] = []
             for tu in tool_use_blocks:
-                assistant_content.append({
+                tool_block: dict = {
                     "type": "tool_use",
                     "id": tu.tool_use_id,
                     "name": tu.name,
                     "input": tu.input,
-                })
+                }
+                # Gemini 3+ requires thought_signature echoed back on function call parts
+                if getattr(tu, "thought_signature", None):
+                    tool_block["thought_signature"] = tu.thought_signature
+                assistant_content.append(tool_block)
 
                 tool_start = time.monotonic()
                 result = await tool_registry.execute(

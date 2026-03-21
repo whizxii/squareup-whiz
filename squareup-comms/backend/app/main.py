@@ -88,20 +88,25 @@ async def lifespan(application: FastAPI):
 
     # Reset agents stuck in "working" status from a previous crash
     try:
+        import asyncio as _aio
         from app.models.agents import Agent
-        async with async_session() as session:
-            from sqlmodel import select
-            stmt = select(Agent).where(Agent.status == "working")
-            result = await session.execute(stmt)
-            stuck_agents = result.scalars().all()
-            for agent in stuck_agents:
-                logger.warning("Resetting stuck agent %s (%s) from 'working' to 'idle'", agent.id, agent.name)
-                agent.status = "idle"
-                agent.current_task = None
-                session.add(agent)
-            if stuck_agents:
-                await session.commit()
-                logger.info("Reset %d stuck agent(s) to idle.", len(stuck_agents))
+        from sqlmodel import select
+
+        async def _reset_stuck():
+            async with async_session() as session:
+                stmt = select(Agent).where(Agent.status == "working")
+                result = await session.execute(stmt)
+                stuck_agents = result.scalars().all()
+                for agent in stuck_agents:
+                    logger.warning("Resetting stuck agent %s (%s) from 'working' to 'idle'", agent.id, agent.name)
+                    agent.status = "idle"
+                    agent.current_task = None
+                    session.add(agent)
+                if stuck_agents:
+                    await session.commit()
+                    logger.info("Reset %d stuck agent(s) to idle.", len(stuck_agents))
+
+        await _aio.wait_for(_reset_stuck(), timeout=15)
     except Exception:
         logger.warning("Failed to reset stuck agents (non-fatal)", exc_info=True)
 
