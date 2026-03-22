@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { formatTime } from "@/lib/format";
+import { useWebSocket } from "@/hooks/use-websocket";
 import {
   Bot,
   Send,
@@ -23,8 +24,6 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import AgentExecutionHistory from "@/components/agents/AgentExecutionHistory";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // Stable reference to avoid infinite re-render loops with React 19 + Zustand
 const EMPTY_AGENT_MESSAGES: AgentChatMessage[] = [];
@@ -47,6 +46,176 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Streaming state refs — accumulated across incremental deltas
+  const streamTextRef = useRef("");
+  const streamToolsRef = useRef<ToolCall[]>([]);
+  const activeAgentMsgIdRef = useRef<string | null>(null);
+
+  // WebSocket connection for agent streaming
+  const token = useAuthStore((s) => s.token);
+  const { send: wsSend, on: wsOn, status: wsStatus } = useWebSocket(token);
+
+  const userId = getCurrentUserId();
+  const syntheticChannelId = agent ? `agent-dm:${agent.id}:${userId}` : "";
+
+  // Join the synthetic room on mount, leave on unmount
+  useEffect(() => {
+    if (!syntheticChannelId || wsStatus !== "connected") return;
+    wsSend({ type: "channel.join", channel_id: syntheticChannelId });
+    return () => {
+      wsSend({ type: "channel.leave", channel_id: syntheticChannelId });
+    };
+  }, [syntheticChannelId, wsStatus, wsSend]);
+
+  // Subscribe to agent streaming events
+  useEffect(() => {
+    if (!agent) return;
+    const agentId = agent.id;
+
+    const offTextDelta = wsOn("agent.text_delta", (data) => {
+      const ch = data.channel_id as string;
+      const aId = data.agent_id as string;
+      const delta = data.delta as string;
+      if (ch !== syntheticChannelId || aId !== agentId || !delta) return;
+
+      streamTextRef.current += delta;
+      const msgId = activeAgentMsgIdRef.current;
+      if (msgId) {
+        updateChatMessage(agentId, msgId, {
+          content: streamTextRef.current,
+          status: "thinking",
+        });
+      }
+    });
+
+    const offToolStart = wsOn("agent.tool_start", (data) => {
+      const ch = data.channel_id as string;
+      const aId = data.agent_id as string;
+      const toolName = data.tool_name as string;
+      if (ch !== syntheticChannelId || aId !== agentId || !toolName) return;
+
+      const newTool: ToolCall = {
+        name: toolName,
+        input: {},
+        output: null,
+        duration_ms: 0,
+        success: false,
+      };
+      streamToolsRef.current = [...streamToolsRef.current, newTool];
+
+      const msgId = activeAgentMsgIdRef.current;
+      if (msgId) {
+        updateChatMessage(agentId, msgId, {
+          toolCalls: [...streamToolsRef.current],
+        });
+      }
+    });
+
+    const offToolResult = wsOn("agent.tool_result", (data) => {
+      const ch = data.channel_id as string;
+      const aId = data.agent_id as string;
+      const toolName = data.tool_name as string;
+      const success = data.success as boolean;
+      const durationMs = (data.duration_ms as number) || 0;
+      if (ch !== syntheticChannelId || aId !== agentId || !toolName) return;
+
+      streamToolsRef.current = streamToolsRef.current.map((tc) =>
+        tc.name === toolName && !tc.success && tc.duration_ms === 0
+          ? { ...tc, success, duration_ms: durationMs }
+          : tc
+      );
+
+      const msgId = activeAgentMsgIdRef.current;
+      if (msgId) {
+        updateChatMessage(agentId, msgId, {
+          toolCalls: [...streamToolsRef.current],
+        });
+      }
+    });
+
+    const offComplete = wsOn("agent.complete", (data) => {
+      const ch = data.channel_id as string;
+      const aId = data.agent_id as string;
+      if (ch !== syntheticChannelId || aId !== agentId) return;
+
+      const msgId = activeAgentMsgIdRef.current;
+      if (msgId) {
+        updateChatMessage(agentId, msgId, {
+          content: streamTextRef.current || "Done.",
+          toolCalls: [...streamToolsRef.current],
+          status: "done",
+        });
+      }
+      updateAgent(agentId, { status: "idle", current_task: undefined });
+      setSending(false);
+      activeAgentMsgIdRef.current = null;
+    });
+
+    const offError = wsOn("agent.error", (data) => {
+      const ch = data.channel_id as string;
+      const aId = data.agent_id as string;
+      const errorMsg = (data.error as string) || "Something went wrong.";
+      if (ch !== syntheticChannelId || aId !== agentId) return;
+
+      const msgId = activeAgentMsgIdRef.current;
+      if (msgId) {
+        updateChatMessage(agentId, msgId, {
+          content: streamTextRef.current || errorMsg,
+          status: "error",
+        });
+      }
+      updateAgent(agentId, { status: "idle", current_task: undefined });
+      setSending(false);
+      activeAgentMsgIdRef.current = null;
+    });
+
+    const offStatus = wsOn("agent.status", (data) => {
+      const aId = data.agent_id as string;
+      const status = data.status as string;
+      if (aId !== agentId) return;
+      updateAgent(agentId, {
+        status: status as import("@/lib/stores/agent-store").AgentStatus,
+      });
+    });
+
+    const offProgress = wsOn("agent.progress", (data) => {
+      const ch = data.channel_id as string;
+      const aId = data.agent_id as string;
+      const current = data.current as number;
+      const total = data.total as number;
+      const description = (data.description as string) || undefined;
+      if (ch !== syntheticChannelId || aId !== agentId) return;
+      useAgentStore.getState().updateProgress(ch, aId, current, total, description);
+    });
+
+    const offConfirmation = wsOn("agent.confirmation", (data) => {
+      const ch = data.channel_id as string;
+      const aId = data.agent_id as string;
+      if (ch !== syntheticChannelId || aId !== agentId) return;
+
+      useAgentStore.getState().addConfirmation({
+        requestId: data.request_id as string,
+        channelId: ch,
+        agentId: aId,
+        agentName: (data.agent_name as string) || agent.name,
+        toolName: data.tool_name as string,
+        toolInput: (data.tool_input as Record<string, unknown>) || {},
+        receivedAt: new Date().toISOString(),
+      });
+    });
+
+    return () => {
+      offTextDelta();
+      offToolStart();
+      offToolResult();
+      offComplete();
+      offError();
+      offStatus();
+      offProgress();
+      offConfirmation();
+    };
+  }, [agent, syntheticChannelId, wsOn, updateChatMessage, updateAgent]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages.length]);
@@ -62,11 +231,15 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
 
   if (!agent) return null;
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!input.trim() || sending) return;
     const text = input.trim();
     setInput("");
     setSending(true);
+
+    // Reset streaming accumulators
+    streamTextRef.current = "";
+    streamToolsRef.current = [];
 
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -84,6 +257,7 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
 
     // Add placeholder agent message (thinking state)
     const agentMsgId = `agent-${Date.now()}`;
+    activeAgentMsgIdRef.current = agentMsgId;
     addChatMessage(agent.id, {
       id: agentMsgId,
       role: "agent",
@@ -94,50 +268,12 @@ export function AgentChat({ onBack }: { onBack: () => void }) {
 
     updateAgent(agent.id, { status: "thinking", current_task: text });
 
-    // Call the real backend API
-    try {
-      const token = useAuthStore.getState().token;
-      const headers: Record<string, string> = token
-        ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
-        : { "X-User-Id": getCurrentUserId(), "Content-Type": "application/json" };
-
-      const res = await fetch(`${API_URL}/api/agents/${agent.id}/invoke`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ message: text }),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(errBody.detail || `API Error: ${res.status}`);
-      }
-
-      const data = await res.json();
-      // Backend returns tools_called as a JSON string — parse it safely
-      let parsedTools: ToolCall[] = [];
-      try {
-        const raw = data.tools_called;
-        const arr = Array.isArray(raw) ? raw : JSON.parse(raw || "[]");
-        parsedTools = Array.isArray(arr) ? arr : [];
-      } catch {
-        parsedTools = [];
-      }
-      updateChatMessage(agent.id, agentMsgId, {
-        content: data.response_text || (parsedTools.length > 0 ? "Completed." : "I couldn't generate a response. Please try again."),
-        toolCalls: parsedTools,
-        status: data.response_text ? "done" : "error",
-      });
-      updateAgent(agent.id, { status: "idle", current_task: undefined });
-      setSending(false);
-    } catch (err) {
-      updateChatMessage(agent.id, agentMsgId, {
-        content: "Failed to reach the agent. Make sure the backend is running.",
-        status: "error",
-      });
-      updateAgent(agent.id, { status: "idle", current_task: undefined });
-      setSending(false);
-      return;
-    }
+    // Send via WebSocket — streaming events will flow back through the subscriptions above
+    wsSend({
+      type: "agent.invoke",
+      agent_id: agent.id,
+      content: text,
+    });
   };
 
   const handleClearChat = () => {

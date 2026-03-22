@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useCallback, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
+import { useAuthStore } from "@/lib/stores/auth-store";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { useCRMNotifications } from "@/hooks/use-crm-notifications";
 import {
   createKeyboardHandler,
   type KeyboardShortcut,
 } from "@/lib/crm-keyboard";
+import {
+  viewTransition,
+  viewTransitionConfig,
+} from "@/lib/animations/crm-variants";
 import { CreateContactDialog } from "@/components/crm/dialogs/CreateContactDialog";
 import { EditContactDialog } from "@/components/crm/dialogs/EditContactDialog";
 import { LogActivityDialog } from "@/components/crm/dialogs/LogActivityDialog";
@@ -18,6 +26,7 @@ import { ExportDialog } from "@/components/crm/dialogs/ExportDialog";
 import { MergeContactsDialog } from "@/components/crm/dialogs/MergeContactsDialog";
 import { KeyboardHelpDialog } from "@/components/crm/dialogs/KeyboardHelpDialog";
 import { CommandPalette } from "@/components/crm/CommandPalette";
+import { AttentionBanner } from "@/components/crm/AttentionBanner";
 
 // ─── Dialog Manager — mounted on ALL CRM routes ──────────────────
 
@@ -194,6 +203,12 @@ export function CRMLayout({ children }: CRMLayoutProps) {
   const openDialog = useCRMUIStore((s) => s.openDialog);
   const closeDialog = useCRMUIStore((s) => s.closeDialog);
   const setCommandPaletteOpen = useCRMUIStore((s) => s.setCommandPaletteOpen);
+  const setCommandPaletteMode = useCRMUIStore((s) => s.setCommandPaletteMode);
+
+  // ─── WebSocket CRM notifications ──────────────────────────────
+  const token = useAuthStore((s) => s.token);
+  const { on: wsOn } = useWebSocket(token);
+  useCRMNotifications(wsOn);
 
   const handleShortcut = useCallback(
     (shortcutId: string) => {
@@ -202,6 +217,7 @@ export function CRMLayout({ children }: CRMLayoutProps) {
           setCommandPaletteOpen(true);
           break;
         case "cmd-j":
+          setCommandPaletteMode("ai");
           setCommandPaletteOpen(true);
           break;
         case "cmd-shift-n":
@@ -224,7 +240,7 @@ export function CRMLayout({ children }: CRMLayoutProps) {
           break;
       }
     },
-    [openDialog, closeDialog, setCommandPaletteOpen]
+    [openDialog, closeDialog, setCommandPaletteOpen, setCommandPaletteMode]
   );
 
   useEffect(() => {
@@ -238,7 +254,20 @@ export function CRMLayout({ children }: CRMLayoutProps) {
   return (
     <CRMErrorBoundary>
       <div className="flex h-full flex-col overflow-hidden bg-gray-50 dark:bg-gray-950">
-        {children}
+        <AttentionBanner />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeView}
+            variants={viewTransition}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={viewTransitionConfig}
+            className="flex-1 overflow-hidden"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
         <CRMDialogManager />
         <CommandPalette />
       </div>

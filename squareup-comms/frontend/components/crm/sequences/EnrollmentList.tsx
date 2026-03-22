@@ -87,13 +87,13 @@ function EnrollmentRow({
     <div className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 hover:bg-accent/30 transition-colors">
       {/* Contact avatar placeholder */}
       <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-medium shrink-0">
-        {enrollment.contact_id.slice(0, 2).toUpperCase()}
+        {(enrollment.contact_name ?? enrollment.contact_id).slice(0, 2).toUpperCase()}
       </div>
 
       {/* Contact ID + enrolled time */}
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium truncate">
-          {enrollment.contact_id}
+          {enrollment.contact_name ?? enrollment.contact_id}
         </p>
         <p className="text-[10px] text-muted-foreground">
           Enrolled {formatRelativeTime(enrollment.enrolled_at)}

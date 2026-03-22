@@ -220,7 +220,16 @@ class ToolRegistry:
 
         ``available_tools`` is the merged tool list from ``get_tools_for_agent``
         so we can resolve custom and MCP tools that aren't in the builtins dict.
+
+        Transparent caching: read-only tools are cached; mutation tools
+        trigger invalidation of related entries.
         """
+        from app.services.tools.tool_cache import (
+            get_cached_result,
+            invalidate_for_tool,
+            store_result,
+        )
+
         # Try builtins first, then fall back to the provided available list
         tool = self.get(tool_name)
         if tool is None and available_tools:
@@ -228,22 +237,35 @@ class ToolRegistry:
         if tool is None:
             return ToolResult(success=False, output=None, error=f"Unknown tool: {tool_name}")
 
+        # --- Cache lookup (read-only tools only) ---
+        cached = get_cached_result(tool_name, tool_input)
+        if cached is not None:
+            return cached
+
         try:
             if tool.source == "builtin":
                 if tool.handler is None:
                     return ToolResult(success=False, output=None, error=f"No handler for tool: {tool_name}")
-                return await tool.handler(tool_input, context)
+                result = await tool.handler(tool_input, context)
 
-            if tool.source == "custom_http":
-                return await self._execute_http_tool(tool, tool_input, context)
+            elif tool.source == "custom_http":
+                result = await self._execute_http_tool(tool, tool_input, context)
 
-            if tool.source == "custom_webhook":
-                return await self._execute_webhook_tool(tool, tool_input, context)
+            elif tool.source == "custom_webhook":
+                result = await self._execute_webhook_tool(tool, tool_input, context)
 
-            if tool.source == "mcp":
-                return await self._execute_mcp_tool(tool, tool_input, context)
+            elif tool.source == "mcp":
+                result = await self._execute_mcp_tool(tool, tool_input, context)
 
-            return ToolResult(success=False, output=None, error=f"Unknown tool source: {tool.source}")
+            else:
+                return ToolResult(success=False, output=None, error=f"Unknown tool source: {tool.source}")
+
+            # --- Post-execution: cache or invalidate ---
+            if result.success:
+                store_result(tool_name, tool_input, result)
+                invalidate_for_tool(tool_name)
+
+            return result
 
         except Exception as exc:
             logger.error("Tool %s execution failed: %s", tool_name, exc)
@@ -259,7 +281,30 @@ class ToolRegistry:
     ) -> ToolResult:
         """Execute a user-configured HTTP request tool."""
         config = tool.config
-        url = config["url_template"].format(**tool_input)
+
+        # Sanitize tool_input values to prevent SSRF via URL injection
+        sanitized_input = {
+            k: str(v).replace("\n", "").replace("\r", "")
+            for k, v in tool_input.items()
+        }
+        url = config["url_template"].format(**sanitized_input)
+
+        # Block requests to private/internal networks
+        from urllib.parse import urlparse
+        import ipaddress
+
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+        blocked_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "metadata.google.internal"}
+        if hostname in blocked_hosts:
+            return ToolResult(success=False, output=None, error="Blocked: request to internal host")
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                return ToolResult(success=False, output=None, error="Blocked: request to private IP")
+        except ValueError:
+            pass  # hostname is a domain name, not an IP — allow DNS resolution
+
         method: str = config.get("method", "GET").upper()
         headers: dict[str, str] = dict(config.get("headers", {}))
         body = config.get("body_template")

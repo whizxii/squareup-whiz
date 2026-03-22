@@ -89,7 +89,9 @@ export function MessageList({ loading = false, onConfirmationRespond }: MessageL
   // Select stable reference, then filter in useMemo to avoid React 19 infinite loop
   const allAgents = useAgentStore((s) => s.agents);
   const thinkingAgents = useMemo(
-    () => allAgents.filter((a) => a.status === "thinking" || a.status === "working"),
+    () => allAgents.filter((a) =>
+      a.status === "thinking" || a.status === "working" || a.status === "tool_calling"
+    ),
     [allAgents]
   );
 
@@ -333,6 +335,7 @@ export function MessageList({ loading = false, onConfirmationRespond }: MessageL
               <AgentThinkingIndicator
                 agentName={agent.name}
                 agentIcon={agent.office_station_icon}
+                statusDescription={agent.current_task}
               />
             </motion.div>
           ))}

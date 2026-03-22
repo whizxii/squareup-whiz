@@ -33,9 +33,16 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: Optional[str] = None
     DEFAULT_MODEL: str = "claude-sonnet-4-6"
 
+    # OpenAI (Whisper transcription)
+    OPENAI_API_KEY: Optional[str] = None
+
     # Google Gemini (free tier — primary)
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # Embedding (Gemini text-embedding-004 — free tier)
+    EMBEDDING_MODEL: str = "text-embedding-004"
+    EMBEDDING_DIMENSIONS: int = 768
 
     # Microsoft OAuth
     MICROSOFT_CLIENT_ID: Optional[str] = None

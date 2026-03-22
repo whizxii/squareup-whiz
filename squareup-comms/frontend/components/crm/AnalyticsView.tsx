@@ -14,6 +14,7 @@ import {
   Globe,
   TrendingUp,
   AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import {
@@ -25,6 +26,7 @@ import {
 } from "@/lib/hooks/use-crm-queries";
 import { MiniBarChart, FunnelChart } from "@/components/crm/charts/MiniBarChart";
 import { DealRiskPanel } from "@/components/crm/DealRiskPanel";
+import { CrossDealPatternsPanel } from "@/components/crm/CrossDealPatternsPanel";
 
 // ─── Shared ─────────────────────────────────────────────────────
 
@@ -320,10 +322,15 @@ export function AnalyticsView() {
         {/* Row 3 */}
         <LeadSourcePanel period={period} />
 
-        {/* Deal Risk */}
-        <SectionCard title="Deal Risk & Pipeline Health" icon={<AlertTriangle className="w-4 h-4" />}>
-          <DealRiskPanel />
-        </SectionCard>
+        {/* Row 4 — AI Insights */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <SectionCard title="Deal Risk & Pipeline Health" icon={<AlertTriangle className="w-4 h-4" />}>
+            <DealRiskPanel />
+          </SectionCard>
+          <SectionCard title="Cross-Deal Patterns" icon={<Sparkles className="w-4 h-4" />}>
+            <CrossDealPatternsPanel />
+          </SectionCard>
+        </div>
       </div>
     </div>
   );

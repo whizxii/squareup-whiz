@@ -599,6 +599,7 @@ export interface SequenceEnrollment {
   id: string;
   sequence_id: string;
   contact_id: string;
+  contact_name?: string;
   current_step: number;
   status: "active" | "completed" | "replied" | "unenrolled" | "bounced";
   enrolled_at: string;
@@ -658,6 +659,32 @@ export interface TimelineEntry {
   entity_type: string;
 }
 
+// ─── Company 360 Aggregate ────────────────────────────────────────
+
+export interface Company360PipelineSummary {
+  total_pipeline_value: number;
+  total_won_value: number;
+  avg_deal_value: number;
+  open_count: number;
+  won_count: number;
+  lost_count: number;
+  total_count: number;
+  win_rate: number;
+}
+
+export interface Company360ContactSummary {
+  total_count: number;
+  avg_lead_score: number;
+}
+
+export interface Company360Response {
+  company: Company;
+  contacts: Contact[];
+  deals: Deal[];
+  pipeline_summary: Company360PipelineSummary;
+  contact_summary: Company360ContactSummary;
+}
+
 // ─── Analytics ─────────────────────────────────────────────────────
 
 export interface AnalyticsOverview {
@@ -687,7 +714,7 @@ export interface StageMetric {
   conversion_rate: number;
 }
 
-export interface RevenueForcast {
+export interface RevenueForecast {
   period: string;
   actual: number;
   forecast: number;
@@ -736,6 +763,81 @@ export interface ActivityAnalytics {
   daily: { date: string; count: number }[];
   total_30d: number;
   avg_per_day: number;
+}
+
+// ─── Cross-Deal Patterns ────────────────────────────────────────────
+
+export interface CrossDealPattern {
+  pattern: string;
+  detail: string;
+  impact: string;
+  action: string;
+}
+
+export interface CrossDealPatternsResponse {
+  id: string | null;
+  type: string;
+  severity: string;
+  title: string;
+  description: string;
+  ai_reasoning: string;
+  suggested_actions: string[];
+  patterns: CrossDealPattern[];
+  win_rate: number | null;
+  avg_cycle_days: number | null;
+  top_segment: string | null;
+  is_read: boolean;
+  is_dismissed: boolean;
+  is_acted_on: boolean;
+  created_at: string;
+}
+
+// ─── Automation Logs ─────────────────────────────────────────────────
+
+export type AutomationLogStatus =
+  | "auto_executed"
+  | "pending_review"
+  | "approved"
+  | "rejected";
+
+export interface AutomationLogEntry {
+  id: string;
+  action_type: string;
+  entity_type: string;
+  entity_id: string;
+  entity_name: string;
+  confidence: number;
+  status: AutomationLogStatus;
+  performed_by: string;
+  result: string | null;
+  review_notes: string | null;
+  ai_reasoning: string | null;
+  source_event: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+}
+
+// ─── AI Insights ─────────────────────────────────────────────────────
+
+export interface AIInsightEntry {
+  id: string;
+  type: string;
+  severity: string;
+  title: string;
+  description: string;
+  ai_reasoning: string;
+  suggested_actions: string[];
+  entity_type: string | null;
+  entity_id: string | null;
+  entity_name: string | null;
+  target_user_id: string | null;
+  is_read: boolean;
+  is_dismissed: boolean;
+  is_acted_on: boolean;
+  created_at: string;
+  highlight: string | null;
+  risk_score: number | null;
 }
 
 // ─── UI / Views ────────────────────────────────────────────────────
@@ -866,7 +968,8 @@ export type CRMView =
   | "workflows"
   | "smart_lists"
   | "automation"
-  | "digest";
+  | "digest"
+  | "graph";
 
 export const STAGES: { id: CRMStage; label: string; color: string }[] = [
   { id: "lead", label: "Lead", color: "bg-gray-400" },
@@ -886,3 +989,167 @@ export const LIFECYCLE_STAGES: { id: LifecycleStage; label: string }[] = [
   { id: "customer", label: "Customer" },
   { id: "evangelist", label: "Evangelist" },
 ];
+
+// ─── Morning Briefing ─────────────────────────────────────────
+
+export interface BriefingItem {
+  category: "deal_risk" | "stale_contact" | "hot_lead" | "meeting" | "action";
+  title: string;
+  description: string;
+  priority: "high" | "medium" | "low";
+  entity_id: string | null;
+  entity_type: "contact" | "deal" | "event" | null;
+  actions: string[];
+}
+
+export interface PipelineSummary {
+  open_deals: number;
+  total_pipeline_value: number;
+  avg_deal_value: number;
+  won_this_month: number;
+  won_value_this_month: number;
+}
+
+export interface MeetingSummary {
+  id: string;
+  title: string;
+  start_at: string;
+  end_at: string;
+  event_type: string;
+  contact_id: string;
+  status: string;
+}
+
+export interface MorningBriefing {
+  greeting: string;
+  date: string;
+  attention_items: BriefingItem[];
+  pipeline_summary: PipelineSummary;
+  todays_meetings: MeetingSummary[];
+  hot_leads_count: number;
+  stale_contacts_count: number;
+  at_risk_deals_count: number;
+}
+
+// ─── Attention Items (banner alerts) ───────────────────────────
+
+export interface AttentionItem {
+  id: string;
+  type:
+    | "deal_at_risk"
+    | "deal_stale"
+    | "contact_cold"
+    | "task_overdue"
+    | "missing_follow_up";
+  severity: "critical" | "warning" | "info";
+  title: string;
+  description: string;
+  entity_type: "deal" | "contact" | "task";
+  entity_id: string;
+  entity_name: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface AttentionItemsResponse {
+  items: AttentionItem[];
+  count: number;
+  generated_at: string;
+}
+
+// ─── Email Drafts (AI auto-drafted) ─────────────────────────────
+
+export interface EmailDraft {
+  id: string;
+  contact_id: string;
+  deal_id: string | null;
+  subject: string;
+  body_html: string;
+  body_text: string;
+  status: "draft";
+  sequence_id: string | null;
+  sequence_step: number | null;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface EmailDraftResult {
+  draft_id: string;
+  subject: string;
+  body_html: string;
+  body_text: string;
+  trigger: string;
+  contact_id: string;
+  deal_id: string | null;
+}
+
+// ─── AI Feedback ──────────────────────────────────────────────────
+
+export type AIFeedbackRating = "thumbs_up" | "thumbs_down";
+
+export type AIFeedbackSourceType =
+  | "automation_log"
+  | "insight"
+  | "lead_score"
+  | "deal_risk"
+  | "copilot";
+
+export type AIFeedbackOutcome =
+  | "correct"
+  | "incorrect"
+  | "partially_correct";
+
+export interface AIFeedbackEntry {
+  id: string;
+  source_type: AIFeedbackSourceType;
+  source_id: string;
+  user_id: string;
+  rating: AIFeedbackRating;
+  outcome: AIFeedbackOutcome | null;
+  feedback_text: string | null;
+  ai_confidence: number | null;
+  action_type: string | null;
+  created_at: string;
+}
+
+export interface AIAccuracyMetrics {
+  total: number;
+  thumbs_up: number;
+  thumbs_down: number;
+  approval_rate: number;
+  by_action_type: Record<
+    string,
+    { total: number; thumbs_up: number; thumbs_down: number; approval_rate: number }
+  >;
+  by_source_type: Record<
+    string,
+    { total: number; thumbs_up: number; thumbs_down: number; approval_rate: number }
+  >;
+  trend: Array<{ week: string; total: number; approval_rate: number }>;
+}
+
+// ─── Relationship Graph ──────────────────────────────────────────
+
+export type GraphNodeType = "contact" | "company" | "deal";
+export type GraphNodeHealth = "good" | "warning" | "at_risk";
+export type GraphLinkType = "works_at" | "involved_in" | "belongs_to";
+
+export interface GraphNode {
+  id: string;
+  type: GraphNodeType;
+  label: string;
+  value: number;
+  health: GraphNodeHealth;
+  metadata: Record<string, unknown>;
+}
+
+export interface GraphLink {
+  source: string;
+  target: string;
+  type: GraphLinkType;
+  strength: number;
+}
+
+export interface RelationshipGraphData {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}

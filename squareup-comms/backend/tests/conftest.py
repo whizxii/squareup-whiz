@@ -51,18 +51,34 @@ def event_loop():
 @pytest.fixture(autouse=True)
 async def _setup_tables():
     """Create all tables before each test, drop after."""
-    # Import all models so SQLModel.metadata knows about them
+    # Import ALL models so SQLModel.metadata knows about every table/FK
     import app.models.users  # noqa: F401
     import app.models.chat  # noqa: F401
+    import app.models.chat_signal  # noqa: F401
     import app.models.crm  # noqa: F401
     import app.models.crm_company  # noqa: F401
     import app.models.crm_audit  # noqa: F401
     import app.models.crm_note  # noqa: F401
     import app.models.crm_tag  # noqa: F401
+    import app.models.crm_deal  # noqa: F401
+    import app.models.crm_email  # noqa: F401
+    import app.models.crm_calendar  # noqa: F401
+    import app.models.crm_pipeline  # noqa: F401
+    import app.models.crm_sequence  # noqa: F401
+    import app.models.crm_recording  # noqa: F401
+    import app.models.crm_workflow  # noqa: F401
+    import app.models.crm_smart_list  # noqa: F401
     import app.models.agents  # noqa: F401
     import app.models.integrations  # noqa: F401
     import app.models.files  # noqa: F401
     import app.models.notifications  # noqa: F401
+    import app.models.tasks  # noqa: F401
+    import app.models.reminders  # noqa: F401
+    import app.models.custom_tools  # noqa: F401
+    import app.models.office  # noqa: F401
+    import app.models.ai_insight  # noqa: F401
+    import app.models.automation_log  # noqa: F401
+    import app.models.digest  # noqa: F401
 
     async with _test_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
@@ -107,6 +123,18 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
     app.state.event_bus = EventBus()
     app.state.background = BackgroundTaskManager()
     app.state.cache = TTLCache(default_ttl=300)
+
+    # Also init shared_infra so tools/scheduler use the same instances
+    from app.core.shared_infra import init as _init_shared_infra
+    _init_shared_infra(
+        event_bus=app.state.event_bus,
+        background=app.state.background,
+        cache=app.state.cache,
+    )
+
+    # Disable rate limiting in tests to avoid cross-test pollution
+    from app.core.rate_limit import limiter
+    limiter.enabled = False
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

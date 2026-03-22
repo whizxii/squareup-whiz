@@ -15,8 +15,9 @@ from app.core.auth import get_current_user
 from app.core.responses import ApiError, success_response
 
 logger = logging.getLogger(__name__)
-from app.api.deps import get_calendar_event_service
+from app.api.deps import get_calendar_event_service, get_followup_service
 from app.services.crm_calendar_service import VALID_EVENT_TYPES, CalendarEventService
+from app.services.crm_followup_service import FollowUpService
 
 router = APIRouter(prefix="/api/crm/v2", tags=["crm-calendar"])
 
@@ -73,6 +74,14 @@ class UpdateEventBody(BaseModel):
     meeting_url: Optional[str] = Field(default=None, max_length=1000)
     attendees: Optional[List[AttendeeSchema]] = None
     reminder_minutes: Optional[int] = None
+
+
+class SnoozeFollowUpBody(BaseModel):
+    snooze_until: datetime
+
+
+class DismissFollowUpBody(BaseModel):
+    pass
 
 
 class CompleteEventBody(BaseModel):
@@ -306,3 +315,38 @@ async def get_contact_calendar(
     return success_response([
         EventResponse.from_model(e).model_dump(mode="json") for e in events
     ])
+
+
+# ---------------------------------------------------------------------------
+# Follow-Up Snooze / Dismiss
+# ---------------------------------------------------------------------------
+
+
+@router.put("/calendar/follow-ups/{event_id}/snooze")
+async def snooze_follow_up(
+    event_id: str,
+    body: SnoozeFollowUpBody,
+    svc: FollowUpService = Depends(get_followup_service),
+    user_id: str = Depends(get_current_user),
+):
+    """Snooze a follow-up to a later time."""
+    try:
+        event = await svc.snooze_follow_up(event_id, body.snooze_until, user_id)
+    except ValueError as exc:
+        raise ApiError(status_code=400, detail=str(exc))
+    if event is None:
+        raise ApiError(status_code=404, detail="Follow-up not found")
+    return success_response(EventResponse.from_model(event))
+
+
+@router.put("/calendar/follow-ups/{event_id}/dismiss")
+async def dismiss_follow_up(
+    event_id: str,
+    svc: FollowUpService = Depends(get_followup_service),
+    user_id: str = Depends(get_current_user),
+):
+    """Dismiss (cancel) a follow-up."""
+    event = await svc.dismiss_follow_up(event_id, user_id)
+    if event is None:
+        raise ApiError(status_code=404, detail="Follow-up not found")
+    return success_response(EventResponse.from_model(event))

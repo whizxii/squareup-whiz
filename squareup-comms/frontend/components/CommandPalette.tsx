@@ -20,9 +20,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useChatStore } from "@/lib/stores/chat-store";
-import { useCRMStore } from "@/lib/stores/crm-store";
+import { useContacts } from "@/lib/hooks/use-crm-queries";
 import { useAgentStore } from "@/lib/stores/agent-store";
 import { useDriveStore } from "@/lib/stores/drive-store";
+import { useDonnaStore, getQuickActionsForPath } from "@/lib/stores/donna-store";
 import { NLAgentCreationDialog } from "@/components/agents/NLAgentCreationDialog";
 
 const GROUP_HEADING_CLASSES =
@@ -43,11 +44,17 @@ export function CommandPalette() {
 
   const channels = useChatStore((s) => s.channels);
   const setActiveChannel = useChatStore((s) => s.setActiveChannel);
-  const contacts = useCRMStore((s) => s.contacts);
-  const setSelectedContact = useCRMStore((s) => s.setSelectedContact);
+  const { data: contactsData } = useContacts(undefined, { limit: 50 });
+  const contacts = contactsData?.items ?? [];
   const agents = useAgentStore((s) => s.agents);
   const setSelectedAgent = useAgentStore((s) => s.setSelectedAgent);
   const files = useDriveStore((s) => s.files);
+  const openDonnaWithPrompt = useDonnaStore((s) => s.openWithPrompt);
+
+  const donnaQuickActions = useMemo(
+    () => getQuickActionsForPath(pathname),
+    [pathname],
+  );
 
   const isSearching = search.trim().length > 0;
   const maxVisible = isSearching ? 8 : 3;
@@ -107,8 +114,7 @@ export function CommandPalette() {
   };
 
   const openContact = (contactId: string) => {
-    setSelectedContact(contactId);
-    router.push("/crm");
+    router.push(`/crm/contacts/${contactId}`);
     setOpen(false);
   };
 
@@ -128,6 +134,14 @@ export function CommandPalette() {
     // Small delay so the palette closes before the dialog opens
     setTimeout(() => setNlAgentOpen(true), 150);
   }, []);
+
+  const askDonna = useCallback(
+    (prompt: string) => {
+      setOpen(false);
+      openDonnaWithPrompt(prompt);
+    },
+    [openDonnaWithPrompt],
+  );
 
   return (
     <>
@@ -332,6 +346,27 @@ export function CommandPalette() {
                     )}
                   </Command.Group>
                 )}
+
+                {/* Ask Donna */}
+                <Command.Group heading="Ask Donna" className={GROUP_HEADING_CLASSES}>
+                  {donnaQuickActions.map((action) => (
+                    <CommandItem
+                      key={action.label}
+                      icon={<span className="text-sm w-4 text-center">{action.icon}</span>}
+                      onSelect={() => askDonna(action.prompt)}
+                    >
+                      {action.label}
+                    </CommandItem>
+                  ))}
+                  {isSearching && (
+                    <CommandItem
+                      icon={<Sparkles className="w-4 h-4 text-sq-agent" />}
+                      onSelect={() => askDonna(search.trim())}
+                    >
+                      Ask Donna: &ldquo;{search.trim()}&rdquo;
+                    </CommandItem>
+                  )}
+                </Command.Group>
 
                 {/* Actions */}
                 <Command.Group heading="Actions" className={GROUP_HEADING_CLASSES}>

@@ -10,9 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, col
 
 from app.core.auth import get_current_user
-from app.core.background import BackgroundTaskManager
 from app.core.db import get_session
-from app.core.events import EventBus
 from app.models.ai_insight import AIInsight
 from app.services.ai.insights_engine import AIInsightsEngine, _serialize_insight
 
@@ -20,10 +18,11 @@ router = APIRouter(prefix="/api/insights", tags=["ai-insights"])
 
 
 def _get_engine(session: AsyncSession) -> AIInsightsEngine:
+    from app.core.shared_infra import get_background, get_event_bus
     return AIInsightsEngine(
         session=session,
-        events=EventBus(),
-        background=BackgroundTaskManager(),
+        events=get_event_bus(),
+        background=get_background(),
     )
 
 
@@ -92,6 +91,20 @@ async def get_pipeline_risk(
     """Generate a global pipeline risk report."""
     engine = _get_engine(session)
     return await engine.generate_pipeline_risk_report()
+
+
+# ---------------------------------------------------------------------------
+# Cross-Deal Patterns
+# ---------------------------------------------------------------------------
+
+@router.get("/cross-deal-patterns")
+async def get_cross_deal_patterns(
+    user: str = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Generate cross-deal pattern analysis from the last 90 days."""
+    engine = _get_engine(session)
+    return await engine.generate_cross_deal_patterns()
 
 
 # ---------------------------------------------------------------------------

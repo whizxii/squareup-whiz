@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Calendar,
@@ -13,8 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
-import { useAuthStore } from "@/lib/stores/auth-store";
-import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
+import { useLatestDigest } from "@/lib/hooks/use-crm-queries";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -39,30 +37,6 @@ interface WeeklyDigest {
   week_start: string | null;
   week_end: string | null;
   created_at: string;
-}
-
-/* ------------------------------------------------------------------ */
-/*  API helpers                                                         */
-/* ------------------------------------------------------------------ */
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-function getHeaders(): Record<string, string> {
-  const token = useAuthStore.getState().token;
-  if (token) return { Authorization: `Bearer ${token}` };
-  return { "X-User-Id": getCurrentUserId() };
-}
-
-async function fetchLatestDigest(): Promise<WeeklyDigest | null> {
-  try {
-    const res = await fetch(`${API_URL}/api/digests/latest`, {
-      headers: getHeaders(),
-    });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -138,23 +112,9 @@ function DateRange({
 /* ------------------------------------------------------------------ */
 
 export default function WeeklyDigestView() {
-  const [digest, setDigest] = useState<WeeklyDigest | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { data: digest = null, isLoading, isFetching, refetch } = useLatestDigest();
 
-  async function load(showRefreshing = false) {
-    if (showRefreshing) setRefreshing(true);
-    const data = await fetchLatestDigest();
-    setDigest(data);
-    setLoading(false);
-    setRefreshing(false);
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
         <RefreshCw className="w-4 h-4 animate-spin mr-2" />
@@ -194,13 +154,13 @@ export default function WeeklyDigestView() {
         </div>
         <button
           type="button"
-          onClick={() => load(true)}
-          disabled={refreshing}
+          onClick={() => refetch()}
+          disabled={isFetching}
           className="p-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors disabled:opacity-40"
           title="Refresh"
         >
           <RefreshCw
-            className={cn("w-3.5 h-3.5", refreshing && "animate-spin")}
+            className={cn("w-3.5 h-3.5", isFetching && "animate-spin")}
           />
         </button>
       </div>

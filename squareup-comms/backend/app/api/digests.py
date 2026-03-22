@@ -10,9 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, col
 
 from app.core.auth import get_current_user
-from app.core.background import BackgroundTaskManager
 from app.core.db import get_session
-from app.core.events import EventBus
 from app.models.digest import Digest
 from app.services.ai.digest_service import DigestService
 
@@ -63,10 +61,11 @@ async def get_latest_digest(
         return _serialize_digest(existing)
 
     # No digest yet — generate one now
+    from app.core.shared_infra import get_background, get_event_bus
     svc = DigestService(
         session=session,
-        events=EventBus(),
-        background=BackgroundTaskManager(),
+        events=get_event_bus(),
+        background=get_background(),
     )
     digest = await svc.generate_weekly_digest(target_user_id=user)
     return _serialize_digest(digest)

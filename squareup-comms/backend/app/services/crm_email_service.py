@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 import uuid
 
 from sqlalchemy import select
@@ -19,6 +19,9 @@ from app.models.crm_email import CRMEmail
 from app.models.crm_sequence import CRMSequenceEnrollment
 from app.repositories.crm_email_repo import EmailRepository
 from app.services.base import BaseService
+
+if TYPE_CHECKING:
+    from app.services.integrations.gmail_sync import GmailSyncService
 
 logger = get_logger(__name__)
 
@@ -110,12 +113,29 @@ class EmailService(BaseService):
 
     # ─── Send ──────────────────────────────────────────────────────
 
+    async def _resolve_to_address(self, contact_id: str, to_addresses: list[str]) -> str:
+        """Build a comma-separated 'to' string, falling back to contact email."""
+        if to_addresses:
+            return ", ".join(to_addresses)
+        result = await self.session.execute(
+            select(CRMContact.email).where(CRMContact.id == contact_id)
+        )
+        contact_email = result.scalar_one_or_none()
+        return contact_email or ""
+
     async def send_email(
         self,
         data: dict[str, Any],
         user_id: str,
+        *,
+        gmail_service: GmailSyncService | None = None,
     ) -> CRMEmail:
-        """Send an email — resolves merge fields, injects tracking, creates record."""
+        """Send an email — resolves merge fields, injects tracking, creates record.
+
+        If *gmail_service* is provided (and Gmail is configured for the user),
+        the email is delivered via the Gmail API.  Otherwise the CRM record is
+        created with status ``"sent"`` for local-only tracking (backwards compat).
+        """
         now = datetime.utcnow()
 
         # Resolve merge fields in subject and body
@@ -129,6 +149,9 @@ class EmailService(BaseService):
         body_html = await self._resolve_merge_fields(body_html, contact_id, deal_id)
         body_text = await self._resolve_merge_fields(body_text, contact_id, deal_id)
 
+        # Start as "queued" when we'll attempt real delivery, else "sent" (local)
+        initial_status = "queued" if gmail_service else "sent"
+
         email = CRMEmail(
             contact_id=contact_id,
             deal_id=deal_id,
@@ -140,7 +163,7 @@ class EmailService(BaseService):
             to_addresses=json.dumps(data.get("to_addresses", [])),
             cc_addresses=json.dumps(data.get("cc_addresses", [])),
             thread_id=data.get("thread_id") or str(uuid.uuid4()),
-            status="sent",
+            status=initial_status,
             sequence_id=data.get("sequence_id"),
             sequence_step=data.get("sequence_step"),
             sent_at=now,
@@ -154,6 +177,36 @@ class EmailService(BaseService):
             tracked_html = self._inject_tracking_pixel(email.body_html, email.id)
             tracked_html = self._wrap_links(tracked_html, email.id)
             email = await self.repo.update(email, {"body_html": tracked_html})
+
+        # Attempt Gmail delivery when a gmail_service is available
+        if gmail_service:
+            to_addresses_list: list[str] = data.get("to_addresses", [])
+            to_str = await self._resolve_to_address(contact_id, to_addresses_list)
+            cc_addresses_list: list[str] = data.get("cc_addresses", [])
+
+            gmail_data: dict[str, str] = {
+                "to": to_str,
+                "subject": email.subject or "",
+                "body_html": email.body_html or "",
+                "body_text": email.body_text or "",
+            }
+            if cc_addresses_list:
+                gmail_data["cc"] = ", ".join(cc_addresses_list)
+
+            try:
+                sent = await gmail_service.send_via_gmail(gmail_data, user_id)
+                delivery_status = "sent" if sent else "sent"  # local-only fallback still counts
+                delivery_method = "gmail" if sent else "local"
+            except Exception:
+                logger.exception("Gmail delivery failed for email %s", email.id)
+                delivery_status = "send_failed"
+                delivery_method = "local"
+
+            email = await self.repo.update(email, {"status": delivery_status})
+            logger.info(
+                "Email %s delivery_method=%s status=%s",
+                email.id, delivery_method, delivery_status,
+            )
 
         # Log activity on the contact
         activity = CRMActivity(

@@ -8,11 +8,11 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
-
 from app.core.auth import get_current_user
 from app.core.responses import ApiError, success_response
-from app.api.deps import get_company_service
+from app.api.deps import get_company_service, get_deal_service
 from app.services.crm_company_service import CompanyService
+from app.services.crm_deal_service import DealService
 
 router = APIRouter(prefix="/api/crm/v2", tags=["crm-companies"])
 
@@ -212,3 +212,104 @@ async def archive_company(
     if not ok:
         raise ApiError(status_code=404, detail="Company not found")
     return success_response({"archived": True})
+
+
+# ---------------------------------------------------------------------------
+# Company Deals
+# ---------------------------------------------------------------------------
+
+
+@router.get("/companies/{company_id}/deals")
+async def get_company_deals(
+    company_id: str,
+    svc: CompanyService = Depends(get_company_service),
+    deal_svc: DealService = Depends(get_deal_service),
+    user_id: str = Depends(get_current_user),
+):
+    """Get all deals associated with a company."""
+    company = await svc.repo.get_by_id(company_id)
+    if company is None:
+        raise ApiError(status_code=404, detail="Company not found")
+
+    from app.api.crm_deals import DealResponse
+
+    page = await deal_svc.repo.search(company_id=company_id, limit=200)
+    return success_response([
+        DealResponse.from_model(d).model_dump(mode="json") for d in page.items
+    ])
+
+
+# ---------------------------------------------------------------------------
+# Company 360 — aggregated intelligence view
+# ---------------------------------------------------------------------------
+
+
+@router.get("/companies/{company_id}/360")
+async def get_company_360(
+    company_id: str,
+    svc: CompanyService = Depends(get_company_service),
+    deal_svc: DealService = Depends(get_deal_service),
+    user_id: str = Depends(get_current_user),
+):
+    """Get full company intelligence: company + contacts + deals + pipeline summary."""
+    company, contacts = await svc.get_with_contacts(company_id)
+    if company is None:
+        raise ApiError(status_code=404, detail="Company not found")
+
+    from app.api.crm_contacts import ContactResponse
+    from app.api.crm_deals import DealResponse
+
+    page = await deal_svc.repo.search(company_id=company_id, limit=200)
+    deals = page.items
+
+    # Pipeline summary
+    open_deals = [d for d in deals if d.status == "open"]
+    won_deals = [d for d in deals if d.status == "won"]
+    lost_deals = [d for d in deals if d.status == "lost"]
+
+    total_pipeline_value = sum(d.value or 0 for d in open_deals)
+    total_won_value = sum(d.value or 0 for d in won_deals)
+    avg_deal_value = (
+        total_pipeline_value / len(open_deals) if open_deals else 0
+    )
+
+    pipeline_summary = {
+        "total_pipeline_value": total_pipeline_value,
+        "total_won_value": total_won_value,
+        "avg_deal_value": round(avg_deal_value, 2),
+        "open_count": len(open_deals),
+        "won_count": len(won_deals),
+        "lost_count": len(lost_deals),
+        "total_count": len(deals),
+        "win_rate": (
+            round(len(won_deals) / (len(won_deals) + len(lost_deals)) * 100, 1)
+            if (won_deals or lost_deals)
+            else 0
+        ),
+    }
+
+    # Contact summary
+    contact_count = len(contacts)
+    avg_lead_score = (
+        round(
+            sum(c.lead_score or 0 for c in contacts) / contact_count, 1
+        )
+        if contact_count
+        else 0
+    )
+
+    return success_response({
+        "company": CompanyResponse.from_model(company).model_dump(mode="json"),
+        "contacts": [
+            ContactResponse.from_model(c).model_dump(mode="json")
+            for c in contacts
+        ],
+        "deals": [
+            DealResponse.from_model(d).model_dump(mode="json") for d in deals
+        ],
+        "pipeline_summary": pipeline_summary,
+        "contact_summary": {
+            "total_count": contact_count,
+            "avg_lead_score": avg_lead_score,
+        },
+    })

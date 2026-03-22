@@ -31,6 +31,7 @@ import type {
   SmartList,
   Workflow,
   Contact360Response,
+  Company360Response,
   AnalyticsOverview,
   PipelineMetrics,
   WinLossAnalytics,
@@ -62,6 +63,7 @@ export const crmKeys = {
   companyDetail: (id: string) => [...crmKeys.companies(), "detail", id] as const,
   companyContacts: (id: string) => [...crmKeys.companies(), id, "contacts"] as const,
   companyDeals: (id: string) => [...crmKeys.companies(), id, "deals"] as const,
+  company360: (id: string) => [...crmKeys.companies(), "360", id] as const,
 
   // Deals
   deals: () => [...crmKeys.all, "deals"] as const,
@@ -106,6 +108,24 @@ export const crmKeys = {
   atRiskDeals: () => [...crmKeys.ai(), "at-risk-deals"] as const,
   staleContacts: () => [...crmKeys.ai(), "stale-contacts"] as const,
   hotLeads: () => [...crmKeys.ai(), "hot-leads"] as const,
+  crossDealPatterns: () => [...crmKeys.ai(), "cross-deal-patterns"] as const,
+  insightsList: (type?: string, isDismissed?: boolean) =>
+    [...crmKeys.ai(), "insights-list", type, isDismissed] as const,
+
+  // Automation
+  automation: () => [...crmKeys.all, "automation"] as const,
+  automationLogs: (status?: string) => [...crmKeys.automation(), "logs", status] as const,
+  pendingReviewCount: () => [...crmKeys.automation(), "pending-count"] as const,
+
+  // Graph
+  graph: (params?: Record<string, unknown>) => [...crmKeys.all, "graph", params] as const,
+
+  // AI Feedback
+  feedback: () => [...crmKeys.all, "ai-feedback"] as const,
+  feedbackForSource: (sourceType: string, sourceId: string) =>
+    [...crmKeys.feedback(), sourceType, sourceId] as const,
+  feedbackMetrics: (days?: number, sourceType?: string, actionType?: string) =>
+    [...crmKeys.feedback(), "metrics", days, sourceType, actionType] as const,
 
   // Analytics
   analytics: () => [...crmKeys.all, "analytics"] as const,
@@ -311,6 +331,14 @@ export function useCreateCompany() {
   });
 }
 
+export function useCompany360(id: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: crmKeys.company360(id),
+    queryFn: () => crmApi.getCompany360(id),
+    enabled: options?.enabled ?? !!id,
+  });
+}
+
 // ─── Deal Hooks ──────────────────────────────────────────────────
 
 export function useDeals(
@@ -458,6 +486,17 @@ export function useCreateNote() {
     onSuccess: (_data, { contactId }) => {
       qc.invalidateQueries({ queryKey: crmKeys.notes(contactId) });
       qc.invalidateQueries({ queryKey: crmKeys.contact360(contactId) });
+    },
+  });
+}
+
+export function useTogglePinNote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ noteId, pinned }: { noteId: string; pinned: boolean }) =>
+      pinned ? crmApi.pinNote(noteId) : crmApi.unpinNote(noteId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm"] });
     },
   });
 }
@@ -896,6 +935,79 @@ export function useLeadSourceAnalytics(period?: string) {
   });
 }
 
+export function useCrossDealPatterns() {
+  return useQuery({
+    queryKey: crmKeys.crossDealPatterns(),
+    queryFn: () => crmApi.getCrossDealPatterns(),
+    staleTime: 300_000,
+  });
+}
+
+// ─── AI Insights Hooks ──────────────────────────────────────────
+
+export function useInsightsList(type?: string, isDismissed?: boolean) {
+  return useQuery({
+    queryKey: crmKeys.insightsList(type, isDismissed),
+    queryFn: () => crmApi.getInsightsList(type, isDismissed),
+    staleTime: 60_000,
+  });
+}
+
+// ─── Automation Hooks ───────────────────────────────────────────
+
+export function useAutomationLogs(status?: string) {
+  return useQuery({
+    queryKey: crmKeys.automationLogs(status),
+    queryFn: () => crmApi.getAutomationLogs(status),
+    staleTime: 30_000,
+  });
+}
+
+export function usePendingReviewCount() {
+  return useQuery({
+    queryKey: crmKeys.pendingReviewCount(),
+    queryFn: () => crmApi.getPendingReviewCount(),
+    staleTime: 30_000,
+  });
+}
+
+// ─── AI Feedback Hooks ──────────────────────────────────────────
+
+export function useFeedbackForSource(sourceType: string, sourceId: string) {
+  return useQuery({
+    queryKey: crmKeys.feedbackForSource(sourceType, sourceId),
+    queryFn: () => crmApi.getFeedbackForSource(sourceType as import("@/lib/types/crm").AIFeedbackSourceType, sourceId),
+    staleTime: 60_000,
+    enabled: !!sourceId,
+  });
+}
+
+export function useAIAccuracyMetrics(params?: {
+  days?: number;
+  source_type?: string;
+  action_type?: string;
+}) {
+  return useQuery({
+    queryKey: crmKeys.feedbackMetrics(params?.days, params?.source_type, params?.action_type),
+    queryFn: () => crmApi.getAIAccuracyMetrics(params),
+    staleTime: 120_000,
+  });
+}
+
+export function useSubmitFeedback() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: Parameters<typeof crmApi.submitFeedback>[0]) =>
+      crmApi.submitFeedback(params),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({
+        queryKey: crmKeys.feedbackForSource(variables.source_type, variables.source_id),
+      });
+      qc.invalidateQueries({ queryKey: crmKeys.feedbackMetrics() });
+    },
+  });
+}
+
 // ─── Notification Hooks ──────────────────────────────────────────
 
 export function useNotifications(pagination?: PaginationParams) {
@@ -1122,5 +1234,83 @@ export function useGenerateLookalike() {
   return useMutation({
     mutationFn: ({ id, limit }: { id: string; limit?: number }) =>
       crmApi.generateLookalike(id, limit),
+  });
+}
+
+// ─── Morning Briefing ──────────────────────────────────────────
+
+export function useMorningBriefing() {
+  return useQuery({
+    queryKey: ["crm", "morning-briefing"],
+    queryFn: () => crmApi.getMorningBriefing(),
+    staleTime: 5 * 60 * 1000, // 5 minutes (matches backend cache TTL)
+    refetchOnWindowFocus: false,
+  });
+}
+
+// ─── Email Drafts (AI auto-drafted) ──────────────────────────────
+
+export function useEmailDrafts(contactId?: string) {
+  return useQuery({
+    queryKey: ["crm", "email-drafts", contactId ?? "all"],
+    queryFn: () => crmApi.listEmailDrafts(contactId),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useGenerateEmailDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: Parameters<typeof crmApi.generateEmailDraft>[0]) =>
+      crmApi.generateEmailDraft(params),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["crm", "email-drafts", variables.contact_id] });
+      qc.invalidateQueries({ queryKey: ["crm", "email-drafts", "all"] });
+    },
+  });
+}
+
+// ─── Digests ──────────────────────────────────────────────────
+
+export function useLatestDigest() {
+  return useQuery({
+    queryKey: ["crm", "digest", "latest"],
+    queryFn: () => crmApi.fetchLatestDigest(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+  });
+}
+
+// ─── Chat Mentions ──────────────────────────────────────────
+
+export function useChatMentions(contactId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ["crm", "chat-mentions", contactId],
+    queryFn: () => crmApi.fetchChatMentions(contactId),
+    enabled: options?.enabled ?? !!contactId,
+  });
+}
+
+// ─── Attention Items ──────────────────────────────────────────
+
+export function useAttentionItems() {
+  return useQuery({
+    queryKey: ["crm", "attention-items"],
+    queryFn: () => crmApi.getAttentionItems(),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    refetchInterval: 5 * 60 * 1000, // auto-refresh every 5 min
+  });
+}
+
+// ─── Relationship Graph ──────────────────────────────────────
+
+export function useRelationshipGraph(params?: {
+  limit?: number;
+  company_id?: string;
+}) {
+  return useQuery({
+    queryKey: crmKeys.graph(params),
+    queryFn: () => crmApi.getRelationshipGraph(params),
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }

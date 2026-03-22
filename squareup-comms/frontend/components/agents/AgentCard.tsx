@@ -2,7 +2,7 @@
 
 import { Agent } from "@/lib/stores/agent-store";
 import { cn } from "@/lib/utils";
-import { Bot, MessageSquare, Zap, Clock, DollarSign, Pencil, Trash2 } from "lucide-react";
+import { Bot, Brain, MessageSquare, Zap, Clock, DollarSign, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 
 interface AgentCardProps {
@@ -10,6 +10,7 @@ interface AgentCardProps {
   onClick: () => void;
   onEdit?: (agent: Agent) => void;
   onDelete?: (agent: Agent) => void;
+  onMemory?: (agent: Agent) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -20,7 +21,7 @@ const statusColors: Record<string, string> = {
   offline: "bg-gray-400",
 };
 
-export function AgentCard({ agent, onClick, onEdit, onDelete }: AgentCardProps) {
+export function AgentCard({ agent, onClick, onEdit, onDelete, onMemory }: AgentCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleEdit = useCallback(
@@ -60,6 +61,18 @@ export function AgentCard({ agent, onClick, onEdit, onDelete }: AgentCardProps) 
         "absolute top-3 right-3 flex items-center gap-1 transition-opacity",
         confirmDelete ? "opacity-100" : "opacity-0 group-hover:opacity-100"
       )}>
+        {onMemory && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onMemory(agent); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onMemory(agent); } }}
+            className="p-1.5 rounded-lg hover:bg-sq-agent/10 text-muted-foreground hover:text-sq-agent transition-colors"
+            title="View memory"
+          >
+            <Brain className="w-3.5 h-3.5" />
+          </span>
+        )}
         {onEdit && (
           <span
             role="button"

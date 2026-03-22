@@ -32,6 +32,7 @@ import {
   Loader2,
   Users,
   X,
+  Circle,
 } from "lucide-react";
 import SpatialAudioManager from "./SpatialAudioManager";
 
@@ -47,10 +48,13 @@ function ActiveCallUI() {
   const roomName = useCallStore((s) => s.roomName);
   const isMuted = useCallStore((s) => s.isMuted);
   const isVideoOff = useCallStore((s) => s.isVideoOff);
+  const isRecording = useCallStore((s) => s.isRecording);
   const leaveCall = useCallStore((s) => s.leaveCall);
   const toggleMute = useCallStore((s) => s.toggleMute);
   const toggleVideo = useCallStore((s) => s.toggleVideo);
   const toggleScreenShare = useCallStore((s) => s.toggleScreenShare);
+  const startRecording = useCallStore((s) => s.startRecording);
+  const stopRecording = useCallStore((s) => s.stopRecording);
 
   const { localParticipant } = useLocalParticipant();
   const remoteParticipants = useRemoteParticipants();
@@ -194,6 +198,12 @@ function ActiveCallUI() {
             <Users className="h-3 w-3" />
             <span className="text-xs">{participantCount}</span>
           </div>
+          {isRecording && (
+            <div className="flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-xs font-medium text-red-500">REC</span>
+            </div>
+          )}
         </div>
 
         <div className="mx-1 h-6 w-px" style={{ backgroundColor: tokens.glassBorder }} />
@@ -232,6 +242,35 @@ function ActiveCallUI() {
           title="Share screen"
         >
           <Monitor className="h-4 w-4" />
+        </button>
+
+        {/* Record */}
+        <button
+          onClick={() => {
+            if (isRecording) {
+              stopRecording();
+            } else {
+              // Start recording — contact_id is required by the API.
+              // When launched from a CRM context the caller should set
+              // recordingContactId on the store before joining. Fall back
+              // to a placeholder so the button still works in ad-hoc calls.
+              const contactId =
+                useCallStore.getState().recordingContactId || "unknown";
+              startRecording(contactId);
+            }
+          }}
+          className="rounded-lg p-2 transition-colors"
+          style={{
+            backgroundColor: isRecording ? "rgba(239,68,68,0.15)" : "transparent",
+            color: isRecording ? "#ef4444" : tokens.textSecondary,
+          }}
+          title={isRecording ? "Stop recording" : "Start recording"}
+        >
+          <Circle
+            className="h-4 w-4"
+            fill={isRecording ? "#ef4444" : "none"}
+            strokeWidth={isRecording ? 0 : 2}
+          />
         </button>
 
         {/* Hang up */}

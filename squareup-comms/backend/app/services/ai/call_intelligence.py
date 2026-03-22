@@ -2,7 +2,7 @@
 
 Orchestrates the transcription pipeline:
 1. Receives a recording ID
-2. Delegates transcription to MockTranscriptionService
+2. Delegates transcription to Whisper (or mock fallback)
 3. Persists results to the recording record
 4. Emits "recording.transcribed" event for activity auto-capture
 """
@@ -10,15 +10,19 @@ Orchestrates the transcription pipeline:
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 
 from app.core.logging_config import get_logger
 from app.models.crm_recording import CRMCallRecording
 from app.repositories.crm_recording_repo import RecordingRepository
-from app.services.ai.transcription import MockTranscriptionService, serialize_transcription_result
+from app.services.ai.transcription import get_transcription_service, serialize_transcription_result
 from app.services.base import BaseService
 
 logger = get_logger(__name__)
+
+# Upload directory mirrored from recording service
+_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "uploads", "recordings")
 
 
 class CallIntelligenceService(BaseService):
@@ -26,7 +30,7 @@ class CallIntelligenceService(BaseService):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._transcription = MockTranscriptionService()
+        self._transcription = get_transcription_service()
 
     @property
     def repo(self) -> RecordingRepository:
@@ -54,8 +58,18 @@ class CallIntelligenceService(BaseService):
         await self.session.commit()
 
         try:
-            # Run transcription (mock)
-            tx_result = await self._transcription.transcribe(recording.duration_seconds)
+            # Resolve local file path from the stored URL
+            file_path: str | None = None
+            if recording.file_url:
+                filename = recording.file_url.rsplit("/", 1)[-1]
+                candidate = os.path.join(_UPLOAD_DIR, filename)
+                if os.path.isfile(candidate):
+                    file_path = candidate
+
+            # Run transcription (Whisper when available, mock fallback)
+            tx_result = await self._transcription.transcribe(
+                recording.duration_seconds, file_path=file_path,
+            )
             serialized = serialize_transcription_result(tx_result)
 
             # Persist results

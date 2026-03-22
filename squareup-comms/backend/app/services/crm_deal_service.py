@@ -3,15 +3,22 @@
 from __future__ import annotations
 
 import json
+import logging
+import uuid
 from datetime import datetime
 from typing import Any, Sequence
 
+from sqlmodel import select
+
+from app.models.chat import Channel, Message
 from app.models.crm import CRMActivity
 from app.models.crm_audit import CRMAuditLog
 from app.models.crm_deal import CRMDeal
 from app.repositories.crm_deal_repo import DealRepository
 from app.services.crm_pipeline_service import PipelineService
 from app.services.base import BaseService
+
+logger = logging.getLogger(__name__)
 
 
 class DealService(BaseService):
@@ -226,6 +233,25 @@ class DealService(BaseService):
         await self.session.commit()
 
         await self.events.emit("deal.won", {"deal_id": deal_id, "value": deal.value})
+
+        # Emit WebSocket notification for frontend toast
+        from app.websocket.manager import hub_manager
+        if deal.owner_id:
+            await hub_manager.send_to_user(deal.owner_id, {
+                "type": "crm.deal_won",
+                "deal_name": deal.title,
+                "value": deal.value,
+            })
+        else:
+            await hub_manager.broadcast_all({
+                "type": "crm.deal_won",
+                "deal_name": deal.title,
+                "value": deal.value,
+            })
+
+        # Post celebration to #general channel
+        await self._post_deal_celebration(deal, user_id)
+
         return deal
 
     async def lose_deal(
@@ -276,6 +302,77 @@ class DealService(BaseService):
 
         await self.events.emit("deal.lost", {"deal_id": deal_id, "reason": reason})
         return deal
+
+    async def _post_deal_celebration(self, deal: CRMDeal, user_id: str) -> None:
+        """Post a celebration message to #general when a deal is won."""
+        from app.websocket.manager import hub_manager
+
+        try:
+            # Find #general or first default public channel
+            result = await self.session.exec(
+                select(Channel)
+                .where(Channel.is_archived == False)  # noqa: E712
+                .where(Channel.type == "public")
+                .order_by(Channel.is_default.desc(), Channel.created_at.asc())
+            )
+            channel = result.first()
+            if channel is None:
+                return
+
+            # Format deal value
+            value_str = ""
+            if deal.value:
+                currency = deal.currency or "USD"
+                if deal.value >= 1_000_000:
+                    value_str = f" — ${deal.value / 1_000_000:.1f}M {currency}"
+                elif deal.value >= 1_000:
+                    value_str = f" — ${deal.value / 1_000:.0f}K {currency}"
+                else:
+                    value_str = f" — ${deal.value:,.0f} {currency}"
+
+            celebration = (
+                f"## Deal Won! \n\n"
+                f"**{deal.title}**{value_str}\n\n"
+                f"Great work closing this one! "
+            )
+
+            msg = Message(
+                id=str(uuid.uuid4()),
+                channel_id=channel.id,
+                sender_id="system",
+                sender_type="agent",
+                content=celebration,
+                created_at=datetime.utcnow(),
+            )
+            self.session.add(msg)
+            await self.session.commit()
+
+            # Broadcast to all connected users
+            await hub_manager.broadcast_all({
+                "type": "chat.message",
+                "message": {
+                    "id": msg.id,
+                    "channel_id": channel.id,
+                    "sender_id": "system",
+                    "sender_type": "agent",
+                    "content": celebration,
+                    "created_at": msg.created_at.isoformat(),
+                    "attachments": [],
+                    "reactions": [],
+                },
+            })
+
+            # Also broadcast a celebration event for confetti / toast on frontend
+            await hub_manager.broadcast_all({
+                "type": "crm.deal_celebration",
+                "deal_name": deal.title,
+                "value": deal.value,
+                "currency": deal.currency or "USD",
+                "channel_id": channel.id,
+                "message_id": msg.id,
+            })
+        except Exception:
+            logger.warning("Failed to post deal celebration for %s", deal.id, exc_info=True)
 
     async def get_deals_for_contact(self, contact_id: str) -> Sequence[CRMDeal]:
         """Get all deals for a contact."""

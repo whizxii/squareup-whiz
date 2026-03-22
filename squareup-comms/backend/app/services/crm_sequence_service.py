@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 from app.models.crm_audit import CRMAuditLog
 from app.models.crm_sequence import CRMEmailSequence, CRMSequenceEnrollment
 from app.repositories.crm_sequence_repo import EnrollmentRepository, SequenceRepository
 from app.services.base import BaseService
 from app.services.crm_email_service import EmailService
+
+if TYPE_CHECKING:
+    from app.services.integrations.gmail_sync import GmailSyncService
 
 
 class SequenceService(BaseService):
@@ -272,8 +275,13 @@ class SequenceService(BaseService):
         self,
         enrollment: CRMSequenceEnrollment,
         user_id: str = "sequence-engine",
+        *,
+        gmail_service: GmailSyncService | None = None,
     ) -> None:
-        """Send the current step's email for an enrollment, resolving merge fields."""
+        """Send the current step's email for an enrollment, resolving merge fields.
+
+        If *gmail_service* is provided the email is delivered via Gmail API.
+        """
         sequence = await self.repo.get_by_id(enrollment.sequence_id)
         if sequence is None:
             return
@@ -295,6 +303,7 @@ class SequenceService(BaseService):
                 "sequence_step": enrollment.current_step,
             },
             user_id,
+            gmail_service=gmail_service,
         )
 
         await self.advance_enrollment(enrollment.id)

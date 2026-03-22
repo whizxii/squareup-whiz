@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import DOMPurify from "dompurify";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -174,7 +175,7 @@ function EmailCard({ email }: { email: Email }) {
           {email.body_html ? (
             <div
               className="prose prose-xs dark:prose-invert max-w-none text-xs"
-              dangerouslySetInnerHTML={{ __html: email.body_html }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(email.body_html) }}
             />
           ) : email.body_text ? (
             <p className="text-xs leading-relaxed whitespace-pre-wrap">

@@ -13,9 +13,12 @@ from httpx import AsyncClient
 @pytest.mark.asyncio
 async def test_connect_returns_503_without_config(client: AsyncClient):
     """Connect returns 503 when Google OAuth is not configured."""
-    # Default test env has empty GOOGLE_CLIENT_ID / SECRET
-    resp = await client.get("/api/calendar/connect")
-    assert resp.status_code == 503
+    with (
+        patch("app.core.config.settings.GOOGLE_CLIENT_ID", None),
+        patch("app.core.config.settings.GOOGLE_CLIENT_SECRET", None),
+    ):
+        resp = await client.get("/api/calendar/connect")
+        assert resp.status_code == 503
 
 
 @pytest.mark.asyncio

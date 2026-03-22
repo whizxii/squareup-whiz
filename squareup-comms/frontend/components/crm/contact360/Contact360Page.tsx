@@ -14,6 +14,7 @@ import { EmailsTab } from "./EmailsTab";
 import { CalendarTab } from "./CalendarTab";
 import { RecordingsTab } from "./RecordingsTab";
 import { ChatHistoryTab } from "./ChatHistoryTab";
+import { DealsTab } from "./DealsTab";
 import {
   LayoutDashboard,
   Clock,
@@ -229,10 +230,7 @@ export function Contact360Page({ contactId, onBack }: Contact360PageProps) {
         )}
 
         {activeTab === "deals" && (
-          <DealsTabPlaceholder
-            deals={c360.deals}
-            contactId={contactId}
-          />
+          <DealsTab contactId={contactId} />
         )}
 
         {activeTab === "emails" && (
@@ -259,64 +257,4 @@ export function Contact360Page({ contactId, onBack }: Contact360PageProps) {
   );
 }
 
-// ─── Placeholder tabs (to be expanded in later phases) ──────────
-
-function DealsTabPlaceholder({
-  deals,
-  contactId,
-}: {
-  deals: { id: string; title: string; stage: string; value?: number; currency: string; probability: number; status: string }[];
-  contactId: string;
-}) {
-  const openDialog = useCRMUIStore((s) => s.openDialog);
-
-  if (deals.length === 0) {
-    return (
-      <div className="p-6">
-        <EmptyState
-          icon={<TrendingUp className="w-6 h-6" />}
-          title="No deals yet"
-          description="Create a deal to start tracking revenue for this contact."
-          action={{
-            label: "Create Deal",
-            onClick: () =>
-              openDialog("create-deal", { contact_id: contactId }),
-          }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6 space-y-3">
-      {deals.map((deal) => (
-        <div
-          key={deal.id}
-          className="rounded-lg border border-border p-4 flex items-center justify-between"
-        >
-          <div>
-            <p className="text-sm font-medium">{deal.title}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs capitalize text-muted-foreground">
-                {deal.stage}
-              </span>
-              <span className="text-[10px] text-muted-foreground">
-                {deal.probability}% probability
-              </span>
-            </div>
-          </div>
-          {deal.value != null && (
-            <span className="text-sm font-mono font-semibold text-primary">
-              {new Intl.NumberFormat("en-IN", {
-                style: "currency",
-                currency: deal.currency,
-                maximumFractionDigits: 0,
-              }).format(deal.value)}
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
 

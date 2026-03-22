@@ -12,11 +12,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlmodel import select
-
-from app.core.db import async_session
 from app.models.automation_log import AutomationLog
-from app.models.crm import CRMContact, CRMActivity
+from app.models.crm import CRMActivity
 from app.services.base import BaseService
 
 logger = logging.getLogger(__name__)
@@ -45,25 +42,22 @@ class AutonomousCRMService(BaseService):
         entity_name = name or email or "Unknown"
 
         if confidence >= _AUTO_EXECUTE_THRESHOLD:
-            contact = CRMContact(
-                id=str(uuid.uuid4()),
-                name=name,
-                email=email,
-                phone=phone,
-                company=company,
-                stage="lead",
-                ai_tags=json.dumps(["auto-captured"]),
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            )
-            self.session.add(contact)
-            await self.session.flush()
+            from app.services.crm_contact_service import ContactService
 
-            await self.events.emit("contact.created", {
-                "contact_id": contact.id,
-                "name": name,
-                "source": "autonomous_crm",
-            })
+            svc = ContactService(
+                self.session, self.events, self.background, self.cache
+            )
+            contact = await svc.create_contact(
+                {
+                    "name": name,
+                    "email": email,
+                    "phone": phone,
+                    "company": company,
+                    "stage": "lead",
+                    "tags": ["auto-captured"],
+                },
+                user_id=performed_by,
+            )
 
             log = await self._write_log(
                 action_type="create_contact",
@@ -119,20 +113,12 @@ class AutonomousCRMService(BaseService):
         from app.models.crm import CRMDeal
 
         if confidence >= _AUTO_EXECUTE_THRESHOLD:
-            deal = await self.session.get(CRMDeal, deal_id)
-            if deal:
-                old_stage = deal.stage
-                deal.stage = new_stage
-                deal.updated_at = datetime.utcnow()
-                self.session.add(deal)
-                await self.session.flush()
+            from app.services.crm_deal_service import DealService
 
-                await self.events.emit("deal.stage_changed", {
-                    "deal_id": deal_id,
-                    "old_stage": old_stage,
-                    "new_stage": new_stage,
-                    "source": "autonomous_crm",
-                })
+            svc = DealService(
+                self.session, self.events, self.background, self.cache
+            )
+            await svc.move_stage(deal_id, new_stage, user_id=performed_by)
 
             log = await self._write_log(
                 action_type="progress_deal",
@@ -185,12 +171,11 @@ class AutonomousCRMService(BaseService):
         """Schedule a follow-up activity if confidence is high."""
         if confidence >= _AUTO_EXECUTE_THRESHOLD:
             activity = CRMActivity(
-                id=str(uuid.uuid4()),
                 contact_id=contact_id,
                 type="follow_up",
                 title=title,
                 content=f"Auto-scheduled follow-up: {title}",
-                due_at=due_at,
+                activity_metadata=json.dumps({"due_at": due_at.isoformat()}),
                 performed_by=performed_by,
                 performer_type="system",
             )
@@ -254,20 +239,14 @@ class AutonomousCRMService(BaseService):
         """Update CRM fields if confidence is high."""
         if confidence >= _AUTO_EXECUTE_THRESHOLD:
             if entity_type == "contact":
-                record = await self.session.get(CRMContact, entity_id)
-                if record:
-                    for field, value in fields.items():
-                        if hasattr(record, field):
-                            setattr(record, field, value)
-                    record.updated_at = datetime.utcnow()
-                    self.session.add(record)
-                    await self.session.flush()
+                from app.services.crm_contact_service import ContactService
 
-                    await self.events.emit("contact.updated", {
-                        "contact_id": entity_id,
-                        "fields": list(fields.keys()),
-                        "source": "autonomous_crm",
-                    })
+                svc = ContactService(
+                    self.session, self.events, self.background, self.cache
+                )
+                await svc.update_contact(
+                    entity_id, fields, user_id=performed_by
+                )
 
             log = await self._write_log(
                 action_type="update_field",

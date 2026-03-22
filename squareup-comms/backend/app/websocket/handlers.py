@@ -48,6 +48,16 @@ async def handle_ws_message(user_id: str, data: dict):
     elif msg_type == "chat.read":
         await handle_chat_read(user_id, data)
 
+    elif msg_type == "channel.join":
+        room_id = data.get("channel_id")
+        if room_id:
+            hub_manager.join_room(user_id, f"channel:{room_id}")
+
+    elif msg_type == "channel.leave":
+        room_id = data.get("channel_id")
+        if room_id:
+            hub_manager.leave_room(user_id, f"channel:{room_id}")
+
     elif msg_type == "office.move":
         await handle_office_move(user_id, data)
 
@@ -59,6 +69,12 @@ async def handle_ws_message(user_id: str, data: dict):
 
     elif msg_type == "office.reaction":
         await handle_office_reaction(user_id, data)
+
+    elif msg_type == "agent.invoke":
+        await handle_agent_invoke(user_id, data)
+
+    elif msg_type == "agent.confirmation_response":
+        await handle_agent_confirmation_response(user_id, data)
 
     elif msg_type == "call.invite":
         await handle_call_invite(user_id, data)
@@ -125,6 +141,10 @@ async def handle_chat_send(user_id: str, data: dict):
                 session.add(parent)
 
         await session.commit()
+
+    # Embed message in background (async — non-blocking)
+    from app.services.embedding_service import embed_message_background
+    embed_message_background(message.id)
 
     # Emit event for Chat Intelligence pipeline (async — non-blocking)
     if _event_bus is not None:
@@ -349,6 +369,68 @@ async def handle_office_reaction(user_id: str, data: dict):
 
 
 # ---------------------------------------------------------------------------
+# Direct agent invocation (streaming via WebSocket)
+# ---------------------------------------------------------------------------
+
+
+async def handle_agent_invoke(user_id: str, data: dict):
+    """Handle direct agent invocation from the Agents page chat panel.
+
+    Creates a synthetic channel_id so run_agent() broadcasts streaming events
+    only to the invoking user via the room-scoped broadcast system.
+    """
+    agent_id = data.get("agent_id")
+    content = data.get("content", "").strip()
+
+    if not agent_id or not content:
+        await hub_manager.send_to_user(user_id, {
+            "type": "agent.error",
+            "agent_id": agent_id or "",
+            "channel_id": "",
+            "error": "Missing agent_id or content.",
+        })
+        return
+
+    # Validate agent exists and is active
+    async with async_session() as session:
+        from app.models.agents import Agent
+
+        agent = await session.get(Agent, agent_id)
+        if not agent or not agent.active:
+            await hub_manager.send_to_user(user_id, {
+                "type": "agent.error",
+                "agent_id": agent_id,
+                "channel_id": "",
+                "error": "Agent not found or inactive.",
+            })
+            return
+
+    # Use client-provided channel_id (e.g. donna-sidebar:...) or fall back
+    # to the default agent-dm scoping for the Agents page chat panel.
+    synthetic_channel_id = data.get("channel_id") or f"agent-dm:{agent_id}:{user_id}"
+    room_id = f"channel:{synthetic_channel_id}"
+
+    # Auto-join the user to the synthetic room so _broadcast() reaches them
+    hub_manager.join_room(user_id, room_id)
+
+    trigger_message_id = str(uuid.uuid4())
+
+    from app.services.agent_engine import run_agent
+
+    task = asyncio.create_task(
+        run_agent(
+            agent_id=agent_id,
+            trigger_message_id=trigger_message_id,
+            channel_id=synthetic_channel_id,
+            user_id=user_id,
+            content=content,
+        ),
+        name=f"agent_invoke:{agent_id}:{trigger_message_id}",
+    )
+    task.add_done_callback(_log_task_exception)
+
+
+# ---------------------------------------------------------------------------
 # Call signaling
 # ---------------------------------------------------------------------------
 
@@ -413,3 +495,32 @@ async def handle_call_reject(user_id: str, data: dict):
             "room_name": room_name,
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Agent confirmation
+# ---------------------------------------------------------------------------
+
+
+async def handle_agent_confirmation_response(user_id: str, data: dict):
+    """Handle user's approve/reject response for a tool confirmation request."""
+    from app.services.agent_engine import submit_confirmation_response
+
+    request_id = data.get("request_id")
+    approved = data.get("approved", False)
+    edited_input = data.get("edited_input")
+
+    if not request_id:
+        logger.warning("Confirmation response missing request_id from user %s", user_id)
+        return
+
+    found = submit_confirmation_response(
+        request_id=request_id,
+        approved=bool(approved),
+        edited_input=edited_input if isinstance(edited_input, dict) else None,
+    )
+    if not found:
+        logger.warning(
+            "Confirmation response for unknown/expired request %s from user %s",
+            request_id, user_id,
+        )

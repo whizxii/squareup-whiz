@@ -135,7 +135,7 @@ EXPORT_FIELDS = [
 
 @router.get("/export/contacts")
 async def export_contacts(
-    format: str = Query(default="csv", regex="^(csv|json)$"),
+    format: str = Query(default="csv", pattern="^(csv|json)$"),
     stage: Optional[str] = Query(default=None),
     source: Optional[str] = Query(default=None),
     owner_id: Optional[str] = Query(default=None),

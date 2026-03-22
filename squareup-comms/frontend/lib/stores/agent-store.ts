@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { useAuthStore } from "@/lib/stores/auth-store";
 
@@ -38,7 +39,7 @@ interface AgentResponse {
   updated_at: string;
 }
 
-export type AgentStatus = "idle" | "thinking" | "working" | "error" | "offline";
+export type AgentStatus = "idle" | "thinking" | "working" | "tool_calling" | "awaiting_confirmation" | "error" | "offline";
 
 export interface Agent {
   id: string;
@@ -129,6 +130,18 @@ export interface StreamingMessage {
   readonly startedAt: string;
 }
 
+// ─── Progress Types ─────────────────────────────────────────────
+
+export interface AgentProgress {
+  readonly channelId: string;
+  readonly agentId: string;
+  readonly current: number;
+  readonly total: number;
+  readonly description?: string;
+  readonly percent: number;
+  readonly updatedAt: string;
+}
+
 // ─── Confirmation Types ──────────────────────────────────────────
 
 export interface ConfirmationRequest {
@@ -152,6 +165,9 @@ interface AgentState {
   // Streaming state — keyed by "channelId:agentId"
   streamingMessages: Record<string, StreamingMessage>;
 
+  // Progress state — keyed by "channelId:agentId"
+  agentProgress: Record<string, AgentProgress>;
+
   // Confirmation state — keyed by requestId
   pendingConfirmations: Record<string, ConfirmationRequest>;
 
@@ -172,6 +188,10 @@ interface AgentState {
   resolveToolCall: (channelId: string, agentId: string, toolName: string, success: boolean, outputPreview: string) => void;
   finalizeStreamingMessage: (channelId: string, agentId: string) => void;
   clearStreamingMessage: (channelId: string, agentId: string) => void;
+
+  // Progress actions
+  updateProgress: (channelId: string, agentId: string, current: number, total: number, description?: string) => void;
+  clearProgress: (channelId: string, agentId: string) => void;
 
   // Confirmation actions
   addConfirmation: (confirmation: ConfirmationRequest) => void;
@@ -229,11 +249,14 @@ function mapAgentResponse(r: AgentResponse): Agent {
   };
 }
 
-export const useAgentStore = create<AgentState>((set) => ({
+export const useAgentStore = create<AgentState>()(
+  persist(
+    (set) => ({
   agents: [],
   selectedAgentId: null,
   chatMessages: {},
   streamingMessages: {},
+  agentProgress: {},
   pendingConfirmations: {},
   loading: false,
   error: null,
@@ -463,15 +486,43 @@ export const useAgentStore = create<AgentState>((set) => ({
   finalizeStreamingMessage: (channelId, agentId) =>
     set((s) => {
       const key = streamKey(channelId, agentId);
-      const { [key]: _removed, ...rest } = s.streamingMessages;
-      return { streamingMessages: rest };
+      const { [key]: _removed, ...restStreaming } = s.streamingMessages;
+      const { [key]: _removedProgress, ...restProgress } = s.agentProgress;
+      return { streamingMessages: restStreaming, agentProgress: restProgress };
     }),
 
   clearStreamingMessage: (channelId, agentId) =>
     set((s) => {
       const key = streamKey(channelId, agentId);
-      const { [key]: _removed, ...rest } = s.streamingMessages;
-      return { streamingMessages: rest };
+      const { [key]: _removed, ...restStreaming } = s.streamingMessages;
+      const { [key]: _removedProgress, ...restProgress } = s.agentProgress;
+      return { streamingMessages: restStreaming, agentProgress: restProgress };
+    }),
+
+  // ─── Progress Actions ──────────────────────────────────────────
+
+  updateProgress: (channelId, agentId, current, total, description) =>
+    set((s) => {
+      const key = streamKey(channelId, agentId);
+      const progress: AgentProgress = {
+        channelId,
+        agentId,
+        current,
+        total,
+        description,
+        percent: total > 0 ? Math.round((current / total) * 100) : 0,
+        updatedAt: new Date().toISOString(),
+      };
+      return {
+        agentProgress: { ...s.agentProgress, [key]: progress },
+      };
+    }),
+
+  clearProgress: (channelId, agentId) =>
+    set((s) => {
+      const key = streamKey(channelId, agentId);
+      const { [key]: _removed, ...rest } = s.agentProgress;
+      return { agentProgress: rest };
     }),
 
   // ─── Confirmation Actions ──────────────────────────────────────
@@ -499,4 +550,10 @@ export const useAgentStore = create<AgentState>((set) => ({
       );
       return { pendingConfirmations: filtered };
     }),
-}));
+}),
+    {
+      name: "agent-chat-messages",
+      partialize: (state) => ({ chatMessages: state.chatMessages }),
+    },
+  ),
+);

@@ -11,6 +11,7 @@ import {
 } from "@/lib/hooks/use-crm-queries";
 import { PipelineSelector } from "./pipeline/PipelineSelector";
 import { StageColumn } from "./pipeline/StageColumn";
+import { CelebrationOverlay, useCelebration } from "./CelebrationOverlay";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Layers } from "lucide-react";
@@ -19,6 +20,7 @@ import type { Deal, PipelineStage } from "@/lib/types/crm";
 export function PipelineView() {
   const activePipelineId = useCRMUIStore((s) => s.activePipelineId);
   const setActivePipelineId = useCRMUIStore((s) => s.setActivePipelineId);
+  const celebration = useCelebration();
 
   const { data: defaultRes, isLoading: loadingDefault } = useDefaultPipeline();
   const { data: pipelinesRes } = usePipelines();
@@ -50,9 +52,22 @@ export function PipelineView() {
       const { draggableId, destination, source } = result;
       if (!destination) return;
       if (destination.droppableId === source.droppableId) return;
+
       moveDealStage.mutate({ id: draggableId, stage: destination.droppableId });
+
+      // Trigger celebration when a deal is moved to "won" stage
+      const destStageId = destination.droppableId.toLowerCase();
+      if (destStageId === "won" || destStageId === "closed-won" || destStageId === "closed_won") {
+        // Find the deal to show name + value
+        const allDeals = Object.values(dealsByStage).flat();
+        const deal = allDeals.find((d) => d.id === draggableId);
+        celebration.celebrate({
+          dealName: deal?.title ?? "Untitled deal",
+          dealValue: deal?.value ?? 0,
+        });
+      }
     },
-    [moveDealStage]
+    [moveDealStage, dealsByStage, celebration]
   );
 
   if (loadingDefault || loadingDeals) {
@@ -93,6 +108,14 @@ export function PipelineView() {
           ))}
         </div>
       </DragDropContext>
+
+      {/* Deal won celebration */}
+      <CelebrationOverlay
+        show={celebration.show}
+        dealName={celebration.data.dealName}
+        dealValue={celebration.data.dealValue}
+        onDismiss={celebration.dismiss}
+      />
     </div>
   );
 }

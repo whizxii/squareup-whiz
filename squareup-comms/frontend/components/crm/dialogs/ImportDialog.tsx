@@ -77,14 +77,69 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   // ─── File parsing ──────────────────────────────────────────────
 
   const parseCSV = useCallback((text: string) => {
-    const lines = text.split("\n").filter((l) => l.trim().length > 0);
-    if (lines.length < 2) return { headers: [] as string[], rows: [] as string[][] };
+    // RFC 4180 compliant CSV parser — handles quoted fields with commas, newlines, escaped quotes
+    const parseRow = (input: string, start: number): { fields: string[]; next: number } | null => {
+      const fields: string[] = [];
+      let i = start;
+      if (i >= input.length) return null;
 
-    const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
-    const rows = lines.slice(1, 6).map((line) =>
-      line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, ""))
-    );
-    return { headers, rows };
+      while (i < input.length) {
+        if (input[i] === '"') {
+          // Quoted field
+          let value = "";
+          i++; // skip opening quote
+          while (i < input.length) {
+            if (input[i] === '"') {
+              if (i + 1 < input.length && input[i + 1] === '"') {
+                value += '"'; // escaped quote
+                i += 2;
+              } else {
+                i++; // skip closing quote
+                break;
+              }
+            } else {
+              value += input[i];
+              i++;
+            }
+          }
+          fields.push(value.trim());
+        } else {
+          // Unquoted field
+          let value = "";
+          while (i < input.length && input[i] !== "," && input[i] !== "\n" && input[i] !== "\r") {
+            value += input[i];
+            i++;
+          }
+          fields.push(value.trim());
+        }
+
+        // After field: expect comma, newline, or end
+        if (i < input.length && input[i] === ",") {
+          i++; // skip comma, continue to next field
+        } else {
+          // End of row — skip \r\n or \n
+          if (i < input.length && input[i] === "\r") i++;
+          if (i < input.length && input[i] === "\n") i++;
+          break;
+        }
+      }
+      return { fields, next: i };
+    };
+
+    const allRows: string[][] = [];
+    let pos = 0;
+    while (pos < text.length) {
+      const result = parseRow(text, pos);
+      if (!result) break;
+      // Skip empty rows
+      if (result.fields.length > 0 && result.fields.some((f) => f.length > 0)) {
+        allRows.push(result.fields);
+      }
+      pos = result.next;
+    }
+
+    if (allRows.length < 2) return { headers: [] as string[], rows: [] as string[][] };
+    return { headers: allRows[0], rows: allRows.slice(1, 6) };
   }, []);
 
   const handleFileDrop = useCallback(

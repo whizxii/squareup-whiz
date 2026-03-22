@@ -75,28 +75,69 @@ def _company_to_dict(co: CRMCompany) -> dict:
 # ---------------------------------------------------------------------------
 
 async def crm_search_contacts(inp: dict, ctx: ToolContext) -> ToolResult:
-    """Search CRM contacts by name, email, company, or general query."""
+    """Hybrid semantic + keyword search for CRM contacts."""
     query = inp.get("query", "")
     limit = min(inp.get("limit", 10), 25)
 
-    async with async_session() as session:
-        stmt = (
-            select(CRMContact)
-            .where(
-                CRMContact.is_archived == False,  # noqa: E712
-                or_(
-                    col(CRMContact.name).ilike(f"%{query}%"),
-                    col(CRMContact.email).ilike(f"%{query}%"),
-                    col(CRMContact.company).ilike(f"%{query}%"),
-                ),
-            )
-            .order_by(CRMContact.updated_at.desc())
-            .limit(limit)
-        )
-        results = await session.execute(stmt)
-        contacts = [_contact_to_dict(c) for c in results.scalars().all()]
+    contacts: list[dict] = []
+    seen_ids: set[str] = set()
 
-    return ToolResult(success=True, output={"contacts": contacts, "count": len(contacts)})
+    # 1. Semantic vector search (understands meaning beyond exact keywords)
+    if query.strip():
+        try:
+            from app.services.embedding_service import vector_search_crm_contacts
+
+            vec_results = await vector_search_crm_contacts(query, limit=limit)
+            for r in vec_results:
+                if r["id"] not in seen_ids:
+                    seen_ids.add(r["id"])
+                    contacts.append({
+                        "id": r["id"],
+                        "name": r["name"],
+                        "email": r["email"],
+                        "company": r["company"],
+                        "title": r["title"],
+                        "stage": r["stage"],
+                        "similarity": r.get("similarity"),
+                    })
+        except Exception:
+            pass  # Fall through to keyword search
+
+    # 2. Keyword fallback — catches exact matches that embeddings may miss
+    remaining = max(0, limit - len(contacts))
+    if remaining > 0 and query.strip():
+        async with async_session() as session:
+            stmt = (
+                select(CRMContact)
+                .where(
+                    CRMContact.is_archived == False,  # noqa: E712
+                    or_(
+                        col(CRMContact.name).ilike(f"%{query}%"),
+                        col(CRMContact.email).ilike(f"%{query}%"),
+                        col(CRMContact.company).ilike(f"%{query}%"),
+                    ),
+                )
+                .order_by(CRMContact.updated_at.desc())
+                .limit(remaining + len(seen_ids))
+            )
+            results = await session.execute(stmt)
+            for c in results.scalars().all():
+                if c.id not in seen_ids:
+                    seen_ids.add(c.id)
+                    contacts.append(_contact_to_dict(c))
+    elif not query.strip():
+        # No query — list all contacts (sorted by recent)
+        async with async_session() as session:
+            stmt = (
+                select(CRMContact)
+                .where(CRMContact.is_archived == False)  # noqa: E712
+                .order_by(CRMContact.updated_at.desc())
+                .limit(limit)
+            )
+            results = await session.execute(stmt)
+            contacts = [_contact_to_dict(c) for c in results.scalars().all()]
+
+    return ToolResult(success=True, output={"contacts": contacts[:limit], "count": len(contacts)})
 
 
 async def crm_get_contact(inp: dict, ctx: ToolContext) -> ToolResult:
@@ -138,6 +179,10 @@ async def crm_create_contact(inp: dict, ctx: ToolContext) -> ToolResult:
         await session.commit()
         await session.refresh(contact)
 
+    # Embed contact in background for semantic search
+    from app.services.embedding_service import embed_crm_contact_background
+    embed_crm_contact_background(contact.id)
+
     return ToolResult(success=True, output=_contact_to_dict(contact))
 
 
@@ -162,6 +207,11 @@ async def crm_update_contact(inp: dict, ctx: ToolContext) -> ToolResult:
         session.add(contact)
         await session.commit()
         await session.refresh(contact)
+
+        # Re-embed contact after update
+        from app.services.embedding_service import embed_crm_contact_background
+        embed_crm_contact_background(contact.id)
+
         return ToolResult(success=True, output=_contact_to_dict(contact))
 
 
@@ -225,38 +275,94 @@ async def crm_update_deal_stage(inp: dict, ctx: ToolContext) -> ToolResult:
         deal = await session.get(CRMDeal, deal_id)
         if not deal:
             return ToolResult(success=False, output=None, error=f"Deal {deal_id} not found")
+
+        was_open = deal.status != "won"
         deal.stage = new_stage
         deal.stage_entered_at = datetime.utcnow()
         deal.updated_at = datetime.utcnow()
+
+        # If stage indicates a win, mark deal as won and celebrate
+        if new_stage.lower() in ("won", "closed_won") and was_open:
+            deal.status = "won"
+            deal.probability = 100
+            deal.actual_close_date = datetime.utcnow()
+
         session.add(deal)
         await session.commit()
         await session.refresh(deal)
+
+        # Post celebration if deal was just won
+        if new_stage.lower() in ("won", "closed_won") and was_open:
+            from app.core.shared_infra import get_background, get_event_bus
+            from app.services.crm_deal_service import DealService
+            svc = DealService(session, get_event_bus(), get_background())
+            await svc._post_deal_celebration(deal, ctx.user_id or "system")
+
         return ToolResult(success=True, output=_deal_to_dict(deal))
 
 
 async def crm_search_companies(inp: dict, ctx: ToolContext) -> ToolResult:
-    """Search CRM companies by name, domain, or industry."""
+    """Hybrid semantic + keyword search for CRM companies."""
     query = inp.get("query", "")
     limit = min(inp.get("limit", 10), 25)
 
-    async with async_session() as session:
-        stmt = (
-            select(CRMCompany)
-            .where(
-                CRMCompany.is_archived == False,  # noqa: E712
-                or_(
-                    col(CRMCompany.name).ilike(f"%{query}%"),
-                    col(CRMCompany.domain).ilike(f"%{query}%"),
-                    col(CRMCompany.industry).ilike(f"%{query}%"),
-                ),
-            )
-            .order_by(CRMCompany.updated_at.desc())
-            .limit(limit)
-        )
-        results = await session.execute(stmt)
-        companies = [_company_to_dict(co) for co in results.scalars().all()]
+    companies: list[dict] = []
+    seen_ids: set[str] = set()
 
-    return ToolResult(success=True, output={"companies": companies, "count": len(companies)})
+    # 1. Semantic vector search
+    if query.strip():
+        try:
+            from app.services.embedding_service import vector_search_crm_companies
+
+            vec_results = await vector_search_crm_companies(query, limit=limit)
+            for r in vec_results:
+                if r["id"] not in seen_ids:
+                    seen_ids.add(r["id"])
+                    companies.append({
+                        "id": r["id"],
+                        "name": r["name"],
+                        "domain": r["domain"],
+                        "industry": r["industry"],
+                        "description": r.get("description"),
+                        "similarity": r.get("similarity"),
+                    })
+        except Exception:
+            pass  # Fall through to keyword search
+
+    # 2. Keyword fallback
+    remaining = max(0, limit - len(companies))
+    if remaining > 0 and query.strip():
+        async with async_session() as session:
+            stmt = (
+                select(CRMCompany)
+                .where(
+                    CRMCompany.is_archived == False,  # noqa: E712
+                    or_(
+                        col(CRMCompany.name).ilike(f"%{query}%"),
+                        col(CRMCompany.domain).ilike(f"%{query}%"),
+                        col(CRMCompany.industry).ilike(f"%{query}%"),
+                    ),
+                )
+                .order_by(CRMCompany.updated_at.desc())
+                .limit(remaining + len(seen_ids))
+            )
+            results = await session.execute(stmt)
+            for co in results.scalars().all():
+                if co.id not in seen_ids:
+                    seen_ids.add(co.id)
+                    companies.append(_company_to_dict(co))
+    elif not query.strip():
+        async with async_session() as session:
+            stmt = (
+                select(CRMCompany)
+                .where(CRMCompany.is_archived == False)  # noqa: E712
+                .order_by(CRMCompany.updated_at.desc())
+                .limit(limit)
+            )
+            results = await session.execute(stmt)
+            companies = [_company_to_dict(co) for co in results.scalars().all()]
+
+    return ToolResult(success=True, output={"companies": companies[:limit], "count": len(companies)})
 
 
 async def crm_log_activity(inp: dict, ctx: ToolContext) -> ToolResult:
@@ -380,6 +486,10 @@ async def crm_add_note(inp: dict, ctx: ToolContext) -> ToolResult:
         await session.commit()
         await session.refresh(note)
         note_id = note.id  # capture after refresh
+
+    # Embed note in background (async — non-blocking)
+    from app.services.embedding_service import embed_crm_note_background
+    embed_crm_note_background(note_id)
 
     return ToolResult(
         success=True,

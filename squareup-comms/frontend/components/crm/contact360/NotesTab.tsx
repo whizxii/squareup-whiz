@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { useCreateNote } from "@/lib/hooks/use-crm-queries";
+import { useCreateNote, useTogglePinNote } from "@/lib/hooks/use-crm-queries";
 import { formatRelativeTime } from "@/lib/format";
 import type { ContactNote } from "@/lib/types/crm";
 import {
@@ -86,6 +86,7 @@ export function NotesTab({ notes, contactId }: NotesTabProps) {
   const [content, setContent] = useState("");
   const [sort, setSort] = useState<SortOption>("pinned");
   const createNote = useCreateNote();
+  const togglePin = useTogglePinNote();
 
   const handleSubmit = useCallback(() => {
     const trimmed = content.trim();
@@ -109,10 +110,10 @@ export function NotesTab({ notes, contactId }: NotesTabProps) {
   );
 
   const handleTogglePin = useCallback(
-    (_noteId: string, _pinned: boolean) => {
-      // TODO: wire up pin/unpin mutation when API is ready
+    (noteId: string, pinned: boolean) => {
+      togglePin.mutate({ noteId, pinned });
     },
-    []
+    [togglePin]
   );
 
   const sorted = useMemo(() => {

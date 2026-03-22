@@ -6,7 +6,7 @@ import { X, CheckCircle, XCircle, Bot, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
-import type { AutomationLogEntry } from "./AutomationFeed";
+import type { AutomationLogEntry } from "@/lib/types/crm";
 
 /* ------------------------------------------------------------------ */
 /*  API helpers                                                         */

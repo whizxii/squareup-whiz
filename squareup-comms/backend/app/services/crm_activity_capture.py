@@ -29,7 +29,7 @@ class ActivityCaptureService:
         self._event_bus.on("email.sent", self._on_email_sent)
         self._event_bus.on("email.received", self._on_email_received)
         self._event_bus.on("email.opened", self._on_email_opened)
-        self._event_bus.on("calendar.event_completed", self._on_calendar_event_completed)
+        self._event_bus.on("calendar_event.completed", self._on_calendar_event_completed)
         self._event_bus.on("recording.transcribed", self._on_recording_transcribed)
         self._event_bus.on("sequence.contact_enrolled", self._on_sequence_enrolled)
         self._event_bus.on("sequence.enrollment_completed", self._on_sequence_completed)

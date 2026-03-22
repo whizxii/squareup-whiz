@@ -859,6 +859,29 @@ async def _seed_crm_demo_impl(session: AsyncSession, seeded_by: str) -> dict:
     }
 
 
+@router.post("/backfill-embeddings")
+async def backfill_embeddings_endpoint(
+    _user_id: str = Depends(get_current_user),
+) -> dict:
+    """Backfill vector embeddings for existing messages and CRM notes.
+
+    Runs in the background. Returns immediately with status.
+    """
+    import asyncio
+
+    from app.services.embedding_service import backfill_embeddings
+
+    async def _run_backfill():
+        msgs = await backfill_embeddings(table="messages", batch_size=50, max_records=5000)
+        notes = await backfill_embeddings(table="crm_notes", batch_size=50, max_records=2000)
+        logger.info("Embedding backfill complete: %d messages, %d notes", msgs, notes)
+
+    loop = asyncio.get_running_loop()
+    loop.create_task(_run_backfill())
+
+    return {"status": "started", "note": "Backfill running in background — check server logs for progress."}
+
+
 @router.delete("/orphan/{uid}")
 async def delete_orphan_profile(
     uid: str,

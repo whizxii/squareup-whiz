@@ -27,6 +27,8 @@ from app.services.crm_workflow_engine import WorkflowEngineService
 from app.services.crm_smart_list_service import SmartListService
 from app.services.crm_analytics_service import AnalyticsService
 from app.services.crm_dedup_service import DedupService
+from app.services.ai.morning_briefing import MorningBriefingService
+from app.services.ai.email_draft_service import EmailDraftService
 
 
 def _get_infra(request: Request) -> tuple:
@@ -36,6 +38,21 @@ def _get_infra(request: Request) -> tuple:
         request.app.state.background,
         request.app.state.cache,
     )
+
+
+def get_event_bus(request: Request):
+    """Return the EventBus from app state."""
+    return request.app.state.event_bus
+
+
+def get_background(request: Request):
+    """Return the BackgroundTaskManager from app state."""
+    return request.app.state.background
+
+
+def get_cache(request: Request):
+    """Return the TTLCache from app state."""
+    return request.app.state.cache
 
 
 async def get_contact_service(
@@ -216,3 +233,43 @@ async def get_dedup_service(
 ) -> DedupService:
     events, background, cache = _get_infra(request)
     return DedupService(session, events, background, cache)
+
+
+# ─── Phase 10: Morning Briefing ─────────────────────────────────────
+
+
+async def get_morning_briefing_service(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> MorningBriefingService:
+    events, background, cache = _get_infra(request)
+    return MorningBriefingService(session, events, background, cache)
+
+
+async def get_email_draft_service(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> EmailDraftService:
+    events, background, cache = _get_infra(request)
+    return EmailDraftService(session, events, background, cache)
+
+
+# ─── Note & Tag Services ──────────────────────────────────────────────
+
+
+async def get_note_service(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> "NoteService":
+    from app.services.crm_note_service import NoteService
+    events, background, cache = _get_infra(request)
+    return NoteService(session, events, background, cache)
+
+
+async def get_tag_service(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> "TagService":
+    from app.services.crm_tag_service import TagService
+    events, background, cache = _get_infra(request)
+    return TagService(session, events, background, cache)

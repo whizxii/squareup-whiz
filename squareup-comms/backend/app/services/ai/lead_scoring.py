@@ -281,6 +281,20 @@ class LeadScoringService(BaseService):
             "trend": result.score_trend,
         })
 
+        # Emit WebSocket notification if contact just became "hot"
+        _HOT_THRESHOLD = 70
+        if (
+            result.overall_score >= _HOT_THRESHOLD
+            and serialized["previous_score"] < _HOT_THRESHOLD
+        ):
+            from app.websocket.manager import hub_manager
+            await hub_manager.broadcast_all({
+                "type": "crm.hot_lead",
+                "contact_name": contact.name,
+                "score": result.overall_score,
+                "contact_id": contact_id,
+            })
+
         logger.info("Scored contact %s: %d", contact_id, result.overall_score)
         return serialized
 

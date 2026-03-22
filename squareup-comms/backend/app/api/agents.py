@@ -15,8 +15,8 @@ from sqlmodel import select
 from app.core.auth import get_current_user
 from app.services.agent_templates import DONNA_PERSONALITY_TEXT
 from app.core.db import get_session
-from app.models.agents import Agent, AgentExecution
-from app.services.agent_engine import invoke_agent_sync
+from app.models.agents import Agent, AgentExecution, AgentMemory
+from app.services.agent_engine import invoke_agent_sync, resume_after_confirmation
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -378,6 +378,26 @@ async def get_agent(
     return await _get_active_agent(agent_id, session)
 
 
+def _is_system_agent(agent: Agent) -> bool:
+    """Return True if the agent is a system/prebuilt agent (not user-created)."""
+    return agent.created_by is None or agent.created_by == "system"
+
+
+def _check_agent_ownership(agent: Agent, user_id: str, action: str = "modify") -> None:
+    """Raise 403 if user is not the agent's owner (unless it's a system agent).
+
+    System agents can be edited by anyone (team-shared).
+    User-created agents can only be modified/deleted by their creator.
+    """
+    if _is_system_agent(agent):
+        return  # System agents are shared — any team member can edit
+    if agent.created_by != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Only the agent's creator can {action} this agent",
+        )
+
+
 @router.put("/{agent_id}", response_model=AgentResponse)
 async def update_agent(
     agent_id: str,
@@ -389,7 +409,7 @@ async def update_agent(
 
     agent = await _get_active_agent(agent_id, session)
 
-    # Allow any team member to update agents (small team workspace)
+    _check_agent_ownership(agent, user_id, action="update")
     update_data = body.model_dump(exclude_unset=True)
 
     # Serialize list fields to JSON strings for storage
@@ -421,7 +441,13 @@ async def deactivate_agent(
 
     agent = await _get_active_agent(agent_id, session)
 
-    # Allow any team member to deactivate agents (small team workspace)
+    # System agents cannot be deactivated
+    if _is_system_agent(agent):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System agents cannot be deactivated",
+        )
+    _check_agent_ownership(agent, user_id, action="deactivate")
     agent.active = False
     agent.status = "offline"
     agent.updated_at = datetime.utcnow()
@@ -449,8 +475,7 @@ async def update_agent_status(
 
     agent = await _get_active_agent(agent_id, session)
 
-    # Allow any team member to update agent status (small team workspace)
-    _ = user_id  # kept for auth dependency
+    _check_agent_ownership(agent, user_id, action="update status for")
 
     agent.status = body.status
     agent.current_task = body.current_task
@@ -460,6 +485,115 @@ async def update_agent_status(
     await session.commit()
     await session.refresh(agent)
     return agent
+
+
+# ---------------------------------------------------------------------------
+# Agent Memory Routes
+# ---------------------------------------------------------------------------
+
+class MemoryResponse(BaseModel):
+    id: str
+    agent_id: str
+    user_id: str
+    key: str
+    value: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MemoryUpdate(BaseModel):
+    value: str = Field(..., min_length=1, max_length=5000)
+
+
+@router.get("/{agent_id}/memories", response_model=List[MemoryResponse])
+async def list_agent_memories(
+    agent_id: str,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user),
+) -> list[AgentMemory]:
+    """List all memories an agent has stored about the current user."""
+
+    await _get_active_agent(agent_id, session)
+
+    stmt = (
+        select(AgentMemory)
+        .where(AgentMemory.agent_id == agent_id, AgentMemory.user_id == user_id)
+        .order_by(AgentMemory.updated_at.desc())
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+@router.put("/{agent_id}/memories/{memory_id}", response_model=MemoryResponse)
+async def update_agent_memory(
+    agent_id: str,
+    memory_id: str,
+    body: MemoryUpdate,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user),
+) -> AgentMemory:
+    """Update the value of a specific memory entry."""
+
+    memory = await session.get(AgentMemory, memory_id)
+    if not memory or memory.agent_id != agent_id or memory.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Memory not found",
+        )
+
+    memory.value = body.value
+    memory.updated_at = datetime.utcnow()
+    session.add(memory)
+    await session.commit()
+    await session.refresh(memory)
+    return memory
+
+
+@router.delete("/{agent_id}/memories/{memory_id}", status_code=status.HTTP_200_OK)
+async def delete_agent_memory(
+    agent_id: str,
+    memory_id: str,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    """Delete a specific memory entry."""
+
+    memory = await session.get(AgentMemory, memory_id)
+    if not memory or memory.agent_id != agent_id or memory.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Memory not found",
+        )
+
+    await session.delete(memory)
+    await session.commit()
+    return {"detail": "Memory deleted", "memory_id": memory_id}
+
+
+@router.delete("/{agent_id}/memories", status_code=status.HTTP_200_OK)
+async def clear_agent_memories(
+    agent_id: str,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    """Delete all memories an agent has about the current user."""
+
+    await _get_active_agent(agent_id, session)
+
+    stmt = (
+        select(AgentMemory)
+        .where(AgentMemory.agent_id == agent_id, AgentMemory.user_id == user_id)
+    )
+    result = await session.execute(stmt)
+    memories = list(result.scalars().all())
+
+    for mem in memories:
+        await session.delete(mem)
+
+    await session.commit()
+    return {"detail": f"Deleted {len(memories)} memories", "count": len(memories)}
 
 
 # ---------------------------------------------------------------------------
@@ -489,7 +623,12 @@ async def invoke_agent(
         channel_id=body.channel_id,
     )
 
-    return {
+    return _invoke_result_to_response(result)
+
+
+def _invoke_result_to_response(result) -> dict:
+    """Convert an InvokeResult to the API response dict."""
+    resp = {
         "response_text": result.response_text,
         "tools_called": json.dumps(result.tool_calls_log, default=str),
         "input_tokens": result.input_tokens,
@@ -500,6 +639,56 @@ async def invoke_agent(
         "error_message": result.error_message,
         "num_tool_calls": len(result.tool_calls_log),
     }
+    if result.execution_id:
+        resp["execution_id"] = result.execution_id
+    if result.pending_confirmation:
+        resp["pending_confirmation"] = result.pending_confirmation
+    return resp
+
+
+class ConfirmRequest(BaseModel):
+    approved: bool = Field(..., description="Whether the user approved the tool execution")
+    edited_input: dict | None = Field(
+        default=None,
+        description="Optionally modified tool input (only used when approved=True)",
+    )
+
+
+@router.post("/{agent_id}/executions/{execution_id}/confirm")
+async def confirm_tool_execution(
+    agent_id: str,
+    execution_id: str,
+    body: ConfirmRequest,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user),
+) -> dict:
+    """Approve or reject a tool that requires confirmation, then resume the ReAct loop."""
+
+    # Verify agent exists
+    await _get_active_agent(agent_id, session)
+
+    # Verify execution belongs to this agent and is awaiting confirmation
+    exec_record = await session.get(AgentExecution, execution_id)
+    if not exec_record or exec_record.agent_id != agent_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Execution not found for this agent",
+        )
+    if exec_record.status != "awaiting_confirmation":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Execution is not awaiting confirmation (status={exec_record.status})",
+        )
+
+    result = await resume_after_confirmation(
+        execution_id=execution_id,
+        agent_id=agent_id,
+        user_id=user_id,
+        approved=body.approved,
+        edited_input=body.edited_input,
+    )
+
+    return _invoke_result_to_response(result)
 
 
 @router.get("/{agent_id}/executions", response_model=PaginatedExecutions)
@@ -589,21 +778,30 @@ PREBUILT_AGENTS = [
             "- Schedule: check availability first, then create event.\n"
             "- Something you lack a tool for: explain what you CAN do and suggest the closest action.\n"
         ),
-        "model": "claude-sonnet-4-6",
+        "model": "gemini-3-flash",
         "tools": json.dumps([
             "crm_search_contacts", "crm_get_contact", "crm_create_contact",
             "crm_update_contact", "crm_count_contacts", "crm_add_note",
             "crm_list_deals", "crm_create_deal", "crm_update_deal_stage",
             "crm_log_activity", "crm_get_pipeline", "crm_search_companies",
-            "list_calendar_events", "create_calendar_event", "check_availability",
+            "list_calendar_events", "create_calendar_event", "update_calendar_event",
+            "check_availability",
             "create_task", "list_tasks", "update_task", "complete_task",
-            "assign_task", "set_reminder", "list_reminders",
+            "assign_task", "set_reminder", "list_reminders", "cancel_reminder",
             "search_messages", "send_channel_message", "draft_email",
+            "send_email", "search_emails", "get_email_thread",
             "search_workspace", "search_crm_notes", "get_contact_history",
-            "list_team_members", "get_user_profile",
-            "list_channels", "get_channel_info",
+            "list_team_members", "get_user_profile", "get_user_status",
+            "list_channels", "get_channel_info", "get_channel_members",
             "get_deal_metrics", "get_pipeline_summary", "get_contact_stats",
             "get_current_time", "parse_relative_date", "calculate_date",
+            "invoke_agent", "list_agents", "delegate_to_agent",
+            "ai_get_daily_brief", "ai_get_evening_brief", "ai_deal_coaching", "ai_pipeline_report",
+            "ai_relationship_analysis", "ai_suggest_next_actions",
+            "analyze_email_chain", "process_email_chain",
+            "entity_360_view", "relationship_map",
+            "report_progress",
+            "generate_weekly_report", "catch_up_summary",
         ]),
         "mcp_servers": json.dumps([]),
         "trigger_mode": "mention",
@@ -622,8 +820,15 @@ PREBUILT_AGENTS = [
             "existing contacts, and logging activities like calls, emails, and meetings. "
             "Always be concise and confirm actions taken."
         ),
-        "model": "claude-sonnet-4-6",
-        "tools": json.dumps(["crm_search", "crm_create_contact", "crm_update_contact", "crm_log_activity"]),
+        "model": "gemini-3-flash",
+        "tools": json.dumps([
+            "crm_search_contacts", "crm_get_contact", "crm_create_contact",
+            "crm_update_contact", "crm_count_contacts", "crm_add_note",
+            "crm_list_deals", "crm_create_deal", "crm_update_deal_stage",
+            "crm_log_activity", "crm_get_pipeline", "crm_search_companies",
+            "get_deal_metrics", "get_pipeline_summary", "get_contact_stats",
+            "search_crm_notes", "get_contact_history",
+        ]),
         "mcp_servers": json.dumps([]),
         "trigger_mode": "mention",
         "office_station_icon": "\U0001F4CA",
@@ -637,26 +842,37 @@ PREBUILT_AGENTS = [
             "manage calendar events, transcribe meeting recordings, and sync meeting notes "
             "back to the CRM. Proactively suggest optimal times and always include an agenda."
         ),
-        "model": "claude-sonnet-4-6",
-        "tools": json.dumps(["calendar_read", "calendar_create", "transcribe", "crm_update"]),
+        "model": "gemini-3-flash",
+        "tools": json.dumps([
+            "list_calendar_events", "create_calendar_event", "update_calendar_event",
+            "check_availability",
+            "crm_search_contacts", "crm_get_contact", "crm_add_note", "crm_log_activity",
+            "create_task", "list_tasks", "set_reminder",
+            "get_current_time", "parse_relative_date",
+        ]),
         "mcp_servers": json.dumps([]),
         "trigger_mode": "mention",
         "office_station_icon": "\U0001F4C5",
         "personality": "Friendly and proactive. Always suggests agendas and follow-ups. Hates unproductive meetings and gently nudges people to stay on track.",
     },
     {
-        "name": "@github-agent",
-        "description": "Tracks GitHub issues, pull requests, and repository activity. Mention @github-agent to check PR status, create issues, or get repo summaries.",
+        "name": "@research-agent",
+        "description": "Searches workspace messages, knowledge, and team info. Mention @research-agent to find past conversations, look up team members, or create tasks from findings.",
         "system_prompt": (
-            "You are the GitHub Agent for SquareUp Comms. You help the engineering team "
-            "track issues, review pull request statuses, and provide repository summaries. "
-            "Format code references with backticks and link to relevant PRs or issues when possible."
+            "You are the Research Agent for SquareUp Comms. You help the team find "
+            "information across workspace messages, channels, and knowledge base. You can "
+            "search conversations, look up team member profiles, and create tasks from your findings. "
+            "Always cite the source channel or message when presenting search results."
         ),
-        "model": "claude-sonnet-4-6",
-        "tools": json.dumps(["github_issues", "github_prs", "github_repos"]),
+        "model": "gemini-3-flash",
+        "tools": json.dumps([
+            "search_workspace", "search_messages", "list_channels",
+            "get_channel_info", "list_team_members", "get_user_profile",
+            "create_task", "list_tasks", "get_current_time",
+        ]),
         "mcp_servers": json.dumps([]),
         "trigger_mode": "mention",
-        "office_station_icon": "\U0001F419",
+        "office_station_icon": "\U0001F50D",
         "personality": "Technical and to-the-point. Uses developer lingo. Formats everything neatly with markdown. Occasionally drops a programming joke.",
     },
     {
@@ -668,8 +884,15 @@ PREBUILT_AGENTS = [
             "and finding optimal meeting times across time zones. Always confirm bookings and "
             "send reminders before events."
         ),
-        "model": "claude-sonnet-4-6",
-        "tools": json.dumps(["calendar_read", "calendar_create", "reminders", "team_availability"]),
+        "model": "gemini-3-flash",
+        "tools": json.dumps([
+            "list_calendar_events", "create_calendar_event", "update_calendar_event",
+            "check_availability",
+            "set_reminder", "list_reminders", "cancel_reminder",
+            "create_task", "list_tasks", "update_task", "complete_task", "assign_task",
+            "list_team_members", "get_user_status",
+            "get_current_time", "parse_relative_date", "calculate_date",
+        ]),
         "mcp_servers": json.dumps([]),
         "trigger_mode": "mention",
         "office_station_icon": "\u23f0",
@@ -708,3 +931,16 @@ async def seed_prebuilt_agents(
 
     await session.commit()
     return created
+
+
+# ---------------------------------------------------------------------------
+# Tool cache stats (diagnostic)
+# ---------------------------------------------------------------------------
+
+@router.get("/tool-cache/stats")
+async def get_tool_cache_stats(
+    user_id: str = Depends(get_current_user),  # noqa: ARG001
+) -> dict:
+    """Return tool-result cache statistics."""
+    from app.services.tools.tool_cache import cache_stats
+    return cache_stats()

@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { ActiveToolCall } from "@/lib/stores/agent-store";
+import { renderToolWidget } from "./AgentWidgets";
 
 interface ToolExecutionCardProps {
   toolCalls: readonly ActiveToolCall[];
@@ -89,15 +90,18 @@ export function ToolExecutionCard({ toolCalls }: ToolExecutionCardProps) {
 function LiveToolCallRow({ call }: { call: ActiveToolCall }) {
   const [showDetails, setShowDetails] = useState(false);
   const hasDetails = call.inputPreview || call.outputPreview;
+  const widget = call.status === "success"
+    ? renderToolWidget(call.toolName, call.outputPreview)
+    : null;
 
   return (
     <div className="border-b border-sq-agent/5 last:border-b-0">
       <button
-        onClick={() => hasDetails && setShowDetails((v) => !v)}
+        onClick={() => (hasDetails || widget) && setShowDetails((v) => !v)}
         className={cn(
           "flex items-center gap-2 w-full px-3 py-1.5 text-left transition-colors",
-          hasDetails && "hover:bg-sq-agent/[0.04] cursor-pointer",
-          !hasDetails && "cursor-default"
+          (hasDetails || widget) && "hover:bg-sq-agent/[0.04] cursor-pointer",
+          !(hasDetails || widget) && "cursor-default"
         )}
       >
         {/* Status icon */}
@@ -121,7 +125,7 @@ function LiveToolCallRow({ call }: { call: ActiveToolCall }) {
           </span>
         )}
 
-        {hasDetails && (
+        {(hasDetails || widget) && (
           <span className="ml-auto">
             {showDetails ? (
               <ChevronDown className="w-2.5 h-2.5 text-muted-foreground" />
@@ -132,8 +136,15 @@ function LiveToolCallRow({ call }: { call: ActiveToolCall }) {
         )}
       </button>
 
-      {/* Expandable details */}
-      {showDetails && (
+      {/* Rich widget result */}
+      {showDetails && widget && (
+        <div className="px-3 pb-2">
+          {widget}
+        </div>
+      )}
+
+      {/* Fallback raw details */}
+      {showDetails && !widget && (
         <div className="px-3 pb-2 space-y-1">
           {call.inputPreview && (
             <div>

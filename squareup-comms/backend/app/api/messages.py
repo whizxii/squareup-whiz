@@ -267,6 +267,10 @@ async def send_message(
     except Exception as exc:
         logger.warning("WS broadcast failed for message %s: %s", message.id, exc)
 
+    # Embed message in background (async — non-blocking)
+    from app.services.embedding_service import embed_message_background
+    embed_message_background(message.id)
+
     # ── Trigger agent execution for @mentioned agents ───────────────
     triggered_agent_ids: set[str] = set()
     mentions_list = body.mentions or []
@@ -470,6 +474,10 @@ async def edit_message(
     session.add(message)
     await session.commit()
     await session.refresh(message)
+
+    # Re-embed edited message in background
+    from app.services.embedding_service import embed_message_background
+    embed_message_background(message.id)
 
     # Broadcast edit to other connected users (non-fatal)
     try:

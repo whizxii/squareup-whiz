@@ -6,6 +6,7 @@ The mock generates realistic enrichment data for development.
 
 from __future__ import annotations
 
+import json
 import random
 import uuid
 from dataclasses import dataclass, asdict
@@ -261,13 +262,49 @@ class ContactEnrichmentService(BaseService):
         return ContactRepository(self.session)
 
     async def enrich_contact(self, contact_id: str) -> dict[str, Any] | None:
-        """Enrich a single contact with external data."""
+        """Enrich a single contact with external data and persist to record."""
         contact = await self.contact_repo.get_by_id(contact_id)
         if contact is None:
             return None
 
         result = await self._enricher.enrich(contact)
         serialized = serialize_enrichment(result, contact_id)
+
+        # ─── Persist enrichment data back to contact record ────────
+        existing_custom = json.loads(contact.custom_fields or "{}")
+        enrichment_payload = {
+            "enrichment": {
+                "bio": result.bio,
+                "headline": result.headline,
+                "location": result.location,
+                "timezone": result.timezone,
+                "skills": list(result.skills),
+                "interests": list(result.interests),
+                "linkedin_url": result.linkedin_url,
+                "twitter_url": result.twitter_url,
+                "github_url": result.github_url,
+                "education": [asdict(e) for e in result.education],
+                "work_history": [asdict(w) for w in result.work_history],
+                "mutual_connections": list(result.mutual_connections),
+                "company_news": list(result.company_news),
+                "confidence_score": result.confidence_score,
+                "source": result.source,
+                "enriched_at": datetime.now(timezone.utc).isoformat(),
+            }
+        }
+        merged_custom = {**existing_custom, **enrichment_payload}
+
+        updates: dict[str, Any] = {
+            "custom_fields": json.dumps(merged_custom),
+        }
+        # Only overwrite title if the contact has none and enrichment has one
+        if not contact.title and result.headline:
+            updates["title"] = result.headline[:200]
+        # Store AI summary from enrichment bio
+        if result.bio and not contact.ai_summary:
+            updates["ai_summary"] = result.bio
+
+        await self.contact_repo.update(contact, updates)
 
         # Emit event for activity capture
         await self.events.emit("enrichment.completed", {
@@ -276,5 +313,5 @@ class ContactEnrichmentService(BaseService):
             "confidence": result.confidence_score,
         })
 
-        logger.info("Enriched contact %s (confidence: %.2f)", contact_id, result.confidence_score)
+        logger.info("Enriched contact %s (confidence: %.2f, persisted)", contact_id, result.confidence_score)
         return serialized

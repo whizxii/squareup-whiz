@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
 import { InlineEdit } from "@/components/ui/InlineEdit";
 import { Badge, ScoreBadge } from "@/components/ui/Badge";
-import { useUpdateContact, useNextActions } from "@/lib/hooks/use-crm-queries";
+import { useUpdateContact, useArchiveContact, useNextActions } from "@/lib/hooks/use-crm-queries";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
 import { formatRelativeTime, APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
 import type {
@@ -189,6 +189,7 @@ export function ContactHeader({
   onBack,
 }: ContactHeaderProps) {
   const updateContact = useUpdateContact();
+  const archiveContact = useArchiveContact();
   const openDialog = useCRMUIStore((s) => s.openDialog);
   const [stageOpen, setStageOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -419,7 +420,10 @@ export function ContactHeader({
                   </button>
                   <div className="my-1 border-t border-border" />
                   <button
-                    onClick={() => setMoreOpen(false)}
+                    onClick={() => {
+                      archiveContact.mutate(contact.id, { onSuccess: onBack });
+                      setMoreOpen(false);
+                    }}
                     className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2"
                   >
                     <Archive className="w-3.5 h-3.5" />

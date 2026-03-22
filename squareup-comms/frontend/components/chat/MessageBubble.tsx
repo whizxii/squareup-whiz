@@ -14,6 +14,7 @@ import { MessageActions } from "./MessageActions";
 import { MessageEditForm } from "./MessageEditForm";
 import { MessageReactions } from "./MessageReactions";
 import { AgentResponseCard } from "./agents/AgentResponseCard";
+import { renderMessageWidget } from "./agents/AgentWidgets";
 import { MessageStatus, type DeliveryStatus } from "./status/MessageStatus";
 import { LinkPreview, extractUrls } from "./embeds/LinkPreview";
 import { addBookmark, removeBookmark, isBookmarked } from "./BookmarkedMessages";
@@ -339,18 +340,17 @@ export function MessageBubble({
             loading={actionLoading}
           />
         ) : parsedWidget ? (
-          <div className="mt-2 mb-1 p-4 rounded-xl border border-border bg-card shadow-sm animate-in fade-in slide-in-from-bottom-2">
-            <div className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-              <Bot className="w-3.5 h-3.5" /> Interactive Widget: {parsedWidget.widget_type.replace(/_/g, " ")}
-            </div>
-            {/* Fallback rendering of JSON data in a pretty format for now. A real app would have specific components per widget_type */}
-            <pre className="text-xs font-mono bg-muted p-2 rounded overflow-x-auto text-foreground/80">
-              {JSON.stringify(parsedWidget.data, null, 2)}
-            </pre>
-            <div className="mt-3 flex gap-2">
-              <button className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">Accept</button>
-              <button className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-accent transition-colors">Modify</button>
-            </div>
+          <div className="mt-2 mb-1 animate-in fade-in slide-in-from-bottom-2">
+            {renderMessageWidget(parsedWidget.widget_type, parsedWidget.data) ?? (
+              <div className="p-3 rounded-lg border border-border/60 bg-card/80 text-xs">
+                <div className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                  <Bot className="w-3 h-3" /> {parsedWidget.widget_type.replace(/_/g, " ")}
+                </div>
+                <pre className="font-mono bg-muted/50 rounded p-1.5 overflow-x-auto max-h-32 text-foreground/80">
+                  {JSON.stringify(parsedWidget.data, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
         ) : sanitizedHtml ? (
           <div

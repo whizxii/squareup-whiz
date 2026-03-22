@@ -10,6 +10,7 @@ from app.core.logging_config import setup_logging, get_logger
 from app.core.db import init_db, async_session
 from app.services.crm_activity_capture import ActivityCaptureService
 from app.services.crm_followup_service import FollowUpService
+from app.services.ai.email_draft_service import EmailDraftCaptureService
 from app.services.integrations.gmail_sync import GmailSyncService
 from app.core.auth import verify_ws_token
 from app.core.middleware import RequestIdMiddleware, LoggingMiddleware
@@ -32,7 +33,6 @@ from app.services.ai.chat_intelligence import ChatIntelligenceService
 from app.services.chat_activity_bridge import ChatActivityBridge
 from app.api.channels import router as channels_router
 from app.api.messages import router as messages_router
-from app.api.crm import router as crm_router
 from app.api.agents import router as agents_router
 from app.api.auth import router as auth_router
 from app.api.calendar import router as calendar_router
@@ -66,6 +66,8 @@ from app.api.office import router as office_router
 from app.api.ai_insights import router as ai_insights_router
 from app.api.automation import router as automation_router
 from app.api.digests import router as digests_router
+from app.api.ai_feedback import router as ai_feedback_router
+from app.api.crm_graph import router as crm_graph_router
 
 # Initialize structured logging before anything else
 setup_logging()
@@ -120,6 +122,14 @@ async def lifespan(application: FastAPI):
     application.state.cache = TTLCache(default_ttl=300)
     logger.info("Event bus, background tasks, and cache initialized.")
 
+    # Make shared infra available outside request context (tools, scheduler)
+    from app.core.shared_infra import init as _init_shared_infra
+    _init_shared_infra(
+        event_bus=application.state.event_bus,
+        background=application.state.background,
+        cache=application.state.cache,
+    )
+
     # Register activity auto-capture handlers
     activity_capture = ActivityCaptureService(
         event_bus=application.state.event_bus,
@@ -127,6 +137,14 @@ async def lifespan(application: FastAPI):
     )
     activity_capture.register_handlers()
     logger.info("Activity auto-capture handlers registered.")
+
+    # Register AI email auto-draft handlers
+    email_draft_capture = EmailDraftCaptureService(
+        event_bus=application.state.event_bus,
+        session_factory=async_session,
+    )
+    email_draft_capture.register_handlers()
+    logger.info("Email auto-draft handlers registered.")
 
     # Register Chat Intelligence pipeline (chat → CRM signals)
     set_event_bus(application.state.event_bus)
@@ -222,7 +240,6 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(channels_router)
 app.include_router(messages_router)
-app.include_router(crm_router)
 app.include_router(agents_router)
 app.include_router(calendar_router)
 app.include_router(crm_contacts_router)
@@ -255,6 +272,8 @@ app.include_router(office_router)
 app.include_router(ai_insights_router)
 app.include_router(automation_router)
 app.include_router(digests_router)
+app.include_router(ai_feedback_router)
+app.include_router(crm_graph_router)
 
 
 @app.get("/health")
@@ -288,6 +307,18 @@ async def websocket_endpoint(
         return
 
     await hub_manager.connect(websocket, user_id)
+
+    # Auto-join user to all their channel rooms for scoped broadcasting
+    try:
+        async with async_session() as session:
+            from app.models.chat import ChannelMember
+            from sqlmodel import select
+            stmt = select(ChannelMember.channel_id).where(ChannelMember.user_id == user_id)
+            result = await session.execute(stmt)
+            for (ch_id,) in result.all():
+                hub_manager.join_room(user_id, f"channel:{ch_id}")
+    except Exception:
+        logger.warning("Failed to auto-join channel rooms for %s", user_id, exc_info=True)
 
     try:
         while True:

@@ -203,7 +203,7 @@ class LLMMeetingPrepService:
                 )
             context = (
                 f"Meeting: {event.title or 'Untitled'}\n"
-                f"Time: {event.start_time.isoformat() if event.start_time else 'TBD'}\n"
+                f"Time: {event.start_at.isoformat() if event.start_at else 'TBD'}\n"
                 f"Contact: {contact.name or 'Unknown'} "
                 f"({contact.title or 'Unknown'} at {contact.company or 'Unknown'})\n"
                 f"Relationship strength: {contact.relationship_strength or 0}/10\n"

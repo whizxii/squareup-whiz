@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -184,12 +185,9 @@ class ChatIntelligenceService:
         saved: list[ChatSignal] = []
 
         async with self._session_factory() as session:
-            # Pre-load contacts for entity resolution
-            contacts = await self._load_contacts(session)
-
             for sig in signals:
                 entity_type, entity_id = await self._resolve_entity(
-                    sig, contacts, session
+                    sig, session
                 )
 
                 chat_signal = ChatSignal(
@@ -212,36 +210,51 @@ class ChatIntelligenceService:
 
         return saved
 
-    async def _load_contacts(self, session: AsyncSession) -> list[CRMContact]:
-        """Load all non-archived contacts for entity matching."""
-        stmt = select(CRMContact).where(CRMContact.is_archived == False)  # noqa: E712
-        result = await session.execute(stmt)
-        return list(result.scalars().all())
-
     async def _resolve_entity(
         self,
         signal: dict,
-        contacts: list[CRMContact],
         session: AsyncSession,
     ) -> tuple[str | None, str | None]:
-        """Try to match a signal to an existing CRM entity."""
+        """Try to match a signal to an existing CRM entity via targeted queries.
+
+        Uses indexed DB lookups instead of loading all contacts into memory.
+        """
         sig_type = signal.get("signal_type", "")
         data = signal.get("extracted_data", {})
 
         if sig_type == "contact_mention":
-            name = (data.get("name") or "").lower().strip()
             email = (data.get("email") or "").lower().strip()
+            name = (data.get("name") or "").lower().strip()
 
-            for contact in contacts:
-                # Match by email (exact)
-                if email and contact.email and contact.email.lower() == email:
-                    return ("contact", contact.id)
-                # Match by name (case-insensitive contains)
-                if name and contact.name and name in contact.name.lower():
-                    return ("contact", contact.id)
+            # Match by email (exact, case-insensitive) — indexed lookup
+            if email:
+                result = await session.execute(
+                    select(CRMContact.id)
+                    .where(
+                        CRMContact.is_archived == False,  # noqa: E712
+                        func.lower(CRMContact.email) == email,
+                    )
+                    .limit(1)
+                )
+                row = result.first()
+                if row:
+                    return ("contact", row[0])
+
+            # Match by name (case-insensitive substring) — DB LIKE query
+            if name:
+                result = await session.execute(
+                    select(CRMContact.id)
+                    .where(
+                        CRMContact.is_archived == False,  # noqa: E712
+                        func.lower(CRMContact.name).like(f"%{name}%"),
+                    )
+                    .limit(1)
+                )
+                row = result.first()
+                if row:
+                    return ("contact", row[0])
 
         if sig_type == "deal_signal":
-            # Deal resolution would require loading deals — defer to Stage 2
             return ("deal", None)
 
         return (None, None)

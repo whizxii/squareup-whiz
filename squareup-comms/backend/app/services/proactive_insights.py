@@ -98,8 +98,7 @@ async def _enrich_critical_insights(insights: list[Insight]) -> list[Insight]:
         return insights
 
     from app.core.db import async_session
-    from app.core.background import BackgroundTaskManager
-    from app.core.events import EventBus
+    from app.core.shared_infra import get_background, get_event_bus
     from app.services.ai.insights_engine import AIInsightsEngine
 
     critical = [i for i in insights if i.severity == "critical"][:3]
@@ -110,8 +109,8 @@ async def _enrich_critical_insights(insights: list[Insight]) -> list[Insight]:
         async with async_session() as session:
             engine = AIInsightsEngine(
                 session=session,
-                events=EventBus(),
-                background=BackgroundTaskManager(),
+                events=get_event_bus(),
+                background=get_background(),
             )
             enriched_map: dict[str, dict] = {}
             for insight in critical:
@@ -406,7 +405,11 @@ async def _detect_missing_follow_ups() -> list[Insight]:
 # ---------------------------------------------------------------------------
 
 async def _broadcast_insights(insights: Sequence[Insight]) -> None:
-    """Send insights to relevant users via WebSocket."""
+    """Send insights to relevant users via WebSocket.
+
+    Emits both the batch ``proactive.insights`` payload (for dashboards)
+    and individual ``crm.*`` typed events (for toast notifications).
+    """
     # Group insights by owner_id for efficient delivery
     by_owner: dict[str | None, list[Insight]] = {}
     for insight in insights:
@@ -434,8 +437,65 @@ async def _broadcast_insights(insights: Sequence[Insight]) -> None:
         }
 
         if owner_id == "__global__":
-            # Broadcast to all connected users
             await hub_manager.broadcast_all(payload)
         else:
-            # Send targeted insights to the specific owner
             await hub_manager.send_to_user(owner_id, payload)
+
+    # Emit individual typed CRM events for toast notifications
+    await _emit_crm_notifications(insights)
+
+
+# ---------------------------------------------------------------------------
+# Typed CRM notification emission (consumed by frontend toast system)
+# ---------------------------------------------------------------------------
+
+# Maps insight types to CRM WebSocket event types
+_INSIGHT_TO_CRM_EVENT: dict[str, str] = {
+    "deal_at_risk": "crm.deal_risk",
+    "deal_stale": "crm.deal_risk",
+    "contact_cold": "crm.stale_contact",
+    "missing_follow_up": "crm.stale_contact",
+}
+
+
+async def _emit_crm_notifications(insights: Sequence[Insight]) -> None:
+    """Emit individual ``crm.*`` typed WebSocket events for each insight.
+
+    These are consumed by the frontend ``useCRMNotifications`` hook to
+    render toast notifications with contextual action buttons.
+    """
+    for insight in insights:
+        crm_type = _INSIGHT_TO_CRM_EVENT.get(insight.type)
+        if crm_type is None:
+            continue
+
+        payload = _build_crm_payload(crm_type, insight)
+        if insight.owner_id:
+            await hub_manager.send_to_user(insight.owner_id, payload)
+        else:
+            await hub_manager.broadcast_all(payload)
+
+
+def _build_crm_payload(crm_type: str, insight: Insight) -> dict:
+    """Build a CRM notification payload matching frontend expectations."""
+    meta = insight.metadata
+
+    if crm_type == "crm.deal_risk":
+        return {
+            "type": crm_type,
+            "deal_name": insight.entity_name,
+            "risk_level": "CRITICAL" if insight.severity == "critical" else "HIGH",
+            "contact_id": meta.get("contact_id"),
+            "deal_id": insight.entity_id,
+            "days_stale": meta.get("days_stale"),
+        }
+
+    if crm_type == "crm.stale_contact":
+        return {
+            "type": crm_type,
+            "contact_name": insight.entity_name,
+            "contact_id": insight.entity_id,
+            "days_since_contact": meta.get("days_cold") or meta.get("hours_overdue", 0) // 24,
+        }
+
+    return {"type": crm_type}

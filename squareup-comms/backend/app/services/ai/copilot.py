@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select, func
@@ -591,59 +590,59 @@ class CopilotService(BaseService):
         }
 
     async def _tool_update_contact(self, params: dict) -> dict:
+        """Update a contact via ContactService for audit + events."""
+        from app.services.crm_contact_service import ContactService
+
         contact_id = params["contact_id"]
         fields = params.get("fields", {})
-
-        contact = await self.session.get(CRMContact, contact_id)
-        if not contact:
-            return {"error": f"Contact {contact_id} not found"}
 
         allowed = {
             "name", "email", "phone", "company", "title",
             "stage", "notes", "source",
         }
-        updated = []
-        for field, value in fields.items():
-            if field in allowed and hasattr(contact, field):
-                setattr(contact, field, value)
-                updated.append(field)
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return {"updated": True, "contact_id": contact_id, "fields_updated": []}
 
-        if updated:
-            contact.updated_at = datetime.utcnow()
-            self.session.add(contact)
-            await self.session.commit()
+        svc = ContactService(
+            self.session, self.events, self.background, self.cache
+        )
+        contact = await svc.update_contact(
+            contact_id, updates, user_id=self._user_id or "copilot"
+        )
+        if contact is None:
+            return {"error": f"Contact {contact_id} not found"}
 
         return {
             "updated": True,
             "contact_id": contact_id,
-            "fields_updated": updated,
+            "fields_updated": list(updates.keys()),
         }
 
     async def _tool_move_deal_stage(self, params: dict) -> dict:
+        """Move a deal stage via DealService for audit + auto-probability."""
+        from app.services.crm_deal_service import DealService
+
         deal_id = params["deal_id"]
         new_stage = params["new_stage"]
 
-        deal = await self.session.get(CRMDeal, deal_id)
-        if not deal:
+        # Read current stage before move for the response
+        existing = await self.session.get(CRMDeal, deal_id)
+        if not existing:
             return {"error": f"Deal {deal_id} not found"}
+        old_stage = existing.stage
 
-        old_stage = deal.stage
-        deal.stage = new_stage
-        deal.stage_entered_at = datetime.utcnow()
-        deal.updated_at = datetime.utcnow()
-        self.session.add(deal)
-        await self.session.commit()
-
-        await self.events.emit("deal.stage_changed", {
-            "deal_id": deal_id,
-            "old_stage": old_stage,
-            "new_stage": new_stage,
-        })
+        svc = DealService(
+            self.session, self.events, self.background, self.cache
+        )
+        deal = await svc.move_stage(
+            deal_id, new_stage, user_id=self._user_id or "copilot"
+        )
 
         return {
             "moved": True,
             "deal_id": deal_id,
-            "title": deal.title,
+            "title": deal.title if deal else existing.title,
             "old_stage": old_stage,
             "new_stage": new_stage,
         }

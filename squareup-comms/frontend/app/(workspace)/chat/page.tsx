@@ -268,13 +268,15 @@ export default function ChatPage() {
     // ─── Agent streaming events ────────────────────────────────────
     const agentActions = useAgentStore.getState();
 
-    // agent.status — agent thinking/tool_calling/idle/error
+    // agent.status — agent thinking/tool_calling/idle/error + contextual description
     const offAgentStatus = wsOn("agent.status", (data) => {
       const agentId = data.agent_id as string;
       const status = data.status as string;
+      const description = (data.description as string) || undefined;
       if (!agentId) return;
       agentActions.updateAgent(agentId, {
         status: status as import("@/lib/stores/agent-store").AgentStatus,
+        current_task: description,
       });
     });
 
@@ -323,6 +325,17 @@ export default function ChatPage() {
       const agentId = data.agent_id as string;
       if (!channelId || !agentId) return;
       useAgentStore.getState().clearStreamingMessage(channelId, agentId);
+    });
+
+    // agent.progress — batch operation progress update
+    const offAgentProgress = wsOn("agent.progress", (data) => {
+      const channelId = data.channel_id as string;
+      const agentId = data.agent_id as string;
+      const current = data.current as number;
+      const total = data.total as number;
+      const description = (data.description as string) || undefined;
+      if (!channelId || !agentId) return;
+      useAgentStore.getState().updateProgress(channelId, agentId, current, total, description);
     });
 
     // agent.confirmation — agent needs user approval for a destructive action
@@ -376,6 +389,7 @@ export default function ChatPage() {
       offAgentToolResult();
       offAgentComplete();
       offAgentError();
+      offAgentProgress();
       offAgentConfirmation();
       offProactiveInsights();
     };
@@ -454,6 +468,24 @@ export default function ChatPage() {
           is_typing: false,
         });
         isTypingRef.current = false;
+      }
+    };
+  }, [activeChannelId, wsSend]);
+
+  // ─── Channel room join/leave for scoped WebSocket broadcasts ─────
+  const prevChannelRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeChannelId && activeChannelId !== prevChannelRef.current) {
+      if (prevChannelRef.current) {
+        wsSend({ type: "channel.leave", channel_id: prevChannelRef.current });
+      }
+      wsSend({ type: "channel.join", channel_id: activeChannelId });
+      prevChannelRef.current = activeChannelId;
+    }
+    return () => {
+      if (prevChannelRef.current) {
+        wsSend({ type: "channel.leave", channel_id: prevChannelRef.current });
+        prevChannelRef.current = null;
       }
     };
   }, [activeChannelId, wsSend]);

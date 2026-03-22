@@ -22,6 +22,7 @@ class AgentTemplate:
     max_iterations: int
     autonomy_level: int
     temperature: float
+    schedule_cron: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +93,10 @@ AGENT_TEMPLATES: tuple[AgentTemplate, ...] = (
             "get_deal_metrics", "get_pipeline_summary", "get_contact_stats",
             # Utility (3 tools)
             "get_current_time", "parse_relative_date", "calculate_date",
+            # AI Insights (2 tools)
+            "ai_get_daily_brief", "ai_get_evening_brief",
+            # Email Chain (2 tools)
+            "analyze_email_chain", "process_email_chain",
         ],
         trigger_mode="mention",
         personality=DONNA_PERSONALITY_TEXT,
@@ -240,13 +245,14 @@ AGENT_TEMPLATES: tuple[AgentTemplate, ...] = (
             "doing today, any blockers). Compile all updates into a clean summary and post it in the team "
             "channel. Flag any blockers that need attention. Track tasks mentioned in updates."
         ),
-        model="claude-sonnet-4-6",
+        model="gemini-3-flash",
         tools=[
             "list_team_members", "send_channel_message", "list_tasks",
             "create_task", "search_messages", "get_current_time",
             "set_reminder",
         ],
         trigger_mode="scheduled",
+        schedule_cron="0 9 * * 1-5",  # 9 AM UTC weekdays
         personality="Cheerful morning person. Keeps standups short and focused. Uses encouraging language.",
         max_iterations=5,
         autonomy_level=3,
@@ -318,6 +324,7 @@ def list_templates() -> list[dict]:
             "model": t.model,
             "tools": t.tools,
             "trigger_mode": t.trigger_mode,
+            "schedule_cron": t.schedule_cron,
             "personality": t.personality,
             "max_iterations": t.max_iterations,
             "autonomy_level": t.autonomy_level,
@@ -341,6 +348,7 @@ def get_template(template_id: str) -> dict | None:
                 "model": t.model,
                 "tools": t.tools,
                 "trigger_mode": t.trigger_mode,
+                "schedule_cron": t.schedule_cron,
                 "personality": t.personality,
                 "max_iterations": t.max_iterations,
                 "autonomy_level": t.autonomy_level,

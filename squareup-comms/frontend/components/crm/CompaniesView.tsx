@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Globe, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Building2, Plus } from "lucide-react";
 import { useCompanies, useCreateCompany } from "@/lib/hooks/use-crm-queries";
 import type { Company } from "@/lib/types/crm";
 import { APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
@@ -56,79 +57,12 @@ function CompanyRow({
   );
 }
 
-// ─── Detail Panel ─────────────────────────────────────────────────
-
-function CompanyPanel({
-  company,
-  onClose,
-}: {
-  company: Company;
-  onClose: () => void;
-}) {
-  return (
-    <div className="w-72 shrink-0 border-l border-border bg-background/80 backdrop-blur-sm p-4 space-y-3 overflow-y-auto">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-sm">{company.name}</h3>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground text-xs"
-        >
-          ✕
-        </button>
-      </div>
-
-      {company.website && (
-        <a
-          href={company.website}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-xs text-primary hover:underline"
-        >
-          <Globe className="w-3 h-3" />
-          {company.website}
-        </a>
-      )}
-
-      <div className="space-y-2 text-xs">
-        {company.industry && (
-          <div>
-            <span className="text-muted-foreground">Industry</span>
-            <p className="font-medium mt-0.5">{company.industry}</p>
-          </div>
-        )}
-        {company.size && (
-          <div>
-            <span className="text-muted-foreground">Size</span>
-            <p className="font-medium mt-0.5">{company.size} employees</p>
-          </div>
-        )}
-        {company.annual_revenue && (
-          <div>
-            <span className="text-muted-foreground">Annual Revenue</span>
-            <p className="font-medium mt-0.5">
-              ${company.annual_revenue.toLocaleString()}
-            </p>
-          </div>
-        )}
-        {company.description && (
-          <div>
-            <span className="text-muted-foreground">About</span>
-            <p className="mt-0.5 leading-relaxed text-foreground/80">
-              {company.description}
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── CompaniesView ────────────────────────────────────────────────
 
 export function CompaniesView() {
   const { data, isLoading } = useCompanies();
   const createCompany = useCreateCompany();
-  const [selected, setSelected] = useState<Company | null>(null);
+  const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
 
@@ -238,11 +172,7 @@ export function CompaniesView() {
                 <CompanyRow
                   key={c.id}
                   company={c}
-                  onClick={(company) =>
-                    setSelected((prev) =>
-                      prev?.id === company.id ? null : company
-                    )
-                  }
+                  onClick={(company) => router.push(`/crm/companies/${company.id}`)}
                 />
               ))}
             </tbody>
@@ -250,13 +180,6 @@ export function CompaniesView() {
         )}
       </div>
 
-      {/* Side panel */}
-      {selected && (
-        <CompanyPanel
-          company={selected}
-          onClose={() => setSelected(null)}
-        />
-      )}
     </div>
   );
 }

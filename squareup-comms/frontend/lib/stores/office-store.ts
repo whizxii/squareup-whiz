@@ -315,6 +315,21 @@ interface OfficeState {
     myUserId: string,
   ) => void;
 
+  // Hydration — populate agents from real agent-store data
+  readonly hydrateAgents: (
+    apiAgents: readonly {
+      readonly id: string;
+      readonly name: string;
+      readonly office_station_icon?: string;
+      readonly status?: string;
+      readonly current_task?: string;
+      readonly office_x?: number;
+      readonly office_y?: number;
+      readonly personality?: string;
+      readonly active?: boolean;
+    }[],
+  ) => void;
+
   // Interaction actions
   readonly setFollowingEntity: (entity: { type: "user" | "agent"; id: string } | null) => void;
   readonly sendWave: (target: { type: "user" | "agent"; id: string }) => void;
@@ -332,49 +347,8 @@ interface OfficeState {
 export const useOfficeStore = create<OfficeState>((set) => ({
   // Entities — hydrated from GET /api/users/ on office mount
   users: [],
-  agents: [
-    {
-      id: "crm-agent",
-      name: "@crm-agent",
-      icon: "\u{1F4CA}",
-      status: "idle",
-      x: 11,
-      y: 7,
-      visualState: "idle" as AgentVisualState,
-      personality: { deskItems: ["\u{26A1}", "\u{1F4DE}", "\u{1F4CC}"], idleQuirk: "sips_coffee" },
-    },
-    {
-      id: "github-agent",
-      name: "@github-agent",
-      icon: "\u{1F419}",
-      status: "working",
-      currentTask: "Reviewing PRs",
-      x: 11,
-      y: 10,
-      visualState: "typing" as AgentVisualState,
-      personality: { deskItems: ["\u{1F986}", "\u{1F5A5}", "\u{2328}"], idleQuirk: "checks_phone" },
-    },
-    {
-      id: "meeting-agent",
-      name: "@meeting-agent",
-      icon: "\u{1F4C5}",
-      status: "idle",
-      x: 10,
-      y: 7,
-      visualState: "idle" as AgentVisualState,
-      personality: { deskItems: ["\u{1F4D3}", "\u{2728}", "\u{1F58A}"], idleQuirk: "stretches" },
-    },
-    {
-      id: "scheduler-agent",
-      name: "@scheduler-agent",
-      icon: "\u{23F0}",
-      status: "idle",
-      x: 10,
-      y: 10,
-      visualState: "idle" as AgentVisualState,
-      personality: { deskItems: ["\u{1F4C6}", "\u{1F418}", "\u{1F4DD}"], idleQuirk: "sips_coffee" },
-    },
-  ],
+  // Agents — hydrated from real agent-store via hydrateAgents()
+  agents: [],
   zones: [...DEFAULT_ZONES],
   furniture: [...DEFAULT_FURNITURE],
 
@@ -600,6 +574,84 @@ export const useOfficeStore = create<OfficeState>((set) => ({
         ? { x: me.office_x ?? 5, y: me.office_y ?? 5 }
         : { x: 5, y: 5 },
     });
+  },
+
+  // Hydration — populate agents from real agent-store data
+  hydrateAgents: (apiAgents) => {
+    const DEFAULT_POSITIONS = [
+      { x: 11, y: 7 },
+      { x: 11, y: 10 },
+      { x: 10, y: 7 },
+      { x: 10, y: 10 },
+    ] as const;
+
+    const DEFAULT_AGENT_PERSONALITY: AgentPersonality = {
+      deskItems: ["\u26A1", "\u{1F4CB}", "\u{1F527}"],
+      idleQuirk: "sips_coffee",
+    };
+
+    const statusToVisual = (status: string): AgentVisualState => {
+      switch (status) {
+        case "working":
+        case "thinking":
+          return "typing";
+        case "error":
+          return "frustrated";
+        default:
+          return "idle";
+      }
+    };
+
+    const parsePersonality = (raw?: string): AgentPersonality => {
+      if (!raw) return DEFAULT_AGENT_PERSONALITY;
+      try {
+        const parsed = JSON.parse(raw);
+        return {
+          deskItems: Array.isArray(parsed.deskItems)
+            ? parsed.deskItems
+            : DEFAULT_AGENT_PERSONALITY.deskItems,
+          idleQuirk: parsed.idleQuirk || DEFAULT_AGENT_PERSONALITY.idleQuirk,
+        };
+      } catch {
+        return DEFAULT_AGENT_PERSONALITY;
+      }
+    };
+
+    const VALID_STATUSES = new Set(["idle", "thinking", "working", "error", "offline"]);
+
+    set((s) => ({
+      agents: apiAgents
+        .filter((a) => a.active !== false)
+        .map((a, i) => {
+          // Preserve existing office agent state if actively working
+          const existing = s.agents.find((ea) => ea.id === a.id);
+          const isActivelyWorking =
+            existing?.status === "working" || existing?.status === "thinking";
+          const pos = DEFAULT_POSITIONS[i % DEFAULT_POSITIONS.length];
+
+          return {
+            id: a.id,
+            name: a.name.startsWith("@")
+              ? a.name
+              : `@${a.name.toLowerCase().replace(/\s+/g, "-")}`,
+            icon: a.office_station_icon || "\u{1F916}",
+            status: isActivelyWorking
+              ? existing.status
+              : (VALID_STATUSES.has(a.status || "")
+                  ? (a.status as OfficeAgent["status"])
+                  : "idle"),
+            currentTask: isActivelyWorking
+              ? existing.currentTask
+              : a.current_task,
+            x: a.office_x ?? pos.x,
+            y: a.office_y ?? pos.y,
+            visualState: isActivelyWorking
+              ? existing.visualState
+              : statusToVisual(a.status || "idle"),
+            personality: parsePersonality(a.personality),
+          };
+        }),
+    }));
   },
 
   // Interaction actions

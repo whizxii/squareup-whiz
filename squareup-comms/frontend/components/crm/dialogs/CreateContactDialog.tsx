@@ -1,31 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { X, Sparkles } from "lucide-react";
 import {
   useCreateContact,
   useCreateActivity,
   useCreateCalendarEvent,
   useUpdateContact,
 } from "@/lib/hooks/use-crm-queries";
+import { useCreateReminder } from "@/lib/hooks/use-tasks-queries";
+import { crmApi } from "@/lib/api/crm-api";
 import type { CRMStage } from "@/lib/types/crm";
 import { toast } from "@/lib/stores/toast-store";
-import { useAuthStore } from "@/lib/stores/auth-store";
-import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import { APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
-
-// ─── Constants ───────────────────────────────────────────────────
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-function getHeaders(): Record<string, string> {
-  const token = useAuthStore.getState().token;
-  const base: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) base["Authorization"] = `Bearer ${token}`;
-  else base["X-User-Id"] = getCurrentUserId();
-  return base;
-}
 
 const LEAD_SOURCES = [
   { value: "website", label: "Website" },
@@ -70,6 +58,7 @@ export function CreateContactDialog({
   const createActivity = useCreateActivity();
   const createCalendar = useCreateCalendarEvent();
   const updateContact = useUpdateContact();
+  const createReminder = useCreateReminder();
 
   // Core fields
   const [name, setName] = useState("");
@@ -82,6 +71,63 @@ export function CreateContactDialog({
   const [notes, setNotes] = useState("");
   const [tags, setTags] = useState("");
   const [createDeal, setCreateDeal] = useState(true);
+
+  // AI suggestion state
+  const [aiSuggesting, setAiSuggesting] = useState(false);
+  const [aiSuggestedFields, setAiSuggestedFields] = useState<Set<string>>(new Set());
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerAiSuggest = useCallback(() => {
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    suggestTimer.current = setTimeout(async () => {
+      const nameVal = name.trim();
+      const emailVal = email.trim();
+      const companyVal = company.trim();
+      if (!nameVal && !emailVal) return;
+
+      setAiSuggesting(true);
+      try {
+        const suggestions = await crmApi.suggestFields({
+          name: nameVal || undefined,
+          email: emailVal || undefined,
+          company: companyVal || undefined,
+        });
+        if (!suggestions || Object.keys(suggestions).length === 0) return;
+
+        const filled = new Set<string>();
+        if (suggestions.company && typeof suggestions.company === "string" && !companyVal) {
+          setCompany(suggestions.company);
+          filled.add("company");
+        }
+        if (suggestions.title && typeof suggestions.title === "string" && !title.trim()) {
+          setTitle(suggestions.title);
+          filled.add("title");
+        }
+        if (suggestions.source && typeof suggestions.source === "string" && !source) {
+          const match = LEAD_SOURCES.find((s) => s.value === suggestions.source);
+          if (match) {
+            setSource(match.value);
+            filled.add("source");
+          }
+        }
+        if (Array.isArray(suggestions.tags) && suggestions.tags.length > 0 && !tags.trim()) {
+          setTags(suggestions.tags.join(", "));
+          filled.add("tags");
+        }
+        if (suggestions.notes && typeof suggestions.notes === "string" && !notes.trim()) {
+          setNotes(suggestions.notes);
+          filled.add("notes");
+        }
+        if (filled.size > 0) {
+          setAiSuggestedFields(filled);
+        }
+      } catch {
+        // Best-effort — silently ignore failures
+      } finally {
+        setAiSuggesting(false);
+      }
+    }, 600);
+  }, [name, email, company, title, source, tags, notes]);
 
   // First interaction (collapsible)
   const [showFirstInteraction, setShowFirstInteraction] = useState(false);
@@ -111,6 +157,9 @@ export function CreateContactDialog({
     setFollowUpTime("09:00");
     setFollowUpNote("");
     setError("");
+    setAiSuggesting(false);
+    setAiSuggestedFields(new Set());
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
   };
 
   const handleCreate = async () => {
@@ -179,13 +228,9 @@ export function CreateContactDialog({
                 follow_up_note: followUpNote.trim() || undefined,
               },
             }),
-            fetch(`${API_URL}/api/reminders/`, {
-              method: "POST",
-              headers: getHeaders(),
-              body: JSON.stringify({
-                message: `Follow-up with ${contactName}`,
-                remind_at: remindAt,
-              }),
+            createReminder.mutateAsync({
+              message: `Follow-up with ${contactName}`,
+              remind_at: remindAt,
             }),
           ]);
           followUpScheduled = true;
@@ -218,8 +263,21 @@ export function CreateContactDialog({
     }
   };
 
+  /** Clear a field from the AI-suggested set when user manually edits it. */
+  const clearAiField = (field: string) => {
+    if (aiSuggestedFields.has(field)) {
+      setAiSuggestedFields((prev) => {
+        const next = new Set(prev);
+        next.delete(field);
+        return next;
+      });
+    }
+  };
+
   const inputCls =
     "w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20";
+  const aiInputCls = (field: string) =>
+    `${inputCls}${aiSuggestedFields.has(field) ? " border-violet-400 dark:border-violet-500 bg-violet-50/50 dark:bg-violet-950/20" : ""}`;
 
   return (
     <Dialog.Root
@@ -244,6 +302,7 @@ export function CreateContactDialog({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onBlur={triggerAiSuggest}
               placeholder="Full name *"
               className={inputCls}
               autoFocus
@@ -254,6 +313,7 @@ export function CreateContactDialog({
               <input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={triggerAiSuggest}
                 placeholder="Email"
                 type="email"
                 className={inputCls}
@@ -267,20 +327,44 @@ export function CreateContactDialog({
               />
             </div>
 
+            {/* AI suggestion status */}
+            {aiSuggesting && (
+              <div className="flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400">
+                <Sparkles className="w-3 h-3 animate-pulse" />
+                <span>AI is suggesting fields...</span>
+              </div>
+            )}
+            {!aiSuggesting && aiSuggestedFields.size > 0 && (
+              <div className="flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400">
+                <Sparkles className="w-3 h-3" />
+                <span>AI suggested {aiSuggestedFields.size} field{aiSuggestedFields.size > 1 ? "s" : ""} — edit to override</span>
+              </div>
+            )}
+
             {/* Company + Job title */}
             <div className="grid grid-cols-2 gap-2">
-              <input
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                placeholder="Company"
-                className={inputCls}
-              />
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Job title"
-                className={inputCls}
-              />
+              <div className="relative">
+                <input
+                  value={company}
+                  onChange={(e) => { setCompany(e.target.value); clearAiField("company"); }}
+                  placeholder="Company"
+                  className={aiInputCls("company")}
+                />
+                {aiSuggestedFields.has("company") && (
+                  <Sparkles className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-violet-500" />
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  value={title}
+                  onChange={(e) => { setTitle(e.target.value); clearAiField("title"); }}
+                  placeholder="Job title"
+                  className={aiInputCls("title")}
+                />
+                {aiSuggestedFields.has("title") && (
+                  <Sparkles className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-violet-500" />
+                )}
+              </div>
             </div>
 
             {/* Stage + Lead source */}
@@ -304,11 +388,14 @@ export function CreateContactDialog({
               <div>
                 <label className="block text-xs text-muted-foreground mb-1 pl-0.5">
                   Lead source
+                  {aiSuggestedFields.has("source") && (
+                    <Sparkles className="inline ml-1 w-3 h-3 text-violet-500" />
+                  )}
                 </label>
                 <select
                   value={source}
-                  onChange={(e) => setSource(e.target.value)}
-                  className={inputCls}
+                  onChange={(e) => { setSource(e.target.value); clearAiField("source"); }}
+                  className={aiInputCls("source")}
                 >
                   <option value="">— None —</option>
                   {LEAD_SOURCES.map((s) => (
@@ -321,21 +408,31 @@ export function CreateContactDialog({
             </div>
 
             {/* Notes */}
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notes (optional)"
-              rows={3}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 resize-none"
-            />
+            <div className="relative">
+              <textarea
+                value={notes}
+                onChange={(e) => { setNotes(e.target.value); clearAiField("notes"); }}
+                placeholder="Notes (optional)"
+                rows={3}
+                className={`w-full px-3 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20 resize-none ${aiSuggestedFields.has("notes") ? "border-violet-400 dark:border-violet-500 bg-violet-50/50 dark:bg-violet-950/20" : "border-border"}`}
+              />
+              {aiSuggestedFields.has("notes") && (
+                <Sparkles className="absolute right-2.5 top-2.5 w-3.5 h-3.5 text-violet-500" />
+              )}
+            </div>
 
             {/* Tags */}
-            <input
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="Tags: investor, warm, B2B (comma-separated)"
-              className={inputCls}
-            />
+            <div className="relative">
+              <input
+                value={tags}
+                onChange={(e) => { setTags(e.target.value); clearAiField("tags"); }}
+                placeholder="Tags: investor, warm, B2B (comma-separated)"
+                className={aiInputCls("tags")}
+              />
+              {aiSuggestedFields.has("tags") && (
+                <Sparkles className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-violet-500" />
+              )}
+            </div>
 
             {/* Pipeline toggle */}
             <label className="flex items-center gap-2 text-sm cursor-pointer">

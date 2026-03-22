@@ -17,6 +17,10 @@ from app.services.tools import (
     email_tools,
     ai_insight_tools,
     autonomous_tools,
+    entity_intelligence_tools,
+    progress_tools,
+    intelligence_report_tools,
+    email_chain_tools,
 )
 
 # Register all tool modules
@@ -34,3 +38,7 @@ calendar_tools.register(tool_registry)
 email_tools.register(tool_registry)
 ai_insight_tools.register(tool_registry)
 autonomous_tools.register(tool_registry)
+entity_intelligence_tools.register(tool_registry)
+progress_tools.register(tool_registry)
+intelligence_report_tools.register(tool_registry)
+email_chain_tools.register(tool_registry)

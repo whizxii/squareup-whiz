@@ -93,17 +93,55 @@ def _build_criterion_filter(criterion: dict[str, Any]) -> Any | None:
 
 
 def build_criteria_filters(criteria: list[dict[str, Any]]) -> list[Any]:
-    """Convert a list of criteria into SQLAlchemy filter expressions.
+    """Convert criteria into SQLAlchemy filters supporting AND/OR conjunction.
 
-    Currently treats all criteria as AND-ed together.
-    OR conjunction support can be added in a future iteration.
+    Each criterion has an optional ``conjunction`` field ("and" or "or",
+    default "and").  An "or" conjunction starts a new group.  Criteria
+    within a group are AND-ed.  Groups are then OR-ed together.
+
+    Example: [A(and), B(and), C(or), D(and)] → (A AND B) OR (C AND D)
+
+    Backward compatible — if every criterion uses "and" (the default),
+    behaviour is identical to the previous AND-only implementation.
     """
-    filters: list[Any] = []
+    if not criteria:
+        return []
+
+    # Split into groups: a new group starts when conjunction is "or"
+    groups: list[list[Any]] = []
+    current_group: list[Any] = []
+
     for criterion in criteria:
+        conjunction = (criterion.get("conjunction") or "and").lower()
         f = _build_criterion_filter(criterion)
-        if f is not None:
-            filters.append(f)
-    return filters
+        if f is None:
+            continue
+
+        if conjunction == "or" and current_group:
+            groups.append(current_group)
+            current_group = [f]
+        else:
+            current_group.append(f)
+
+    if current_group:
+        groups.append(current_group)
+
+    if not groups:
+        return []
+
+    # Single group → return individual filters (AND-ed by caller via .where())
+    if len(groups) == 1:
+        return groups[0]
+
+    # Multiple groups → AND within each group, OR between groups
+    or_conditions = []
+    for group in groups:
+        if len(group) == 1:
+            or_conditions.append(group[0])
+        else:
+            or_conditions.append(and_(*group))
+
+    return [or_(*or_conditions)]
 
 
 # ─── Smart List Service ──────────────────────────────────────────

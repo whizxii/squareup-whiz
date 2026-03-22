@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { X, Search, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
 import {
   useCreateDeal,
   usePipelines,
   useDefaultPipeline,
+  useContacts,
 } from "@/lib/hooks/use-crm-queries";
 import type { PipelineStage } from "@/lib/types/crm";
 
@@ -35,11 +37,59 @@ export function CreateDealDialog({ open, onOpenChange }: CreateDealDialogProps) 
 
   const [title, setTitle] = useState("");
   const [contactId, setContactId] = useState(initialContactId);
+  const [contactSearch, setContactSearch] = useState("");
+  const [contactDropdownOpen, setContactDropdownOpen] = useState(false);
+  const [selectedContactName, setSelectedContactName] = useState("");
+  const contactSearchRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [pipelineId, setPipelineId] = useState(initialPipelineId);
   const [stage, setStage] = useState(initialStage);
   const [value, setValue] = useState("");
   const [currency, setCurrency] = useState("INR");
   const [expectedClose, setExpectedClose] = useState("");
+
+  // Debounced contact search
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(contactSearch), 300);
+    return () => clearTimeout(timer);
+  }, [contactSearch]);
+
+  const { data: contactsRes, isLoading: contactsLoading } = useContacts(
+    debouncedSearch.length >= 2 ? { search: debouncedSearch } : undefined,
+    { limit: 8 },
+  );
+  const contactResults = contactsRes?.items ?? [];
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setContactDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelectContact = useCallback(
+    (id: string, name: string) => {
+      setContactId(id);
+      setSelectedContactName(name);
+      setContactSearch("");
+      setContactDropdownOpen(false);
+    },
+    [],
+  );
+
+  const handleClearContact = useCallback(() => {
+    setContactId("");
+    setSelectedContactName("");
+    setContactSearch("");
+  }, []);
 
   const selectedPipeline =
     pipelines.find((p) => p.id === pipelineId) ?? defaultPipeline;
@@ -102,13 +152,80 @@ export function CreateDealDialog({ open, onOpenChange }: CreateDealDialogProps) 
               autoFocus
             />
 
-            {/* Contact ID (text for now, will be searchable dropdown later) */}
-            <input
-              value={contactId}
-              onChange={(e) => setContactId(e.target.value)}
-              placeholder="Contact ID (optional)"
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20"
-            />
+            {/* Contact search */}
+            <div className="relative" ref={dropdownRef}>
+              {contactId ? (
+                <div className="flex items-center gap-2 w-full px-3 py-2 rounded-lg border border-border bg-background text-sm">
+                  <span className="flex-1 truncate">{selectedContactName || contactId}</span>
+                  <button
+                    type="button"
+                    onClick={handleClearContact}
+                    className="p-0.5 rounded hover:bg-accent text-muted-foreground"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <input
+                    ref={contactSearchRef}
+                    value={contactSearch}
+                    onChange={(e) => {
+                      setContactSearch(e.target.value);
+                      setContactDropdownOpen(e.target.value.length >= 2);
+                    }}
+                    onFocus={() => {
+                      if (contactSearch.length >= 2) setContactDropdownOpen(true);
+                    }}
+                    placeholder="Search contact (optional)"
+                    className="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring/20"
+                  />
+                  {contactsLoading && contactSearch.length >= 2 && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+              )}
+
+              {contactDropdownOpen && contactSearch.length >= 2 && (
+                <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-card shadow-lg max-h-48 overflow-y-auto">
+                  {contactResults.length === 0 && !contactsLoading ? (
+                    <p className="px-3 py-2 text-xs text-muted-foreground">
+                      No contacts found
+                    </p>
+                  ) : (
+                    contactResults.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handleSelectContact(c.id, c.name ?? c.email ?? c.id)}
+                        className={cn(
+                          "w-full text-left px-3 py-2 hover:bg-accent transition-colors",
+                          "flex items-center gap-2"
+                        )}
+                      >
+                        <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-medium shrink-0">
+                          {(c.name ?? "?").slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{c.name ?? "Unnamed"}</p>
+                          {c.email && (
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {c.email}
+                            </p>
+                          )}
+                        </div>
+                        {c.company && (
+                          <span className="text-[10px] text-muted-foreground shrink-0">
+                            {c.company}
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Pipeline */}
             <select

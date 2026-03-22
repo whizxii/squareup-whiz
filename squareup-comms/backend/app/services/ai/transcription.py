@@ -1,17 +1,27 @@
-"""Mock transcription service — generates realistic transcription data for development.
+"""Transcription service — real Whisper STT + LLM analysis, with mock fallback.
 
-In production, this would integrate with Whisper, Deepgram, or AssemblyAI.
-The mock generates speaker-diarized segments, summaries, action items, topics,
-objections, sentiment, and next steps.
+Provides:
+  - WhisperTranscriptionService: Uses OpenAI Whisper API for speech-to-text,
+    then LLM for analysis (summary, action items, sentiment, etc.)
+  - MockTranscriptionService: Hardcoded development fallback (no API keys needed).
+  - get_transcription_service(): Factory that returns the appropriate service.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import random
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any
 
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+# ─── Data Classes ─────────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class TranscriptSegment:
@@ -55,7 +65,179 @@ class TranscriptionResult:
     next_steps: list[str]
 
 
-# ─── Mock conversation templates ───────────────────────────────────
+# ─── Whisper Transcription Service ────────────────────────────────
+
+
+class WhisperTranscriptionService:
+    """Real transcription using OpenAI Whisper API + LLM analysis."""
+
+    async def transcribe(
+        self,
+        duration_seconds: int,
+        *,
+        file_path: str | None = None,
+    ) -> TranscriptionResult:
+        """Transcribe an audio file via Whisper API, then analyse with LLM.
+
+        Parameters
+        ----------
+        duration_seconds:
+            Recording duration (used as context hint if file is unavailable).
+        file_path:
+            Absolute path to the audio file on disk.  When ``None`` the method
+            falls back to mock transcription.
+        """
+        if file_path is None or not Path(file_path).exists():
+            logger.warning(
+                "No audio file at %s — falling back to mock transcription",
+                file_path,
+            )
+            return await _MOCK_SERVICE.transcribe(duration_seconds)
+
+        # Step 1: Speech-to-text via Whisper
+        raw_segments = await self._whisper_transcribe(file_path)
+        if not raw_segments:
+            logger.warning("Whisper returned empty result — falling back to mock")
+            return await _MOCK_SERVICE.transcribe(duration_seconds)
+
+        full_transcript = "\n".join(seg["text"] for seg in raw_segments)
+
+        # Build TranscriptSegment list from Whisper verbose JSON
+        segments = [
+            TranscriptSegment(
+                speaker="Speaker",  # Whisper doesn't diarise
+                text=seg["text"].strip(),
+                start_ms=int(seg["start"] * 1000),
+                end_ms=int(seg["end"] * 1000),
+                confidence=seg.get("avg_logprob", 0.0),
+            )
+            for seg in raw_segments
+        ]
+
+        # Step 2: LLM-powered analysis
+        analysis = await self._analyse_transcript(full_transcript)
+
+        return TranscriptionResult(
+            transcript=full_transcript,
+            segments=segments,
+            summary=analysis.get("summary", ""),
+            action_items=[
+                ActionItem(
+                    text=a.get("text", ""),
+                    assignee=a.get("assignee"),
+                    due_date=a.get("due_date"),
+                    is_completed=False,
+                )
+                for a in analysis.get("action_items", [])
+            ],
+            sentiment=analysis.get("sentiment", "neutral"),
+            key_topics=[
+                KeyTopic(
+                    topic=t.get("topic", ""),
+                    relevance_score=float(t.get("relevance_score", 0.5)),
+                )
+                for t in analysis.get("key_topics", [])
+            ],
+            objections=[
+                Objection(
+                    text=o.get("text", ""),
+                    context=o.get("context", ""),
+                    resolved=bool(o.get("resolved", False)),
+                )
+                for o in analysis.get("objections", [])
+            ],
+            next_steps=analysis.get("next_steps", []),
+        )
+
+    # ── Whisper API call ──────────────────────────────────────────
+
+    async def _whisper_transcribe(self, file_path: str) -> list[dict[str, Any]]:
+        """Call OpenAI Whisper API and return verbose segments."""
+        try:
+            from openai import AsyncOpenAI
+
+            client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+            with open(file_path, "rb") as audio_file:
+                response = await client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    response_format="verbose_json",
+                    timestamp_granularities=["segment"],
+                )
+
+            # response is a Transcription object with .segments
+            segments = response.segments or []
+            return [
+                {
+                    "text": seg.text,
+                    "start": seg.start,
+                    "end": seg.end,
+                    "avg_logprob": getattr(seg, "avg_logprob", 0.0),
+                }
+                for seg in segments
+            ]
+
+        except Exception as exc:
+            logger.error("Whisper API call failed: %s", exc)
+            return []
+
+    # ── LLM analysis call ─────────────────────────────────────────
+
+    async def _analyse_transcript(self, transcript: str) -> dict[str, Any]:
+        """Use the configured LLM to extract insights from a transcript."""
+        from app.services.llm_service import get_llm_client, llm_available, parse_llm_json
+
+        if not llm_available():
+            logger.info("No LLM configured — returning empty analysis")
+            return {}
+
+        prompt = _ANALYSIS_PROMPT.format(transcript=transcript[:8000])
+
+        try:
+            client = get_llm_client()
+            raw = await client.chat(
+                messages=[
+                    {"role": "system", "content": _ANALYSIS_SYSTEM},
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=2048,
+                temperature=0.3,
+            )
+            result = parse_llm_json(raw)
+            return result if result is not None else {}
+        except Exception as exc:
+            logger.error("LLM analysis failed: %s", exc)
+            return {}
+
+
+_ANALYSIS_SYSTEM = (
+    "You are a sales call analyst. Given a call transcript, extract structured "
+    "insights. Always respond with valid JSON only — no markdown, no preamble."
+)
+
+_ANALYSIS_PROMPT = """Analyse this call transcript and return JSON with exactly these keys:
+
+{{
+  "summary": "2-3 sentence summary of the call",
+  "action_items": [
+    {{"text": "action description", "assignee": "person or null", "due_date": "YYYY-MM-DD or null"}}
+  ],
+  "sentiment": "positive|neutral|negative|mixed",
+  "key_topics": [
+    {{"topic": "topic name", "relevance_score": 0.0-1.0}}
+  ],
+  "objections": [
+    {{"text": "objection", "context": "when it came up", "resolved": true/false}}
+  ],
+  "next_steps": ["step 1", "step 2"]
+}}
+
+Transcript:
+{transcript}"""
+
+
+# ─── Mock Transcription Service ───────────────────────────────────
 
 _MOCK_CONVERSATIONS: list[list[dict[str, str]]] = [
     [
@@ -141,26 +323,24 @@ _MOCK_SENTIMENTS = ["positive", "positive", "positive"]
 class MockTranscriptionService:
     """Generates realistic mock transcription results for development."""
 
-    async def transcribe(self, duration_seconds: int) -> TranscriptionResult:
+    async def transcribe(
+        self,
+        duration_seconds: int,
+        *,
+        file_path: str | None = None,
+    ) -> TranscriptionResult:
         """Generate a mock transcription for a recording of given duration."""
         idx = random.randint(0, len(_MOCK_CONVERSATIONS) - 1)
         conversation = _MOCK_CONVERSATIONS[idx]
 
-        # Build segments with realistic timing
         segments = _build_segments(conversation, duration_seconds)
         full_transcript = "\n".join(
             f"{seg.speaker}: {seg.text}" for seg in segments
         )
 
-        action_items = [
-            ActionItem(**item) for item in _MOCK_ACTION_ITEMS_SETS[idx]
-        ]
-        key_topics = [
-            KeyTopic(**item) for item in _MOCK_TOPICS_SETS[idx]
-        ]
-        objections = [
-            Objection(**item) for item in _MOCK_OBJECTIONS_SETS[idx]
-        ]
+        action_items = [ActionItem(**item) for item in _MOCK_ACTION_ITEMS_SETS[idx]]
+        key_topics = [KeyTopic(**item) for item in _MOCK_TOPICS_SETS[idx]]
+        objections = [Objection(**item) for item in _MOCK_OBJECTIONS_SETS[idx]]
 
         return TranscriptionResult(
             transcript=full_transcript,
@@ -172,6 +352,10 @@ class MockTranscriptionService:
             objections=objections,
             next_steps=_MOCK_NEXT_STEPS_SETS[idx],
         )
+
+
+# Module-level mock singleton (reused by Whisper fallback)
+_MOCK_SERVICE = MockTranscriptionService()
 
 
 def _build_segments(
@@ -189,7 +373,6 @@ def _build_segments(
     current_ms = 0
 
     for entry in conversation:
-        # Add small random variation to segment duration
         jitter = random.randint(-500, 500)
         seg_duration = max(1000, avg_segment_ms + jitter)
         end_ms = min(current_ms + seg_duration, total_ms)
@@ -208,6 +391,9 @@ def _build_segments(
     return segments
 
 
+# ─── Serialization ────────────────────────────────────────────────
+
+
 def serialize_transcription_result(result: TranscriptionResult) -> dict[str, str]:
     """Convert TranscriptionResult fields to JSON strings for database storage."""
     return {
@@ -220,3 +406,15 @@ def serialize_transcription_result(result: TranscriptionResult) -> dict[str, str
         "ai_objections": json.dumps([asdict(o) for o in result.objections]),
         "ai_next_steps": json.dumps(result.next_steps),
     }
+
+
+# ─── Factory ──────────────────────────────────────────────────────
+
+
+def get_transcription_service() -> WhisperTranscriptionService | MockTranscriptionService:
+    """Return a real Whisper service if OPENAI_API_KEY is set, else mock."""
+    if settings.OPENAI_API_KEY:
+        logger.info("Using WhisperTranscriptionService (OpenAI API)")
+        return WhisperTranscriptionService()
+    logger.info("No OPENAI_API_KEY — using MockTranscriptionService")
+    return MockTranscriptionService()

@@ -7,8 +7,10 @@ import { AgentChat } from "@/components/agents/AgentChat";
 import CreateAgentDialog from "@/components/agents/CreateAgentDialog";
 import AgentTemplates from "@/components/agents/AgentTemplates";
 import EditAgentDialog from "@/components/agents/EditAgentDialog";
+import AgentMemoryPanel from "@/components/agents/AgentMemoryPanel";
 import {
   Bot,
+  Brain,
   Plus,
   Sparkles,
   Search,
@@ -41,6 +43,7 @@ export default function AgentsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [memoryAgent, setMemoryAgent] = useState<Agent | null>(null);
 
   const filteredAgents = agents.filter((a) => {
     if (!a.active) return false;
@@ -82,6 +85,10 @@ export default function AgentsPage() {
 
   const handleEditAgent = useCallback((agent: Agent) => {
     setEditingAgent(agent);
+  }, []);
+
+  const handleMemoryAgent = useCallback((agent: Agent) => {
+    setMemoryAgent(agent);
   }, []);
 
   const handleDeleteAgent = useCallback(
@@ -245,6 +252,7 @@ export default function AgentsPage() {
                 onClick={() => setSelectedAgent(agent.id)}
                 onEdit={handleEditAgent}
                 onDelete={handleDeleteAgent}
+                onMemory={handleMemoryAgent}
               />
             ))}
           </div>
@@ -259,6 +267,7 @@ export default function AgentsPage() {
                 onClick={() => setSelectedAgent(agent.id)}
                 onEdit={handleEditAgent}
                 onDelete={handleDeleteAgent}
+                onMemory={handleMemoryAgent}
               />
             ))}
           </div>
@@ -288,6 +297,15 @@ export default function AgentsPage() {
           onClose={() => setShowTemplates(false)}
         />
       )}
+
+      {/* Agent Memory Panel */}
+      {memoryAgent && (
+        <AgentMemoryPanel
+          agentId={memoryAgent.id}
+          agentName={memoryAgent.name}
+          onClose={() => setMemoryAgent(null)}
+        />
+      )}
     </div>
   );
 }
@@ -306,11 +324,13 @@ function AgentListRow({
   onClick,
   onEdit,
   onDelete,
+  onMemory,
 }: {
   agent: Agent;
   onClick: () => void;
   onEdit?: (agent: Agent) => void;
   onDelete?: (agent: Agent) => void;
+  onMemory?: (agent: Agent) => void;
 }) {
   return (
     <button
@@ -372,8 +392,20 @@ function AgentListRow({
         </div>
       )}
 
-      {/* Edit/Delete on hover */}
+      {/* Memory/Edit/Delete on hover */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        {onMemory && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onMemory(agent); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onMemory(agent); } }}
+            className="p-1.5 rounded-lg hover:bg-sq-agent/10 text-muted-foreground hover:text-sq-agent transition-colors"
+            title="View memory"
+          >
+            <Brain className="w-3.5 h-3.5" />
+          </span>
+        )}
         {onEdit && (
           <span
             role="button"

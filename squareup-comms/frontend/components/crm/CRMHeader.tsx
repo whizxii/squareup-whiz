@@ -16,8 +16,9 @@ import {
   ListFilter,
   Upload,
   Download,
-  Zap,
+  Bot,
   Newspaper,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCRMUIStore } from "@/lib/stores/crm-ui-store";
@@ -42,8 +43,9 @@ const VIEWS: ViewConfig[] = [
   { id: "sequences", label: "Sequences", icon: <Workflow className="w-4 h-4" /> },
   { id: "workflows", label: "Workflows", icon: <GitBranch className="w-4 h-4" /> },
   { id: "smart_lists", label: "Smart Lists", icon: <ListFilter className="w-4 h-4" /> },
-  { id: "automation", label: "Automation", icon: <Zap className="w-4 h-4" /> },
+  { id: "automation", label: "AI Activity", icon: <Bot className="w-4 h-4" /> },
   { id: "digest", label: "Digest", icon: <Newspaper className="w-4 h-4" /> },
+  { id: "graph", label: "Graph", icon: <Network className="w-4 h-4" /> },
 ];
 
 // ─── Quick add menu items ────────────────────────────────────────

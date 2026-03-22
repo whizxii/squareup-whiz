@@ -71,6 +71,23 @@ function ToastItem({ toast }: { toast: Toast }) {
         {toast.description && (
           <p className="text-xs text-muted-foreground mt-0.5">{toast.description}</p>
         )}
+        {toast.actions && toast.actions.length > 0 && (
+          <div className="flex gap-2 mt-2">
+            {toast.actions.map((action) => (
+              <button
+                key={action.label}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  action.onClick();
+                  removeToast(toast.id);
+                }}
+                className="text-[11px] px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <button
         onClick={() => removeToast(toast.id)}

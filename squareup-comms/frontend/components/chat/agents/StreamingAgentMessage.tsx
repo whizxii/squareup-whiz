@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Bot } from "lucide-react";
-import { useAgentStore, type StreamingMessage } from "@/lib/stores/agent-store";
+import { useAgentStore, type StreamingMessage, type AgentProgress } from "@/lib/stores/agent-store";
 import { ToolExecutionCard } from "./ToolExecutionCard";
 
 interface StreamingAgentMessageProps {
@@ -17,6 +17,7 @@ interface StreamingAgentMessageProps {
  */
 export function StreamingAgentMessages({ channelId }: StreamingAgentMessageProps) {
   const streamingMessages = useAgentStore((s) => s.streamingMessages);
+  const agentProgress = useAgentStore((s) => s.agentProgress);
   const agents = useAgentStore((s) => s.agents);
 
   // Filter streaming messages for this channel
@@ -36,12 +37,15 @@ export function StreamingAgentMessages({ channelId }: StreamingAgentMessageProps
     <>
       {activeStreams.map((stream) => {
         const agent = agents.find((a) => a.id === stream.agentId);
+        const progressKey = `${channelId}:${stream.agentId}`;
+        const progress = agentProgress[progressKey];
         return (
           <SingleStreamingMessage
-            key={`${stream.channelId}:${stream.agentId}`}
+            key={progressKey}
             stream={stream}
             agentName={agent?.name ?? "Agent"}
             agentIcon={agent?.office_station_icon}
+            progress={progress}
           />
         );
       })}
@@ -53,10 +57,12 @@ function SingleStreamingMessage({
   stream,
   agentName,
   agentIcon,
+  progress,
 }: {
   stream: StreamingMessage;
   agentName: string;
   agentIcon?: string;
+  progress?: AgentProgress;
 }) {
   const hasText = stream.text.length > 0;
   const hasTools = stream.toolCalls.length > 0;
@@ -84,6 +90,11 @@ function SingleStreamingMessage({
           </span>
         </div>
 
+        {/* Progress bar for batch operations */}
+        {progress && progress.total > 0 && (
+          <ProgressIndicator progress={progress} />
+        )}
+
         {/* Streaming text with cursor */}
         {hasText && (
           <div className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
@@ -99,7 +110,7 @@ function SingleStreamingMessage({
         )}
 
         {/* Show cursor when no text yet (pure thinking) */}
-        {!hasText && !hasTools && (
+        {!hasText && !hasTools && !progress && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="inline-flex gap-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-sq-agent/60 animate-bounce" style={{ animationDelay: "0ms", animationDuration: "600ms" }} />
@@ -111,6 +122,43 @@ function SingleStreamingMessage({
 
         {/* Live tool execution cards */}
         {hasTools && <ToolExecutionCard toolCalls={stream.toolCalls} />}
+      </div>
+    </div>
+  );
+}
+
+/** Animated progress bar for batch operations. */
+function ProgressIndicator({ progress }: { progress: AgentProgress }) {
+  const { current, total, percent, description } = progress;
+
+  return (
+    <div className="rounded-lg border border-sq-agent/20 bg-sq-agent/5 p-2.5 space-y-1.5">
+      {/* Description + fraction */}
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-foreground/80 truncate">
+          {description || `Processing ${current} of ${total}`}
+        </span>
+        <span className="text-muted-foreground shrink-0 ml-2 tabular-nums">
+          {current}/{total}
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1.5 w-full rounded-full bg-sq-agent/10 overflow-hidden">
+        <div
+          className={cn(
+            "h-full rounded-full bg-sq-agent transition-all duration-300 ease-out",
+            percent < 100 && "animate-pulse"
+          )}
+          style={{ width: `${Math.min(percent, 100)}%` }}
+        />
+      </div>
+
+      {/* Percentage */}
+      <div className="text-right">
+        <span className="text-[10px] text-muted-foreground tabular-nums">
+          {percent}%
+        </span>
       </div>
     </div>
   );

@@ -12,18 +12,35 @@ from app.services.tools.registry import ToolDefinition, ToolResult, ToolContext,
 
 async def _handle_get_daily_brief(inp: dict, ctx: ToolContext) -> ToolResult:
     """Fetch (or generate) today's daily brief for the current user."""
-    from app.core.background import BackgroundTaskManager
-    from app.core.events import EventBus
+    from app.core.shared_infra import get_background, get_event_bus
     from app.services.ai.insights_engine import AIInsightsEngine
 
     try:
         async with async_session() as session:
             engine = AIInsightsEngine(
                 session=session,
-                events=EventBus(),
-                background=BackgroundTaskManager(),
+                events=get_event_bus(),
+                background=get_background(),
             )
             brief = await engine.generate_daily_brief(ctx.user_id)
+        return ToolResult(success=True, output=brief)
+    except Exception as exc:
+        return ToolResult(success=False, error=str(exc))
+
+
+async def _handle_get_evening_brief(inp: dict, ctx: ToolContext) -> ToolResult:
+    """Generate an end-of-day brief: today's recap + tomorrow's preview."""
+    from app.core.shared_infra import get_background, get_event_bus
+    from app.services.ai.insights_engine import AIInsightsEngine
+
+    try:
+        async with async_session() as session:
+            engine = AIInsightsEngine(
+                session=session,
+                events=get_event_bus(),
+                background=get_background(),
+            )
+            brief = await engine.generate_evening_brief(ctx.user_id)
         return ToolResult(success=True, output=brief)
     except Exception as exc:
         return ToolResult(success=False, error=str(exc))
@@ -35,16 +52,15 @@ async def _handle_deal_coaching(inp: dict, ctx: ToolContext) -> ToolResult:
     if not deal_id:
         return ToolResult(success=False, error="deal_id is required")
 
-    from app.core.background import BackgroundTaskManager
-    from app.core.events import EventBus
+    from app.core.shared_infra import get_background, get_event_bus
     from app.services.ai.insights_engine import AIInsightsEngine
 
     try:
         async with async_session() as session:
             engine = AIInsightsEngine(
                 session=session,
-                events=EventBus(),
-                background=BackgroundTaskManager(),
+                events=get_event_bus(),
+                background=get_background(),
             )
             coaching = await engine.generate_deal_coaching(deal_id)
         if coaching is None:
@@ -56,16 +72,15 @@ async def _handle_deal_coaching(inp: dict, ctx: ToolContext) -> ToolResult:
 
 async def _handle_pipeline_report(inp: dict, ctx: ToolContext) -> ToolResult:
     """Generate a pipeline risk report for all open deals."""
-    from app.core.background import BackgroundTaskManager
-    from app.core.events import EventBus
+    from app.core.shared_infra import get_background, get_event_bus
     from app.services.ai.insights_engine import AIInsightsEngine
 
     try:
         async with async_session() as session:
             engine = AIInsightsEngine(
                 session=session,
-                events=EventBus(),
-                background=BackgroundTaskManager(),
+                events=get_event_bus(),
+                background=get_background(),
             )
             report = await engine.generate_pipeline_risk_report()
         return ToolResult(success=True, output=report)
@@ -81,8 +96,7 @@ async def _handle_relationship_analysis(inp: dict, ctx: ToolContext) -> ToolResu
 
     from sqlmodel import select
 
-    from app.core.background import BackgroundTaskManager
-    from app.core.events import EventBus
+    from app.core.shared_infra import get_background, get_event_bus
     from app.models.crm import CRMContact
     from app.services.ai.relationship_strength import RelationshipStrengthService
 
@@ -97,8 +111,8 @@ async def _handle_relationship_analysis(inp: dict, ctx: ToolContext) -> ToolResu
 
             svc = RelationshipStrengthService(
                 session=session,
-                events=EventBus(),
-                background=BackgroundTaskManager(),
+                events=get_event_bus(),
+                background=get_background(),
             )
             score = await svc.calculate(contact_id)
 
@@ -128,6 +142,19 @@ def register(registry: ToolRegistry) -> None:
         category="ai_insights",
         input_schema={"type": "object", "properties": {}},
         handler=_handle_get_daily_brief,
+    ))
+
+    registry.register_builtin(ToolDefinition(
+        name="ai_get_evening_brief",
+        display_name="Get Evening Brief",
+        description=(
+            "Get your AI-generated evening brief with today's recap (completed tasks, "
+            "meetings attended) and tomorrow's preview (upcoming meetings, due tasks, "
+            "stale deals, and suggested morning priorities)."
+        ),
+        category="ai_insights",
+        input_schema={"type": "object", "properties": {}},
+        handler=_handle_get_evening_brief,
     ))
 
     registry.register_builtin(ToolDefinition(

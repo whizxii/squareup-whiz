@@ -96,13 +96,17 @@ async def _handle_suggest_next_actions(inp: dict, ctx: ToolContext) -> ToolResul
 
 
 async def _handle_smart_search(inp: dict, ctx: ToolContext) -> ToolResult:
-    """Semantic CRM search across contacts and deals."""
+    """Hybrid semantic + keyword search across CRM entities, messages, and notes."""
+    import logging
+
     query = inp.get("query", "").strip()
-    entity_types = inp.get("entity_types", ["contacts", "deals"])
+    entity_types = inp.get("entity_types", ["contacts", "deals", "messages", "notes"])
     limit = min(int(inp.get("limit", 10)), 30)
 
     if not query:
         return ToolResult(success=False, error="query is required")
+
+    _logger = logging.getLogger(__name__)
 
     from sqlmodel import or_, select
 
@@ -111,26 +115,89 @@ async def _handle_smart_search(inp: dict, ctx: ToolContext) -> ToolResult:
 
     results: list[dict] = []
     try:
-        async with async_session() as session:
-            if "contacts" in entity_types:
-                contacts_q = await session.execute(
-                    select(CRMContact).where(
-                        or_(
-                            CRMContact.name.ilike(f"%{query}%"),
-                            CRMContact.email.ilike(f"%{query}%"),
-                            CRMContact.company.ilike(f"%{query}%"),
-                        )
-                    ).limit(limit)
+        # 1. Semantic search on messages and notes (vector)
+        if "messages" in entity_types or "notes" in entity_types:
+            try:
+                from app.services.embedding_service import (
+                    vector_search_messages,
+                    vector_search_crm_notes,
                 )
-                for c in contacts_q.scalars().all():
+
+                if "messages" in entity_types:
+                    vec_msgs = await vector_search_messages(query, limit=limit)
+                    for m in vec_msgs:
+                        results.append({
+                            "type": "message",
+                            "id": m["id"],
+                            "channel_id": m["channel_id"],
+                            "sender_id": m["sender_id"],
+                            "content": (m["content"] or "")[:200],
+                            "created_at": m["created_at"],
+                            "similarity": m.get("similarity"),
+                        })
+
+                if "notes" in entity_types:
+                    vec_notes = await vector_search_crm_notes(query, limit=limit)
+                    for n in vec_notes:
+                        results.append({
+                            "type": "crm_note",
+                            "id": n["id"],
+                            "contact_id": n["contact_id"],
+                            "content": (n["content"] or "")[:200],
+                            "created_at": n["created_at"],
+                            "similarity": n.get("similarity"),
+                        })
+            except Exception:
+                _logger.debug("Vector search unavailable for smart search", exc_info=True)
+
+        # 2. Semantic + keyword search on contacts and deals
+        seen_contact_ids: set[str] = set()
+
+        # 2a. Vector search on contacts (semantic)
+        if "contacts" in entity_types:
+            try:
+                from app.services.embedding_service import vector_search_crm_contacts
+
+                vec_contacts = await vector_search_crm_contacts(query, limit=limit)
+                for vc in vec_contacts:
+                    seen_contact_ids.add(vc["id"])
                     results.append({
                         "type": "contact",
-                        "id": c.id,
-                        "name": c.name,
-                        "email": c.email,
-                        "company": c.company,
-                        "stage": c.lifecycle_stage,
+                        "id": vc["id"],
+                        "name": vc["name"],
+                        "email": vc["email"],
+                        "company": vc["company"],
+                        "stage": vc["stage"],
+                        "similarity": vc.get("similarity"),
                     })
+            except Exception:
+                _logger.debug("Vector search unavailable for contacts in smart search", exc_info=True)
+
+        async with async_session() as session:
+            # 2b. Keyword fallback for contacts
+            if "contacts" in entity_types:
+                remaining_contacts = max(0, limit - len(seen_contact_ids))
+                if remaining_contacts > 0:
+                    contacts_q = await session.execute(
+                        select(CRMContact).where(
+                            or_(
+                                CRMContact.name.ilike(f"%{query}%"),
+                                CRMContact.email.ilike(f"%{query}%"),
+                                CRMContact.company.ilike(f"%{query}%"),
+                            )
+                        ).limit(remaining_contacts + len(seen_contact_ids))
+                    )
+                    for c in contacts_q.scalars().all():
+                        if c.id not in seen_contact_ids:
+                            seen_contact_ids.add(c.id)
+                            results.append({
+                                "type": "contact",
+                                "id": c.id,
+                                "name": c.name,
+                                "email": c.email,
+                                "company": c.company,
+                                "stage": c.lifecycle_stage,
+                            })
 
             if "deals" in entity_types:
                 deals_q = await session.execute(
@@ -168,8 +235,7 @@ async def _handle_forecast_deal(inp: dict, ctx: ToolContext) -> ToolResult:
 
     from sqlmodel import select
 
-    from app.core.background import BackgroundTaskManager
-    from app.core.events import EventBus
+    from app.core.shared_infra import get_background, get_event_bus
     from app.models.crm_deal import CRMDeal
     from app.services.ai.deal_risk import DealRiskService
 
@@ -182,8 +248,8 @@ async def _handle_forecast_deal(inp: dict, ctx: ToolContext) -> ToolResult:
 
             svc = DealRiskService(
                 session=session,
-                events=EventBus(),
-                background=BackgroundTaskManager(),
+                events=get_event_bus(),
+                background=get_background(),
             )
             risk = await svc.assess(deal_id)
 
@@ -296,17 +362,20 @@ def register(registry: ToolRegistry) -> None:
 
     registry.register_builtin(ToolDefinition(
         name="ai_smart_search",
-        display_name="Smart CRM Search",
-        description="Search across CRM contacts and deals using a natural language query.",
+        display_name="Smart Search",
+        description=(
+            "Semantic search across the entire workspace — CRM contacts, deals, "
+            "chat messages, and notes. Understands meaning beyond exact keywords."
+        ),
         category="ai_autonomous",
         input_schema={
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Search query (name, company, topic)"},
+                "query": {"type": "string", "description": "Natural language search query"},
                 "entity_types": {
                     "type": "array",
-                    "items": {"type": "string", "enum": ["contacts", "deals"]},
-                    "description": "Entity types to search (default: contacts and deals)",
+                    "items": {"type": "string", "enum": ["contacts", "deals", "messages", "notes"]},
+                    "description": "Entity types to search (default: all four)",
                 },
                 "limit": {
                     "type": "integer",

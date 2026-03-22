@@ -116,11 +116,16 @@ class EmailResponse(BaseModel):
 async def send_email(
     body: EmailSendBody,
     svc: EmailService = Depends(get_email_service),
+    gmail_svc: GmailSyncService = Depends(get_gmail_sync_service),
     user_id: str = Depends(get_current_user),
 ):
-    """Send an outbound email to a contact."""
+    """Send an outbound email to a contact.
+
+    When Gmail is configured for the user the email is delivered via
+    the Gmail API; otherwise a local CRM record is created for tracking.
+    """
     data = body.model_dump(exclude_unset=True)
-    email = await svc.send_email(data, user_id)
+    email = await svc.send_email(data, user_id, gmail_service=gmail_svc)
     return success_response(EmailResponse.from_model(email))
 
 

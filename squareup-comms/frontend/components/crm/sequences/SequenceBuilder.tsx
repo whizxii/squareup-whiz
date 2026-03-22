@@ -50,7 +50,7 @@ function StepCard({
       <div className="flex items-center gap-2 px-3 py-2.5">
         {/* Drag handle + order */}
         <div className="flex items-center gap-1 text-muted-foreground">
-          <GripVertical className="w-3.5 h-3.5 cursor-grab" />
+          <GripVertical className="w-3.5 h-3.5" />
           <span className="text-[10px] font-mono w-4 text-center">
             {index + 1}
           </span>

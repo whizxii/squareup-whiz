@@ -32,6 +32,7 @@ import type {
   EmailSequence,
   SequenceEnrollment,
   Contact360Response,
+  Company360Response,
   AnalyticsOverview,
   PipelineMetrics,
   WinLossAnalytics,
@@ -41,6 +42,14 @@ import type {
   ActivityAnalytics,
   CRMNotification,
   PaginatedResponse,
+  CrossDealPatternsResponse,
+  AutomationLogEntry,
+  AIInsightEntry,
+  AIFeedbackEntry,
+  AIFeedbackRating,
+  AIFeedbackSourceType,
+  AIAccuracyMetrics,
+  RelationshipGraphData,
 } from "@/lib/types/crm";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -281,6 +290,10 @@ class CRMApiClient {
   ): Promise<PaginatedResponse<Deal>> {
     const params = buildParams({ ...pagination });
     return this.request(`/api/crm/v2/companies/${companyId}/deals${params}`);
+  }
+
+  async getCompany360(companyId: string): Promise<Company360Response> {
+    return this.request(`/api/crm/v2/companies/${companyId}/360`);
   }
 
   // ─── Tags ────────────────────────────────────────────────────
@@ -660,6 +673,17 @@ class CRMApiClient {
     });
   }
 
+  async suggestFields(data: {
+    name?: string;
+    email?: string;
+    company?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.request("/api/crm/v2/ai/suggest-fields", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
   async getAtRiskDeals(): Promise<Deal[]> {
     return this.request("/api/crm/v2/ai/insights/at-risk-deals");
   }
@@ -670,6 +694,69 @@ class CRMApiClient {
 
   async getHotLeads(): Promise<Contact[]> {
     return this.request("/api/crm/v2/ai/insights/hot-leads");
+  }
+
+  async getCrossDealPatterns(): Promise<CrossDealPatternsResponse> {
+    return this.request("/api/insights/cross-deal-patterns");
+  }
+
+  // ─── Automation Logs ──────────────────────────────────────────
+
+  async getAutomationLogs(
+    status?: string,
+    limit: number = 100,
+    offset: number = 0
+  ): Promise<{ logs: AutomationLogEntry[]; count: number }> {
+    const params = buildParams({ status, limit, offset });
+    return this.request(`/api/automation/logs${params}`);
+  }
+
+  async getPendingReviewCount(): Promise<{ count: number }> {
+    return this.request("/api/automation/pending-count");
+  }
+
+  async approveAutomation(
+    logId: string,
+    notes?: string
+  ): Promise<AutomationLogEntry> {
+    return this.request(`/api/automation/review/${logId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ notes: notes ?? null }),
+    });
+  }
+
+  async rejectAutomation(
+    logId: string,
+    notes?: string
+  ): Promise<AutomationLogEntry> {
+    return this.request(`/api/automation/review/${logId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ notes: notes ?? null }),
+    });
+  }
+
+  // ─── AI Insights ──────────────────────────────────────────────
+
+  async getInsightsList(
+    type?: string,
+    isDismissed?: boolean,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{ insights: AIInsightEntry[]; total: number }> {
+    const params = buildParams({ type, is_dismissed: isDismissed, limit, offset });
+    return this.request(`/api/insights${params}`);
+  }
+
+  async dismissInsight(insightId: string): Promise<{ id: string; dismissed: boolean }> {
+    return this.request(`/api/insights/${insightId}/dismiss`, {
+      method: "PATCH",
+    });
+  }
+
+  async markInsightRead(insightId: string): Promise<{ id: string; read: boolean }> {
+    return this.request(`/api/insights/${insightId}/read`, {
+      method: "PATCH",
+    });
   }
 
   // ─── Analytics ───────────────────────────────────────────────
@@ -1119,6 +1206,151 @@ class CRMApiClient {
         contact_b_id: contactBId,
       }),
     });
+  }
+
+  // ─── Morning Briefing ──────────────────────────────────────────
+
+  async getMorningBriefing(): Promise<import("@/lib/types/crm").MorningBriefing> {
+    return this.request("/api/crm/v2/ai/morning-briefing");
+  }
+
+  // ─── Attention Items ──────────────────────────────────────────
+
+  async getAttentionItems(): Promise<import("@/lib/types/crm").AttentionItemsResponse> {
+    return this.request("/api/crm/v2/ai/attention-items");
+  }
+
+  // ─── Digests ──────────────────────────────────────────────────
+
+  async fetchLatestDigest(): Promise<{
+    id: string;
+    title: string;
+    summary: string;
+    highlights: string[];
+    stats: {
+      deals_won?: number;
+      deals_lost?: number;
+      new_deals?: number;
+      new_contacts?: number;
+      activities?: number;
+      pipeline_value?: number;
+      [key: string]: unknown;
+    };
+    week_start: string | null;
+    week_end: string | null;
+    created_at: string;
+  } | null> {
+    try {
+      return await this.request("/api/digests/latest");
+    } catch {
+      return null;
+    }
+  }
+
+  // ─── Chat Intelligence ──────────────────────────────────────────
+
+  async fetchChatMentions(
+    contactId: string,
+    limit = 50
+  ): Promise<{
+    mentions: Array<{
+      id: string;
+      message_id: string;
+      channel_id: string;
+      sender_id: string;
+      signal_type: string;
+      entity_type?: string;
+      entity_id?: string;
+      confidence: number;
+      extracted_data: Record<string, unknown>;
+      ai_reasoning?: string;
+      processed: boolean;
+      created_at?: string;
+    }>;
+    total: number;
+  }> {
+    const qs = buildParams({ limit });
+    const data = await this.request<{ mentions?: unknown[]; total?: number }>(
+      `/api/chat-intelligence/contacts/${contactId}/chat-mentions${qs}`
+    );
+    return {
+      mentions: (data.mentions ?? []) as Array<{
+        id: string;
+        message_id: string;
+        channel_id: string;
+        sender_id: string;
+        signal_type: string;
+        entity_type?: string;
+        entity_id?: string;
+        confidence: number;
+        extracted_data: Record<string, unknown>;
+        ai_reasoning?: string;
+        processed: boolean;
+        created_at?: string;
+      }>,
+      total: data.total ?? 0,
+    };
+  }
+
+  // ─── AI Email Drafts ──────────────────────────────────────────
+
+  async listEmailDrafts(contactId?: string, limit = 20): Promise<import("@/lib/types/crm").EmailDraft[]> {
+    const qs = buildParams({ contact_id: contactId, limit });
+    return this.request(`/api/crm/v2/ai/email-drafts${qs}`);
+  }
+
+  async generateEmailDraft(params: {
+    trigger: string;
+    contact_id: string;
+    deal_id?: string;
+    extra_context?: Record<string, unknown>;
+  }): Promise<import("@/lib/types/crm").EmailDraftResult> {
+    return this.request("/api/crm/v2/ai/email-drafts/generate", {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+  }
+
+  // ─── AI Feedback ──────────────────────────────────────────────
+
+  async submitFeedback(params: {
+    source_type: AIFeedbackSourceType;
+    source_id: string;
+    rating: AIFeedbackRating;
+    feedback_text?: string;
+    ai_confidence?: number;
+    action_type?: string;
+  }): Promise<AIFeedbackEntry> {
+    return this.request("/api/ai-feedback", {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+  }
+
+  async getFeedbackForSource(
+    sourceType: AIFeedbackSourceType,
+    sourceId: string
+  ): Promise<{ feedback: AIFeedbackEntry[] }> {
+    return this.request(`/api/ai-feedback/for/${sourceType}/${sourceId}`);
+  }
+
+  async getAIAccuracyMetrics(params?: {
+    days?: number;
+    source_type?: string;
+    action_type?: string;
+  }): Promise<AIAccuracyMetrics> {
+    const qs = buildParams(params ?? {});
+    return this.request(`/api/ai-feedback/metrics${qs}`);
+  }
+
+  // ─── Relationship Graph ──────────────────────────────────────
+
+  async getRelationshipGraph(params?: {
+    limit?: number;
+    company_id?: string;
+  }): Promise<RelationshipGraphData> {
+    const qs = buildParams(params ?? {});
+    return this.request(`/api/crm/v2/graph${qs}`);
   }
 }
 

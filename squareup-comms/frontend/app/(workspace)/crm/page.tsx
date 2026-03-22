@@ -13,38 +13,22 @@ import { SmartListsView } from "@/components/crm/SmartListView";
 import { CalendarView } from "@/components/crm/CalendarView";
 import { DashboardView } from "@/components/crm/DashboardView";
 import { AnalyticsView } from "@/components/crm/AnalyticsView";
-import AutomationFeed from "@/components/crm/AutomationFeed";
+import { AIActivityView } from "@/components/crm/AIActivityView";
 import WeeklyDigestView from "@/components/crm/WeeklyDigestView";
 import { CompaniesView } from "@/components/crm/CompaniesView";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { RelationshipGraphView } from "@/components/crm/RelationshipGraphView";
 import { useContacts } from "@/lib/hooks/use-crm-queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetchWithRetry } from "@/lib/fetch-with-retry";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { getCurrentUserId } from "@/lib/hooks/useCurrentUserId";
 import {
-  Bot,
-  Sparkles,
-} from "lucide-react";
+  CRMOnboardingWizard,
+  useCRMOnboardingComplete,
+} from "@/components/crm/CRMOnboardingWizard";
+import { FeatureDiscoveryProvider } from "@/components/crm/FeatureDiscovery";
+import { Bot } from "lucide-react";
 import type { CRMView } from "@/lib/types/crm";
-
-// ─── Placeholder view for unimplemented tabs ─────────────────────
-
-function PlaceholderView({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <EmptyState icon={icon} title={title} description={description} />
-    </div>
-  );
-}
 
 // ─── View router ─────────────────────────────────────────────────
 
@@ -73,7 +57,7 @@ function ActiveView({ view }: { view: CRMView }) {
     case "automation":
       return (
         <div className="flex-1 overflow-auto p-4">
-          <AutomationFeed />
+          <AIActivityView />
         </div>
       );
     case "digest":
@@ -82,6 +66,8 @@ function ActiveView({ view }: { view: CRMView }) {
           <WeeklyDigestView />
         </div>
       );
+    case "graph":
+      return <RelationshipGraphView />;
     default:
       return <PipelineView />;
   }
@@ -95,12 +81,14 @@ export default function CRMPage() {
   const searchQuery = useCRMUIStore((s) => s.searchQuery);
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [wizardDismissed, setWizardDismissed] = useState(false);
+  const onboardingComplete = useCRMOnboardingComplete();
   const queryClient = useQueryClient();
 
   // React Query for contacts — drives empty state check
   const { data: contactsData } = useContacts(undefined, { limit: 1 });
   const hasContacts = (contactsData?.items?.length ?? 0) > 0;
-  const showEmptyState = !hasContacts && !searchQuery;
+  const showOnboarding = !hasContacts && !searchQuery && !onboardingComplete && !wizardDismissed;
 
   async function loadDemoData() {
     setSeeding(true);
@@ -135,28 +123,20 @@ export default function CRMPage() {
         onClose={() => setCopilotOpen(false)}
       />
 
+      {/* Progressive feature discovery toasts */}
+      <FeatureDiscoveryProvider />
+
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-hidden flex flex-col">
-          {showEmptyState ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-6">
-              <EmptyState
-                icon={<span className="text-3xl">&#x1F465;</span>}
-                title="Your CRM starts here"
-                description="Add a contact manually, or send a call recording to @crm-agent and let it do the work."
-                action={{
-                  label: "Add your first contact",
-                  onClick: () => openDialog("create-contact"),
-                }}
-              />
-              <button
-                onClick={loadDemoData}
-                disabled={seeding}
-                className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
-              >
-                <Sparkles className="w-4 h-4" />
-                {seeding ? "Loading demo data…" : "Load demo data to see what SquareUp CRM can do"}
-              </button>
-            </div>
+          {showOnboarding ? (
+            <CRMOnboardingWizard
+              onComplete={() => setWizardDismissed(true)}
+              onAddContact={() => openDialog("create-contact")}
+              onImportCSV={() => openDialog("import")}
+              onLoadDemo={loadDemoData}
+              onOpenCopilot={() => setCopilotOpen(true)}
+              isDemoLoading={seeding}
+            />
           ) : (
             <ActiveView view={activeView} />
           )}

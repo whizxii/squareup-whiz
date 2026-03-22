@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatRelativeTime } from "@/lib/format";
+import { useChatMentions } from "@/lib/hooks/use-crm-queries";
 import {
   MessageSquare,
   User,
@@ -15,8 +15,6 @@ import {
   SmilePlus,
   RefreshCw,
 } from "lucide-react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -123,40 +121,11 @@ interface ChatHistoryTabProps {
 }
 
 export function ChatHistoryTab({ contactId }: ChatHistoryTabProps) {
-  const [mentions, setMentions] = useState<ChatMention[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error, refetch } = useChatMentions(contactId);
+  const mentions = data?.mentions ?? [];
+  const total = data?.total ?? 0;
 
-  const fetchMentions = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `${API_URL}/api/chat-intelligence/contacts/${contactId}/chat-mentions?limit=50`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token") || ""}`,
-          },
-        }
-      );
-      if (!res.ok) throw new Error("Failed to fetch chat mentions");
-      const json = await res.json();
-      const data = json.data ?? json;
-      setMentions(data.mentions ?? []);
-      setTotal(data.total ?? 0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, [contactId]);
-
-  useEffect(() => {
-    fetchMentions();
-  }, [fetchMentions]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6 space-y-3">
         {[1, 2, 3].map((i) => (
@@ -172,8 +141,8 @@ export function ChatHistoryTab({ contactId }: ChatHistoryTabProps) {
         <EmptyState
           icon={<MessageSquare className="w-6 h-6" />}
           title="Error loading chat history"
-          description={error}
-          action={{ label: "Retry", onClick: fetchMentions }}
+          description={error instanceof Error ? error.message : "Unknown error"}
+          action={{ label: "Retry", onClick: () => refetch() }}
         />
       </div>
     );
@@ -199,7 +168,7 @@ export function ChatHistoryTab({ contactId }: ChatHistoryTabProps) {
           {total} chat signal{total !== 1 ? "s" : ""} detected
         </p>
         <button
-          onClick={fetchMentions}
+          onClick={() => refetch()}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <RefreshCw className="w-3 h-3" />

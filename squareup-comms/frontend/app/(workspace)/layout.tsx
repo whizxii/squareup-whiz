@@ -24,6 +24,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useSeedData } from "@/hooks/use-seed-data";
 import InsightsBellButton from "@/components/insights/InsightsBellButton";
 import ProactiveInsightsPanel from "@/components/insights/ProactiveInsightsPanel";
+import { DonnaSidebar } from "@/components/donna/DonnaSidebar";
+import { DonnaTrigger } from "@/components/donna/DonnaTrigger";
+import { DealCelebration } from "@/components/DealCelebration";
 
 const navItems = [
   { href: "/office", icon: Building2, label: "Office" },
@@ -175,6 +178,15 @@ export default function WorkspaceLayout({
 
       {/* Call Overlay — floating controls during active call */}
       <CallOverlay />
+
+      {/* Donna AI Sidebar — persistent, context-aware assistant panel */}
+      <DonnaSidebar />
+
+      {/* Donna floating trigger button */}
+      <DonnaTrigger />
+
+      {/* Deal win celebration — global confetti + banner */}
+      <DealCelebration />
       </div>
     </AuthGuard>
   );

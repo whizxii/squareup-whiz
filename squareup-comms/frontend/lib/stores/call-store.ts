@@ -43,6 +43,11 @@ export interface CallState {
   readonly isVideoOff: boolean;
   readonly isScreenSharing: boolean;
 
+  // Recording (Egress)
+  readonly isRecording: boolean;
+  readonly egressId: string | null;
+  readonly recordingContactId: string | null;
+
   // Participants
   readonly participants: readonly CallParticipant[];
 
@@ -59,6 +64,8 @@ export interface CallState {
   readonly toggleMute: () => void;
   readonly toggleVideo: () => void;
   readonly toggleScreenShare: () => void;
+  readonly startRecording: (contactId: string, dealId?: string, title?: string) => Promise<void>;
+  readonly stopRecording: () => Promise<void>;
   readonly setParticipants: (participants: readonly CallParticipant[]) => void;
   readonly setIncomingCall: (call: IncomingCall | null) => void;
   readonly acceptIncomingCall: () => Promise<void>;
@@ -94,6 +101,9 @@ export const useCallStore = create<CallState>((set, get) => ({
   isMuted: false,
   isVideoOff: false,
   isScreenSharing: false,
+  isRecording: false,
+  egressId: null,
+  recordingContactId: null,
   participants: [],
   incomingCall: null,
   consecutiveFailures: 0,
@@ -134,7 +144,16 @@ export const useCallStore = create<CallState>((set, get) => ({
     }
   },
 
-  leaveCall: () =>
+  leaveCall: () => {
+    // Stop recording if active before leaving the call
+    const state = get();
+    if (state.isRecording && state.egressId) {
+      fetch(`${API_URL}/api/calls/record/stop`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ egress_id: state.egressId }),
+      }).catch(() => {/* best-effort — call is ending anyway */});
+    }
     set({
       isInCall: false,
       roomName: null,
@@ -143,12 +162,62 @@ export const useCallStore = create<CallState>((set, get) => ({
       isMuted: false,
       isVideoOff: false,
       isScreenSharing: false,
+      isRecording: false,
+      egressId: null,
+      recordingContactId: null,
       participants: [],
-    }),
+    });
+  },
 
   toggleMute: () => set((s) => ({ isMuted: !s.isMuted })),
   toggleVideo: () => set((s) => ({ isVideoOff: !s.isVideoOff })),
   toggleScreenShare: () => set((s) => ({ isScreenSharing: !s.isScreenSharing })),
+
+  startRecording: async (contactId: string, dealId?: string, title?: string) => {
+    const { roomName, isRecording } = get();
+    if (!roomName || isRecording) return;
+    try {
+      const res = await fetch(`${API_URL}/api/calls/record/start`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          room_name: roomName,
+          contact_id: contactId,
+          deal_id: dealId ?? null,
+          title: title ?? null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Recording API error: ${res.status}`);
+      }
+      const data = await res.json();
+      set({ isRecording: true, egressId: data.egress_id, recordingContactId: contactId });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to start recording";
+      set({ error: message });
+    }
+  },
+
+  stopRecording: async () => {
+    const { egressId, isRecording } = get();
+    if (!isRecording || !egressId) return;
+    try {
+      const res = await fetch(`${API_URL}/api/calls/record/stop`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ egress_id: egressId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Stop recording error: ${res.status}`);
+      }
+      set({ isRecording: false, egressId: null, recordingContactId: null });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to stop recording";
+      set({ error: message });
+    }
+  },
 
   setParticipants: (participants) => set({ participants }),
 

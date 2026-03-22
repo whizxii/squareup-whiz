@@ -1,8 +1,16 @@
-"""Conversation memory — short-term channel history + long-term agent memory."""
+"""Conversation memory — short-term channel history + long-term agent memory.
+
+Implements a two-tier context strategy:
+1. Recent messages (last 20) — kept verbatim for full conversational fidelity.
+2. Older messages (up to 60 more) — LLM-summarized into a compressed block
+   giving the agent "peripheral awareness" of what happened earlier.
+"""
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import time
 from datetime import datetime
 
 from sqlmodel import select
@@ -12,6 +20,13 @@ from app.models.agents import Agent, AgentMemory
 from app.models.chat import Message
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# In-memory summary cache — avoids re-summarizing the same message batch.
+# Key: SHA-256 of message IDs, Value: (summary_text, timestamp)
+# ---------------------------------------------------------------------------
+_summary_cache: dict[str, tuple[str, float]] = {}
+_SUMMARY_CACHE_TTL = 300  # 5 minutes
 
 
 # ---------------------------------------------------------------------------
@@ -139,29 +154,176 @@ Response: "Booked: Meeting with Sarah Chen tomorrow at 2:00 PM — 'Acme Deal Di
 """
 
 
+def _cache_key(message_ids: list[str]) -> str:
+    """Deterministic cache key from an ordered list of message IDs."""
+    raw = "|".join(message_ids)
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _evict_stale_cache() -> None:
+    """Remove expired entries from the summary cache."""
+    now = time.time()
+    stale = [k for k, (_, ts) in _summary_cache.items() if now - ts > _SUMMARY_CACHE_TTL]
+    for k in stale:
+        del _summary_cache[k]
+
+
+async def _summarize_messages_llm(messages_text: str) -> str | None:
+    """Use the cheapest available LLM to summarize a block of older messages.
+
+    Returns None if no LLM is available or the call fails.
+    """
+    from app.services.llm_service import get_llm_client, llm_available
+
+    if not llm_available():
+        return None
+
+    prompt = (
+        "Summarize this chat history in 3-5 bullet points. Focus on:\n"
+        "- Key decisions made\n"
+        "- Action items or tasks mentioned\n"
+        "- Important names, deals, or contacts discussed\n"
+        "- Unresolved questions or pending topics\n\n"
+        "Be concise — each bullet should be one sentence. "
+        "Omit greetings, small talk, and repeated information.\n\n"
+        f"Chat history:\n{messages_text}"
+    )
+
+    try:
+        client = get_llm_client()  # cheapest available (Gemini free tier)
+        summary = await client.chat(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+            temperature=0.0,
+        )
+        return summary.strip() if summary else None
+    except Exception:
+        logger.debug("LLM summarization failed, falling back to extractive", exc_info=True)
+        return None
+
+
+def _extractive_summary(db_messages: list) -> str:
+    """Simple extractive fallback — no LLM needed.
+
+    Extracts unique participant names and a compressed timeline of messages.
+    Used when LLM is unavailable or summarization fails.
+    """
+    senders: set[str] = set()
+    snippets: list[str] = []
+
+    for m in db_messages:
+        content = (m.content or "").strip()
+        if not content:
+            continue
+        sender_label = f"{m.sender_type}:{m.sender_id}"
+        senders.add(sender_label)
+        # Keep first 80 chars of each message as a snippet
+        snippet = content[:80] + ("…" if len(content) > 80 else "")
+        snippets.append(f"- [{sender_label}] {snippet}")
+
+    participants = ", ".join(sorted(senders))
+    # Show at most 15 snippets to keep it manageable
+    snippet_block = "\n".join(snippets[:15])
+    suffix = f"\n  … and {len(snippets) - 15} more messages" if len(snippets) > 15 else ""
+
+    return (
+        f"**Earlier conversation participants:** {participants}\n"
+        f"**Key message excerpts:**\n{snippet_block}{suffix}"
+    )
+
+
+async def _get_or_create_summary(older_messages: list) -> str:
+    """Return a summary of older messages, using cache when possible."""
+    _evict_stale_cache()
+
+    msg_ids = [m.id for m in older_messages]
+    key = _cache_key(msg_ids)
+
+    # Cache hit
+    cached = _summary_cache.get(key)
+    if cached is not None:
+        return cached[0]
+
+    # Build raw text for LLM
+    lines: list[str] = []
+    for m in older_messages:
+        content = (m.content or "").strip()
+        if not content:
+            continue
+        ts = m.created_at.strftime("%H:%M") if m.created_at else "?"
+        lines.append(f"[{ts}] {m.sender_type}:{m.sender_id}: {content[:300]}")
+
+    raw_text = "\n".join(lines)
+
+    # Try LLM summarization first, fall back to extractive
+    summary = await _summarize_messages_llm(raw_text)
+    if not summary:
+        summary = _extractive_summary(older_messages)
+
+    _summary_cache[key] = (summary, time.time())
+    return summary
+
+
 async def load_conversation_context(
     channel_id: str,
     agent_id: str,
     limit: int = 20,
+    *,
+    deep_context: bool = True,
+    total_messages: int = 80,
 ) -> list[dict]:
-    """Load recent channel messages as conversation history for the LLM.
+    """Load channel messages as conversation history for the LLM.
+
+    Two-tier context strategy:
+    1. Recent ``limit`` messages — kept verbatim (full conversational fidelity).
+    2. Older messages (up to ``total_messages - limit``) — summarized into a
+       compressed block prepended as a "user" context message.
+
+    When ``deep_context`` is False, only the recent ``limit`` messages are loaded
+    (legacy behavior).
 
     Maps messages to Claude roles:
     - Agent's own messages → "assistant"
     - Everything else → "user" (with sender attribution)
     """
     async with async_session() as session:
+        fetch_count = total_messages if deep_context else limit
         stmt = (
             select(Message)
             .where(Message.channel_id == channel_id)
             .order_by(Message.created_at.desc())
-            .limit(limit)
+            .limit(fetch_count)
         )
         result = await session.execute(stmt)
-        db_messages = list(reversed(result.scalars().all()))
+        all_db_messages = list(reversed(result.scalars().all()))
+
+    # Split into older (to summarize) and recent (verbatim)
+    if deep_context and len(all_db_messages) > limit:
+        older_messages = all_db_messages[: len(all_db_messages) - limit]
+        recent_messages = all_db_messages[len(all_db_messages) - limit :]
+    else:
+        older_messages = []
+        recent_messages = all_db_messages
 
     messages: list[dict] = []
-    for m in db_messages:
+
+    # Prepend summary of older messages as context
+    if older_messages:
+        summary = await _get_or_create_summary(older_messages)
+        oldest_ts = older_messages[0].created_at
+        newest_ts = older_messages[-1].created_at
+        time_range = ""
+        if oldest_ts and newest_ts:
+            time_range = f" ({oldest_ts.strftime('%b %d %H:%M')} – {newest_ts.strftime('%H:%M')})"
+
+        context_block = (
+            f"[EARLIER CONVERSATION SUMMARY — {len(older_messages)} messages{time_range}]\n"
+            f"{summary}"
+        )
+        messages.append({"role": "user", "content": context_block})
+
+    # Build recent messages verbatim
+    for m in recent_messages:
         content = m.content or ""
         if not content.strip():
             continue

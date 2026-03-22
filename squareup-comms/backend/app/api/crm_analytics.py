@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/crm/v2", tags=["crm-analytics"])
 
 @router.get("/analytics/overview")
 async def analytics_overview(
-    period: str = Query(default="30d", regex="^(7d|30d|90d|ytd)$"),
+    period: str = Query(default="30d", pattern="^(7d|30d|90d|ytd)$"),
     svc: AnalyticsService = Depends(get_analytics_service),
     user_id: str = Depends(get_current_user),
 ):
@@ -37,7 +37,7 @@ async def analytics_pipeline(
 
 @router.get("/analytics/revenue")
 async def analytics_revenue(
-    period: str = Query(default="30d", regex="^(7d|30d|90d|ytd)$"),
+    period: str = Query(default="30d", pattern="^(7d|30d|90d|ytd)$"),
     svc: AnalyticsService = Depends(get_analytics_service),
     user_id: str = Depends(get_current_user),
 ):
@@ -58,7 +58,7 @@ async def analytics_activity(
 
 @router.get("/analytics/win-loss")
 async def analytics_win_loss(
-    period: str = Query(default="30d", regex="^(7d|30d|90d|ytd)$"),
+    period: str = Query(default="30d", pattern="^(7d|30d|90d|ytd)$"),
     svc: AnalyticsService = Depends(get_analytics_service),
     user_id: str = Depends(get_current_user),
 ):
@@ -79,7 +79,7 @@ async def analytics_stage_duration(
 
 @router.get("/analytics/deal-velocity")
 async def analytics_deal_velocity(
-    period: str = Query(default="30d", regex="^(7d|30d|90d|ytd)$"),
+    period: str = Query(default="30d", pattern="^(7d|30d|90d|ytd)$"),
     svc: AnalyticsService = Depends(get_analytics_service),
     user_id: str = Depends(get_current_user),
 ):
@@ -90,7 +90,7 @@ async def analytics_deal_velocity(
 
 @router.get("/analytics/lead-sources")
 async def analytics_lead_sources(
-    period: str = Query(default="30d", regex="^(7d|30d|90d|ytd)$"),
+    period: str = Query(default="30d", pattern="^(7d|30d|90d|ytd)$"),
     svc: AnalyticsService = Depends(get_analytics_service),
     user_id: str = Depends(get_current_user),
 ):
