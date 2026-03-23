@@ -200,12 +200,15 @@ class GeminiLLMClient:
         system: str,
         messages: list[dict],
         tools: list[dict] | None = None,
-        model: str = "gemini-3-flash-preview",
+        model: str = "gemini-2.5-flash-lite",
         max_tokens: int = 4096,
         temperature: float = 0.7,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Stream a Gemini response, yielding StreamEvent objects."""
         types = self._genai_types
+
+        # Resolve model aliases (e.g. deprecated names → current models)
+        model = _GEMINI_MODEL_ALIASES.get(model, model)
 
         gemini_tools = self._convert_tools_to_gemini(tools)
         gemini_contents = self._convert_messages_to_gemini(messages)
@@ -280,12 +283,15 @@ class GeminiLLMClient:
         self,
         messages: list[dict],
         system: str = "",
-        model: str = "gemini-3-flash-preview",
+        model: str = "gemini-2.5-flash-lite",
         max_tokens: int = 1024,
         temperature: float = 0.7,
     ) -> str:
         """Simple non-streaming chat completion."""
         types = self._genai_types
+
+        # Resolve model aliases (e.g. deprecated names → current models)
+        model = _GEMINI_MODEL_ALIASES.get(model, model)
 
         gemini_contents = self._convert_messages_to_gemini(messages)
 
