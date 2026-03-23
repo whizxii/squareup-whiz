@@ -157,17 +157,24 @@ class GeminiLLMClient:
                         block_name = block["name"]
                         if block_id:
                             tool_id_to_name[block_id] = block_name
-                        part_kwargs: dict[str, Any] = {
-                            "function_call": types.FunctionCall(
-                                name=block_name,
-                                args=block.get("input", {}),
-                            ),
-                        }
-                        # Gemini 3+ requires thought_signature echoed back
+                        fc = types.FunctionCall(
+                            name=block_name,
+                            args=block.get("input", {}),
+                        )
+                        # Gemini 2.5+/3+ may require thought_signature echoed
+                        # back, but older SDK versions don't support the kwarg.
                         ts = block.get("thought_signature")
                         if ts:
-                            part_kwargs["thought_signature"] = ts
-                        parts.append(types.Part(**part_kwargs))
+                            try:
+                                parts.append(types.Part(
+                                    function_call=fc,
+                                    thought_signature=ts,
+                                ))
+                            except TypeError:
+                                # SDK version doesn't support thought_signature
+                                parts.append(types.Part(function_call=fc))
+                        else:
+                            parts.append(types.Part(function_call=fc))
 
                     elif block_type == "tool_result":
                         result_content = block.get("content", "")

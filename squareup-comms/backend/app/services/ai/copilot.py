@@ -7,6 +7,7 @@ function-calling, not regex pattern-matching.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -758,64 +759,75 @@ class CopilotService(BaseService):
 
         failed_providers: set[str] = set()
         final_text = ""
+        last_tool_results: list[dict] = []  # track for partial-result fallback
+
+        from app.services.llm_service import is_rate_limit_error
 
         try:
             for iteration in range(self._MAX_ITERATIONS):
                 text_parts: list[str] = []
                 tool_use_blocks: list = []
 
-                try:
-                    async for event in client.stream_with_tools(
-                        system=system_prompt,
-                        messages=messages,
-                        tools=CRM_TOOLS,
-                        max_tokens=2000,
-                        temperature=0.3,
-                    ):
-                        if isinstance(event, TextDelta):
-                            text_parts.append(event.text)
-                        elif isinstance(event, ToolUseComplete):
-                            tool_use_blocks.append(event)
-                        elif isinstance(event, UsageUpdate):
-                            pass
-                except Exception as stream_exc:
-                    failed_providers.add(client.PROVIDER)
-                    fallback = get_fallback_client(failed_providers)
-                    if not fallback:
-                        raise RuntimeError(
-                            "All LLM providers unavailable"
-                        ) from stream_exc
+                stream_ok = await self._stream_iteration(
+                    client, system_prompt, messages, CRM_TOOLS,
+                    text_parts, tool_use_blocks,
+                    TextDelta, ToolUseComplete, UsageUpdate,
+                )
 
-                    logger.warning(
-                        "Copilot LLM (%s) failed: %s — switching to %s",
-                        client.PROVIDER,
-                        stream_exc,
-                        fallback.PROVIDER,
-                    )
-                    client = fallback
-                    text_parts = []
-                    tool_use_blocks = []
-
-                    try:
-                        async for event in client.stream_with_tools(
-                            system=system_prompt,
-                            messages=messages,
-                            tools=CRM_TOOLS,
-                            max_tokens=2000,
-                            temperature=0.3,
-                        ):
-                            if isinstance(event, TextDelta):
-                                text_parts.append(event.text)
-                            elif isinstance(event, ToolUseComplete):
-                                tool_use_blocks.append(event)
-                    except Exception as fallback_exc:
-                        logger.exception(
-                            "Copilot fallback LLM (%s) also failed",
-                            client.PROVIDER,
+                if not stream_ok:
+                    # Retry once on rate limit with short backoff
+                    if is_rate_limit_error(self._last_stream_exc):
+                        logger.warning(
+                            "Copilot rate-limited on %s (iter %d), "
+                            "retrying after 2s",
+                            client.PROVIDER, iteration,
                         )
-                        raise RuntimeError(
-                            "All LLM providers failed"
-                        ) from fallback_exc
+                        await asyncio.sleep(2)
+                        text_parts, tool_use_blocks = [], []
+                        stream_ok = await self._stream_iteration(
+                            client, system_prompt, messages, CRM_TOOLS,
+                            text_parts, tool_use_blocks,
+                            TextDelta, ToolUseComplete, UsageUpdate,
+                        )
+
+                    if not stream_ok:
+                        # Try fallback provider
+                        failed_providers.add(client.PROVIDER)
+                        fallback = get_fallback_client(failed_providers)
+
+                        if fallback:
+                            logger.warning(
+                                "Copilot LLM (%s) failed: %s — "
+                                "switching to %s",
+                                client.PROVIDER,
+                                self._last_stream_exc,
+                                fallback.PROVIDER,
+                            )
+                            client = fallback
+                            text_parts, tool_use_blocks = [], []
+                            stream_ok = await self._stream_iteration(
+                                client, system_prompt, messages,
+                                CRM_TOOLS, text_parts, tool_use_blocks,
+                                TextDelta, ToolUseComplete, UsageUpdate,
+                            )
+
+                        if not stream_ok:
+                            # No providers left — use partial results if
+                            # we already have tool output from a prior
+                            # iteration, otherwise raise.
+                            if last_tool_results:
+                                logger.warning(
+                                    "All LLM providers failed on iter %d; "
+                                    "returning partial tool results",
+                                    iteration,
+                                )
+                                final_text = self._format_partial_results(
+                                    last_tool_results,
+                                )
+                                break
+                            raise RuntimeError(
+                                "All LLM providers unavailable"
+                            ) from self._last_stream_exc
 
                 full_text = "".join(text_parts)
 
@@ -838,7 +850,6 @@ class CopilotService(BaseService):
                         "name": tu.name,
                         "input": tu.input,
                     }
-                    # Gemini 3+ requires thought_signature echoed back
                     if getattr(tu, "thought_signature", None):
                         tool_block["thought_signature"] = tu.thought_signature
                     assistant_content.append(tool_block)
@@ -856,6 +867,7 @@ class CopilotService(BaseService):
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": tu.tool_use_id,
+                        "name": tu.name,
                         "content": result_str[:10_000],
                     })
                     logger.info(
@@ -866,6 +878,7 @@ class CopilotService(BaseService):
                     )
 
                 messages.append({"role": "user", "content": tool_results})
+                last_tool_results = tool_results  # save for fallback
 
             if not final_text:
                 final_text = (
@@ -873,8 +886,11 @@ class CopilotService(BaseService):
                     "Please try a simpler query."
                 )
 
-        except Exception:
-            logger.exception("Copilot agentic loop failed")
+        except Exception as exc:
+            logger.exception(
+                "Copilot agentic loop failed: %s: %s",
+                type(exc).__name__, exc,
+            )
             return {
                 "type": "error",
                 "message": (
@@ -894,3 +910,94 @@ class CopilotService(BaseService):
             "message": final_text,
             "data": None,
         }
+
+    # ── Helpers for agentic loop ───────────────────────────────────────
+
+    _last_stream_exc: Exception | None = None
+
+    async def _stream_iteration(
+        self,
+        client: Any,
+        system_prompt: str,
+        messages: list[dict],
+        tools: list[dict],
+        text_parts: list[str],
+        tool_use_blocks: list,
+        TextDelta: type,
+        ToolUseComplete: type,
+        UsageUpdate: type,
+    ) -> bool:
+        """Run one streaming LLM call. Returns True on success."""
+        try:
+            async for event in client.stream_with_tools(
+                system=system_prompt,
+                messages=messages,
+                tools=tools,
+                max_tokens=2000,
+                temperature=0.3,
+            ):
+                if isinstance(event, TextDelta):
+                    text_parts.append(event.text)
+                elif isinstance(event, ToolUseComplete):
+                    tool_use_blocks.append(event)
+                elif isinstance(event, UsageUpdate):
+                    pass
+            return True
+        except Exception as exc:
+            logger.warning(
+                "LLM stream failed (%s): %s: %s",
+                client.PROVIDER,
+                type(exc).__name__,
+                exc,
+            )
+            self._last_stream_exc = exc
+            return False
+
+    @staticmethod
+    def _format_partial_results(tool_results: list[dict]) -> str:
+        """Format raw tool results into a readable text response.
+
+        Used as a fallback when the LLM cannot synthesize tool output
+        (e.g. all providers failed on the second iteration).
+        """
+        parts = ["Here's what I found from the CRM data:\n"]
+        for tr in tool_results:
+            name = tr.get("name", "tool")
+            content = tr.get("content", "")
+            try:
+                data = json.loads(content) if isinstance(content, str) else content
+            except (json.JSONDecodeError, TypeError):
+                data = content
+
+            if isinstance(data, dict) and "error" in data:
+                parts.append(f"- {name}: Error — {data['error']}")
+                continue
+
+            # Format list results (e.g. search_contacts returns a list)
+            if isinstance(data, list):
+                if not data:
+                    parts.append(f"- {name}: No results found.")
+                else:
+                    parts.append(f"- {name}: Found {len(data)} result(s):")
+                    for item in data[:10]:
+                        if isinstance(item, dict):
+                            label = (
+                                item.get("name")
+                                or item.get("title")
+                                or item.get("subject")
+                                or json.dumps(item, default=str)[:120]
+                            )
+                            parts.append(f"  • {label}")
+                        else:
+                            parts.append(f"  • {item}")
+            elif isinstance(data, dict):
+                label = (
+                    data.get("name")
+                    or data.get("title")
+                    or json.dumps(data, default=str)[:200]
+                )
+                parts.append(f"- {name}: {label}")
+            else:
+                parts.append(f"- {name}: {str(data)[:200]}")
+
+        return "\n".join(parts)
