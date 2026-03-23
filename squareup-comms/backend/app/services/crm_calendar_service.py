@@ -6,10 +6,8 @@ import json
 from datetime import datetime
 from typing import Any, Sequence
 
-from sqlmodel import select
-
 from app.core.logging_config import get_logger
-from app.models.crm import CRMActivity, CRMContact
+from app.models.crm import CRMActivity
 from app.models.crm_audit import CRMAuditLog
 from app.models.crm_calendar import CRMCalendarEvent
 from app.repositories.crm_calendar_repo import CalendarEventRepository
@@ -38,15 +36,6 @@ class CalendarEventService(BaseService):
     ) -> CRMCalendarEvent:
         """Create a new calendar event with activity and audit in a single transaction."""
         now = datetime.utcnow()
-
-        # Validate contact exists before creating event (prevents FK violation)
-        contact_id = data.get("contact_id")
-        if contact_id:
-            result = await self.session.exec(
-                select(CRMContact).where(CRMContact.id == contact_id)
-            )
-            if result.first() is None:
-                raise ValueError(f"Contact not found: {contact_id}")
 
         attendees_raw = data.get("attendees", [])
         attendees_json = json.dumps(attendees_raw) if isinstance(attendees_raw, list) else attendees_raw

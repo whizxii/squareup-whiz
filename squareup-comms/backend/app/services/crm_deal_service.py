@@ -315,6 +315,12 @@ class DealService(BaseService):
         await self.events.emit("deal.lost", {"deal_id": deal_id, "reason": reason})
         return deal
 
+    # Deal stages → contact stages (contact model uses "won"/"lost", not "closed_won"/"closed_lost")
+    _DEAL_TO_CONTACT_STAGE = {
+        "closed_won": "won",
+        "closed_lost": "lost",
+    }
+
     async def _sync_contact_stage(
         self,
         contact_id: str,
@@ -322,12 +328,13 @@ class DealService(BaseService):
         now: datetime,
     ) -> None:
         """Update the linked contact's stage to stay in sync with the deal."""
+        mapped_stage = self._DEAL_TO_CONTACT_STAGE.get(new_stage, new_stage)
         result = await self.session.exec(
             select(CRMContact).where(CRMContact.id == contact_id)
         )
         contact = result.first()
-        if contact is not None and contact.stage != new_stage:
-            contact.stage = new_stage
+        if contact is not None and contact.stage != mapped_stage:
+            contact.stage = mapped_stage
             contact.stage_changed_at = now
             contact.updated_at = now
             self.session.add(contact)
