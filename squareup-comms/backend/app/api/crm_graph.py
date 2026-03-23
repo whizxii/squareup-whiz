@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -90,7 +91,7 @@ def _deal_node(deal: CRMDeal) -> dict[str, Any]:
             "currency": deal.currency or "INR",
             "probability": deal.probability or 0,
             "status": deal.status,
-            "days_in_stage": deal.days_in_stage or 0,
+            "days_in_stage": (datetime.utcnow() - deal.stage_entered_at).days if deal.stage_entered_at else 0,
         },
     }
 

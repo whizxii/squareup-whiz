@@ -6,6 +6,9 @@ type WSStatus = "connecting" | "connected" | "disconnected" | "reconnecting";
 type MessageHandler = (data: Record<string, unknown>) => void;
 
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000]; // exponential backoff
+const MAX_RECONNECT_ATTEMPTS = 10;
+// Close codes that indicate auth failure — do not retry
+const AUTH_FAILURE_CODES = new Set([4001, 4003]);
 
 export function useWebSocket(token?: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -43,7 +46,16 @@ export function useWebSocket(token?: string | null) {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      // Don't retry on auth failures or after max attempts
+      if (AUTH_FAILURE_CODES.has(event.code)) {
+        setStatus("disconnected");
+        return;
+      }
+      if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
+        setStatus("disconnected");
+        return;
+      }
       setStatus("reconnecting");
       const delay =
         RECONNECT_DELAYS[

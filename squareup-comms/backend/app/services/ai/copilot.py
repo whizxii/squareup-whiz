@@ -796,17 +796,26 @@ class CopilotService(BaseService):
                     text_parts = []
                     tool_use_blocks = []
 
-                    async for event in client.stream_with_tools(
-                        system=system_prompt,
-                        messages=messages,
-                        tools=CRM_TOOLS,
-                        max_tokens=2000,
-                        temperature=0.3,
-                    ):
-                        if isinstance(event, TextDelta):
-                            text_parts.append(event.text)
-                        elif isinstance(event, ToolUseComplete):
-                            tool_use_blocks.append(event)
+                    try:
+                        async for event in client.stream_with_tools(
+                            system=system_prompt,
+                            messages=messages,
+                            tools=CRM_TOOLS,
+                            max_tokens=2000,
+                            temperature=0.3,
+                        ):
+                            if isinstance(event, TextDelta):
+                                text_parts.append(event.text)
+                            elif isinstance(event, ToolUseComplete):
+                                tool_use_blocks.append(event)
+                    except Exception as fallback_exc:
+                        logger.exception(
+                            "Copilot fallback LLM (%s) also failed",
+                            client.PROVIDER,
+                        )
+                        raise RuntimeError(
+                            "All LLM providers failed"
+                        ) from fallback_exc
 
                 full_text = "".join(text_parts)
 
@@ -867,7 +876,7 @@ class CopilotService(BaseService):
         except Exception:
             logger.exception("Copilot agentic loop failed")
             return {
-                "type": "clarification",
+                "type": "error",
                 "message": (
                     "Something went wrong processing your query. "
                     "Please try again."

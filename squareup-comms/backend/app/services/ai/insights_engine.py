@@ -457,7 +457,7 @@ class AIInsightsEngine(BaseService):
             return _empty_cross_deal_result()
 
         # Gather related contacts for source/stage info
-        contact_ids = list({d.contact_id for d in all_deals})
+        contact_ids = list({d.contact_id for d in all_deals if d.contact_id})
         contacts_result = await self.session.execute(
             select(CRMContact).where(CRMContact.id.in_(contact_ids))
         )

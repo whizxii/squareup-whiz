@@ -131,7 +131,7 @@ class MorningBriefingService(BaseService):
             select(CRMDeal)
             .where(CRMDeal.status == "open")
             .where(
-                (CRMDeal.health_score.in_(["yellow", "red"]))
+                (CRMDeal.deal_health.in_(["yellow", "red"]))
                 | (CRMDeal.updated_at < cutoff)
             )
             .order_by(CRMDeal.value.desc().nullslast())
@@ -198,7 +198,7 @@ class MorningBriefingService(BaseService):
         stmt_won = (
             select(CRMDeal)
             .where(CRMDeal.status == "won")
-            .where(CRMDeal.closed_at >= month_start)
+            .where(CRMDeal.actual_close_date >= month_start)
         )
         result_won = await self.session.execute(stmt_won)
         won_deals = list(result_won.scalars().all())
@@ -232,7 +232,7 @@ class MorningBriefingService(BaseService):
                 title=f"{deal.title} needs attention",
                 description=(
                     f"{value_str} deal in {deal.stage} stage — "
-                    f"health: {deal.health_score or 'unknown'}"
+                    f"health: {deal.deal_health or 'unknown'}"
                 ),
                 priority="high",
                 entity_id=deal.id,

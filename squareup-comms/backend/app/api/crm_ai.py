@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -251,8 +254,16 @@ async def ai_copilot(
     svc: CopilotService = Depends(get_copilot_service),
 ):
     """Natural language CRM assistant with tool-use and conversation history."""
-    result = await svc.ask(body.query, history=body.history, user_id=user_id)
-    return success_response(data=result)
+    try:
+        result = await svc.ask(body.query, history=body.history, user_id=user_id)
+        return success_response(data=result)
+    except Exception as exc:
+        logger.exception("Copilot endpoint error for query: %s", body.query[:80])
+        return success_response(data={
+            "type": "error",
+            "message": "The AI copilot is temporarily unavailable. Please try again in a moment.",
+            "data": None,
+        })
 
 
 # ---------------------------------------------------------------------------
