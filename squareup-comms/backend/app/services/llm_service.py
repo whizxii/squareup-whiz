@@ -730,6 +730,37 @@ def get_fallback_client(
     return None
 
 
+def is_rate_limit_error(exc: Exception) -> bool:
+    """Return True if the exception indicates a 429 rate-limit from any provider."""
+    # OpenAI / Groq SDK
+    try:
+        from openai import RateLimitError as OpenAIRateLimit
+        if isinstance(exc, OpenAIRateLimit):
+            return True
+    except ImportError:
+        pass
+    # Anthropic SDK
+    try:
+        from anthropic import RateLimitError as AnthropicRateLimit
+        if isinstance(exc, AnthropicRateLimit):
+            return True
+    except ImportError:
+        pass
+    # Google Gemini / gRPC
+    try:
+        from google.api_core.exceptions import ResourceExhausted
+        if isinstance(exc, ResourceExhausted):
+            return True
+    except ImportError:
+        pass
+    # Generic: check for status_code=429 or "429" / "rate limit" in message
+    status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    if status == 429:
+        return True
+    msg = str(exc).lower()
+    return "429" in msg or "rate limit" in msg or "resource exhausted" in msg
+
+
 def resolve_model_for_client(client: "LLMClient", requested_model: str | None) -> str:
     """Return a model name that is compatible with the given LLM client.
 

@@ -57,6 +57,7 @@ from app.services.llm_service import (
     calculate_cost,
     get_fallback_client,
     get_llm_client,
+    is_rate_limit_error,
     resolve_model_for_client,
 )
 from app.services.plan_and_execute import (
@@ -541,27 +542,63 @@ async def run_agent(
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            # Stream LLM response (with fallback on provider failure)
-            try:
+            # Stream LLM response (with rate-limit retry + provider fallback)
+            async def _stream_once(
+                client, model, tp: list, tub: list,
+            ) -> None:
                 async with _async_timeout(LLM_STREAM_TIMEOUT):
-                    async for event in llm.stream_with_tools(
+                    async for event in client.stream_with_tools(
                         system=system_prompt,
                         messages=messages,
                         tools=tool_schemas if tool_schemas else None,
-                        model=resolved_model,
+                        model=model,
                         max_tokens=4096,
                         temperature=temperature,
                     ):
                         if isinstance(event, TextDelta):
-                            text_parts.append(event.text)
+                            tp.append(event.text)
                             await _broadcast_text_delta(
                                 channel_id, agent.id, stream_message_id, event.text,
                             )
                         elif isinstance(event, ToolUseComplete):
-                            tool_use_blocks.append(event)
+                            tub.append(event)
                         elif isinstance(event, UsageUpdate):
+                            nonlocal total_input_tokens, total_output_tokens
                             total_input_tokens += event.input_tokens
                             total_output_tokens += event.output_tokens
+
+            RATE_LIMIT_BACKOFFS = [5, 15, 30]  # seconds
+
+            async def _stream_with_retry(client, model) -> tuple[list[str], list[ToolUseComplete]]:
+                """Try streaming, retrying with backoff on rate limits."""
+                last_exc: Exception | None = None
+                for attempt, delay in enumerate([0] + RATE_LIMIT_BACKOFFS):
+                    if delay:
+                        logger.info(
+                            "Agent %s: rate-limited by %s, retrying in %ds (attempt %d)...",
+                            agent.id, client.PROVIDER, delay, attempt + 1,
+                        )
+                        await _broadcast_status(
+                            channel_id, agent.id, "thinking",
+                            f"Rate-limited, retrying in {delay}s...",
+                        )
+                        await asyncio.sleep(delay)
+                    tp: list[str] = []
+                    tub: list[ToolUseComplete] = []
+                    try:
+                        await _stream_once(client, model, tp, tub)
+                        return tp, tub
+                    except (TimeoutError, asyncio.TimeoutError):
+                        raise
+                    except Exception as exc:
+                        last_exc = exc
+                        if not is_rate_limit_error(exc):
+                            raise  # Non-rate-limit error — don't retry, fall through
+                assert last_exc is not None
+                raise last_exc  # All retries exhausted
+
+            try:
+                text_parts, tool_use_blocks = await _stream_with_retry(llm, resolved_model)
             except (TimeoutError, asyncio.TimeoutError):
                 raise  # Let outer handler deal with timeouts
             except Exception as stream_exc:
@@ -579,28 +616,8 @@ async def run_agent(
                 await _broadcast_status(channel_id, agent.id, "thinking", "Switching providers...")
                 llm = fallback
                 resolved_model = fallback.DEFAULT_MODEL
-                text_parts = []
-                tool_use_blocks = []
                 try:
-                    async with _async_timeout(LLM_STREAM_TIMEOUT):
-                        async for event in llm.stream_with_tools(
-                            system=system_prompt,
-                            messages=messages,
-                            tools=tool_schemas if tool_schemas else None,
-                            model=resolved_model,
-                            max_tokens=4096,
-                            temperature=temperature,
-                        ):
-                            if isinstance(event, TextDelta):
-                                text_parts.append(event.text)
-                                await _broadcast_text_delta(
-                                    channel_id, agent.id, stream_message_id, event.text,
-                                )
-                            elif isinstance(event, ToolUseComplete):
-                                tool_use_blocks.append(event)
-                            elif isinstance(event, UsageUpdate):
-                                total_input_tokens += event.input_tokens
-                                total_output_tokens += event.output_tokens
+                    text_parts, tool_use_blocks = await _stream_with_retry(llm, resolved_model)
                 except (TimeoutError, asyncio.TimeoutError):
                     raise
                 except Exception as fallback_exc:
@@ -1036,26 +1053,55 @@ async def invoke_agent_sync(
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            # Stream LLM response (with fallback on provider failure)
-            try:
+            # Stream LLM response (with rate-limit retry + provider fallback)
+            RATE_LIMIT_BACKOFFS_SYNC = [5, 15, 30]
+
+            async def _sync_stream_once(client, model):
+                tp: list[str] = []
+                tub: list[ToolUseComplete] = []
                 async with _async_timeout(LLM_STREAM_TIMEOUT):
-                    async for event in llm.stream_with_tools(
+                    async for event in client.stream_with_tools(
                         system=system_prompt,
                         messages=messages,
                         tools=tool_schemas if tool_schemas else None,
-                        model=resolved_model,
+                        model=model,
                         max_tokens=4096,
                         temperature=temperature,
                     ):
                         if isinstance(event, TextDelta):
-                            text_parts.append(event.text)
+                            tp.append(event.text)
                         elif isinstance(event, ToolUseComplete):
-                            tool_use_blocks.append(event)
+                            tub.append(event)
                         elif isinstance(event, UsageUpdate):
+                            nonlocal total_input_tokens, total_output_tokens
                             total_input_tokens += event.input_tokens
                             total_output_tokens += event.output_tokens
+                return tp, tub
+
+            async def _sync_stream_with_retry(client, model):
+                last_exc: Exception | None = None
+                for attempt, delay in enumerate([0] + RATE_LIMIT_BACKOFFS_SYNC):
+                    if delay:
+                        logger.info(
+                            "Agent %s: rate-limited by %s, retrying in %ds (attempt %d)...",
+                            agent.id, client.PROVIDER, delay, attempt + 1,
+                        )
+                        await asyncio.sleep(delay)
+                    try:
+                        return await _sync_stream_once(client, model)
+                    except (TimeoutError, asyncio.TimeoutError):
+                        raise
+                    except Exception as exc:
+                        last_exc = exc
+                        if not is_rate_limit_error(exc):
+                            raise
+                assert last_exc is not None
+                raise last_exc
+
+            try:
+                text_parts, tool_use_blocks = await _sync_stream_with_retry(llm, resolved_model)
             except (TimeoutError, asyncio.TimeoutError):
-                raise  # Let outer handler deal with timeouts
+                raise
             except Exception as stream_exc:
                 failed_providers.add(llm.PROVIDER)
                 fallback = get_fallback_client(failed_providers)
@@ -1070,25 +1116,8 @@ async def invoke_agent_sync(
                 )
                 llm = fallback
                 resolved_model = fallback.DEFAULT_MODEL
-                text_parts = []
-                tool_use_blocks = []
                 try:
-                    async with _async_timeout(LLM_STREAM_TIMEOUT):
-                        async for event in llm.stream_with_tools(
-                            system=system_prompt,
-                            messages=messages,
-                            tools=tool_schemas if tool_schemas else None,
-                            model=resolved_model,
-                            max_tokens=4096,
-                            temperature=temperature,
-                        ):
-                            if isinstance(event, TextDelta):
-                                text_parts.append(event.text)
-                            elif isinstance(event, ToolUseComplete):
-                                tool_use_blocks.append(event)
-                            elif isinstance(event, UsageUpdate):
-                                total_input_tokens += event.input_tokens
-                                total_output_tokens += event.output_tokens
+                    text_parts, tool_use_blocks = await _sync_stream_with_retry(llm, resolved_model)
                 except (TimeoutError, asyncio.TimeoutError):
                     raise
                 except Exception as fallback_exc:
@@ -1499,23 +1528,50 @@ async def resume_after_confirmation(
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            try:
+            RATE_LIMIT_BACKOFFS_CONF = [5, 15, 30]
+
+            async def _conf_stream_once(client, model):
+                tp: list[str] = []
+                tub: list[ToolUseComplete] = []
                 async with _async_timeout(LLM_STREAM_TIMEOUT):
-                    async for event in llm.stream_with_tools(
-                        system=system_prompt,
-                        messages=messages,
+                    async for event in client.stream_with_tools(
+                        system=system_prompt, messages=messages,
                         tools=tool_schemas if tool_schemas else None,
-                        model=resolved_model,
-                        max_tokens=4096,
+                        model=model, max_tokens=4096,
                         temperature=temperature,
                     ):
                         if isinstance(event, TextDelta):
-                            text_parts.append(event.text)
+                            tp.append(event.text)
                         elif isinstance(event, ToolUseComplete):
-                            tool_use_blocks.append(event)
+                            tub.append(event)
                         elif isinstance(event, UsageUpdate):
+                            nonlocal total_input_tokens, total_output_tokens
                             total_input_tokens += event.input_tokens
                             total_output_tokens += event.output_tokens
+                return tp, tub
+
+            async def _conf_stream_with_retry(client, model):
+                last_exc: Exception | None = None
+                for attempt, delay in enumerate([0] + RATE_LIMIT_BACKOFFS_CONF):
+                    if delay:
+                        logger.info(
+                            "Confirmation loop: rate-limited by %s, retrying in %ds...",
+                            client.PROVIDER, delay,
+                        )
+                        await asyncio.sleep(delay)
+                    try:
+                        return await _conf_stream_once(client, model)
+                    except (TimeoutError, asyncio.TimeoutError):
+                        raise
+                    except Exception as exc:
+                        last_exc = exc
+                        if not is_rate_limit_error(exc):
+                            raise
+                assert last_exc is not None
+                raise last_exc
+
+            try:
+                text_parts, tool_use_blocks = await _conf_stream_with_retry(llm, resolved_model)
             except (TimeoutError, asyncio.TimeoutError):
                 raise
             except Exception as stream_exc:
@@ -1525,23 +1581,8 @@ async def resume_after_confirmation(
                     raise RuntimeError("All LLM providers are unavailable.") from stream_exc
                 llm = fallback
                 resolved_model = fallback.DEFAULT_MODEL
-                text_parts = []
-                tool_use_blocks = []
                 try:
-                    async with _async_timeout(LLM_STREAM_TIMEOUT):
-                        async for event in llm.stream_with_tools(
-                            system=system_prompt, messages=messages,
-                            tools=tool_schemas if tool_schemas else None,
-                            model=resolved_model, max_tokens=4096,
-                            temperature=temperature,
-                        ):
-                            if isinstance(event, TextDelta):
-                                text_parts.append(event.text)
-                            elif isinstance(event, ToolUseComplete):
-                                tool_use_blocks.append(event)
-                            elif isinstance(event, UsageUpdate):
-                                total_input_tokens += event.input_tokens
-                                total_output_tokens += event.output_tokens
+                    text_parts, tool_use_blocks = await _conf_stream_with_retry(llm, resolved_model)
                 except (TimeoutError, asyncio.TimeoutError):
                     raise
                 except Exception as fallback_exc:
