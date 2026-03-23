@@ -362,7 +362,7 @@ export function SequencesView() {
 
         {/* Enrollments for this sequence */}
         <div className="border-t border-border pt-6">
-          <EnrollmentList sequenceId={view.sequenceId} />
+          <EnrollmentList sequenceId={view.sequenceId} totalSteps={seq.steps.length} />
         </div>
       </div>
     );

@@ -396,7 +396,13 @@ export function useMoveDealStage() {
       crmApi.moveDealStage(id, stage),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: crmKeys.deals() });
+      qc.invalidateQueries({ queryKey: crmKeys.contacts() });
+      qc.invalidateQueries({ queryKey: crmKeys.pipelines() });
       qc.invalidateQueries({ queryKey: crmKeys.analytics() });
+    },
+    onError: () => {
+      // Re-fetch to revert optimistic DnD state on failure
+      qc.invalidateQueries({ queryKey: crmKeys.deals() });
     },
   });
 }
@@ -407,6 +413,8 @@ export function useWinDeal() {
     mutationFn: (id: string) => crmApi.winDeal(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: crmKeys.deals() });
+      qc.invalidateQueries({ queryKey: crmKeys.contacts() });
+      qc.invalidateQueries({ queryKey: crmKeys.pipelines() });
       qc.invalidateQueries({ queryKey: crmKeys.analytics() });
     },
   });
@@ -419,6 +427,8 @@ export function useLoseDeal() {
       crmApi.loseDeal(id, reason, detail),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: crmKeys.deals() });
+      qc.invalidateQueries({ queryKey: crmKeys.contacts() });
+      qc.invalidateQueries({ queryKey: crmKeys.pipelines() });
       qc.invalidateQueries({ queryKey: crmKeys.analytics() });
     },
   });

@@ -11,7 +11,7 @@ from typing import Any, Sequence
 from sqlmodel import select
 
 from app.models.chat import Channel, Message
-from app.models.crm import CRMActivity
+from app.models.crm import CRMActivity, CRMContact
 from app.models.crm_audit import CRMAuditLog
 from app.models.crm_deal import CRMDeal
 from app.repositories.crm_deal_repo import DealRepository
@@ -187,6 +187,10 @@ class DealService(BaseService):
             performed_by=user_id,
         )
         self.session.add(audit)
+
+        # Sync contact stage to match the deal stage
+        await self._sync_contact_stage(deal.contact_id, new_stage, now)
+
         await self.session.commit()
 
         await self.events.emit("deal.stage_changed", {
@@ -230,6 +234,10 @@ class DealService(BaseService):
             performed_by=user_id,
         )
         self.session.add(audit)
+
+        # Sync contact stage to "closed_won"
+        await self._sync_contact_stage(deal.contact_id, "closed_won", now)
+
         await self.session.commit()
 
         await self.events.emit("deal.won", {"deal_id": deal_id, "value": deal.value})
@@ -298,10 +306,31 @@ class DealService(BaseService):
             performed_by=user_id,
         )
         self.session.add(audit)
+
+        # Sync contact stage to "closed_lost"
+        await self._sync_contact_stage(deal.contact_id, "closed_lost", now)
+
         await self.session.commit()
 
         await self.events.emit("deal.lost", {"deal_id": deal_id, "reason": reason})
         return deal
+
+    async def _sync_contact_stage(
+        self,
+        contact_id: str,
+        new_stage: str,
+        now: datetime,
+    ) -> None:
+        """Update the linked contact's stage to stay in sync with the deal."""
+        result = await self.session.exec(
+            select(CRMContact).where(CRMContact.id == contact_id)
+        )
+        contact = result.first()
+        if contact is not None and contact.stage != new_stage:
+            contact.stage = new_stage
+            contact.stage_changed_at = now
+            contact.updated_at = now
+            self.session.add(contact)
 
     async def _post_deal_celebration(self, deal: CRMDeal, user_id: str) -> None:
         """Post a celebration message to #general when a deal is won."""

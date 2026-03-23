@@ -174,6 +174,8 @@ async def create_event(
         ]
     try:
         event = await svc.create_event(data, user_id)
+    except ValueError as exc:
+        raise ApiError(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.error("Failed to create calendar event: %s", exc, exc_info=True)
         raise ApiError(status_code=500, detail=f"Failed to create calendar event: {exc}") from exc

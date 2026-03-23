@@ -76,33 +76,38 @@ function EnrollmentRow({
   enrollment,
   onUnenroll,
   isUnenrolling,
+  totalSteps,
 }: {
   enrollment: SequenceEnrollment;
   onUnenroll: (id: string) => void;
   isUnenrolling: boolean;
+  totalSteps?: number;
 }) {
   const sc = STATUS_CONFIG[enrollment.status] ?? STATUS_CONFIG.active;
+  const displayName = enrollment.contact_name || "Unknown Contact";
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 hover:bg-accent/30 transition-colors">
       {/* Contact avatar placeholder */}
       <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-medium shrink-0">
-        {(enrollment.contact_name ?? enrollment.contact_id).slice(0, 2).toUpperCase()}
+        {displayName.slice(0, 2).toUpperCase()}
       </div>
 
-      {/* Contact ID + enrolled time */}
+      {/* Contact name + enrolled time */}
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium truncate">
-          {enrollment.contact_name ?? enrollment.contact_id}
+          {displayName}
         </p>
         <p className="text-[10px] text-muted-foreground">
           Enrolled {formatRelativeTime(enrollment.enrolled_at)}
         </p>
       </div>
 
-      {/* Current step */}
+      {/* Current step with total context */}
       <div className="text-[10px] text-muted-foreground text-center shrink-0 w-14">
-        <span className="font-mono">Step {enrollment.current_step}</span>
+        <span className="font-mono">
+          {enrollment.current_step}{totalSteps ? `/${totalSteps}` : ""}
+        </span>
       </div>
 
       {/* Status badge */}
@@ -146,9 +151,10 @@ function EnrollmentRow({
 
 interface EnrollmentListProps {
   sequenceId: string;
+  totalSteps?: number;
 }
 
-export function EnrollmentList({ sequenceId }: EnrollmentListProps) {
+export function EnrollmentList({ sequenceId, totalSteps }: EnrollmentListProps) {
   const [statusFilter, setStatusFilter] = useState<
     EnrollmentStatus | "all"
   >("all");
@@ -240,6 +246,7 @@ export function EnrollmentList({ sequenceId }: EnrollmentListProps) {
               enrollment={enrollment}
               onUnenroll={handleUnenroll}
               isUnenrolling={unenrollingId === enrollment.id}
+              totalSteps={totalSteps}
             />
           ))}
         </div>
