@@ -81,7 +81,7 @@ class GeminiLLMClient:
     """Google Gemini API with native function calling."""
 
     PROVIDER = "gemini"
-    DEFAULT_MODEL = "gemini-3-flash-preview"
+    DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
     def __init__(self, api_key: str) -> None:
         from google import genai
@@ -761,12 +761,39 @@ def is_rate_limit_error(exc: Exception) -> bool:
     return "429" in msg or "rate limit" in msg or "resource exhausted" in msg
 
 
+def is_quota_exhausted(exc: Exception) -> bool:
+    """Return True if the error is a daily/monthly quota exhaustion (not transient).
+
+    Quota exhaustion means retrying on the same provider won't help — skip
+    straight to fallback instead of wasting time on backoff retries.
+    """
+    msg = str(exc).lower()
+    quota_signals = [
+        "quota exceeded",
+        "exceeded your current quota",
+        "resource_exhausted",
+        "generaterequestsperday",
+        "requests_per_day",
+        "daily limit",
+        "monthly limit",
+    ]
+    return any(signal in msg for signal in quota_signals)
+
+
+_GEMINI_MODEL_ALIASES: dict[str, str] = {
+    "gemini-2.5-flash": "gemini-2.5-flash-lite",
+    "gemini-3-flash": "gemini-2.5-flash-lite",
+    "gemini-3-flash-preview": "gemini-2.5-flash-lite",
+}
+
+
 def resolve_model_for_client(client: "LLMClient", requested_model: str | None) -> str:
     """Return a model name that is compatible with the given LLM client.
 
-    If the requested model belongs to the client's provider, use it as-is.
+    If the requested model belongs to the client's provider, use it as-is
+    (after applying any alias mappings for deprecated models).
     Otherwise, fall back to the client's DEFAULT_MODEL so that, e.g.,
-    a GroqLLMClient never receives "gemini-3-flash-preview".
+    a GroqLLMClient never receives "gemini-2.5-flash-lite".
     """
     if not requested_model:
         return client.DEFAULT_MODEL
@@ -776,6 +803,8 @@ def resolve_model_for_client(client: "LLMClient", requested_model: str | None) -
     expected_prefix = prefix_map.get(provider, "")
 
     if requested_model.startswith(expected_prefix):
+        if provider == "gemini":
+            return _GEMINI_MODEL_ALIASES.get(requested_model, requested_model)
         return requested_model
     return client.DEFAULT_MODEL
 

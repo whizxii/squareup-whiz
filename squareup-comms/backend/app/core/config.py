@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # Google Gemini (free tier — primary)
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash-lite"
 
     # Embedding (Gemini text-embedding-004 — free tier)
     EMBEDDING_MODEL: str = "text-embedding-004"

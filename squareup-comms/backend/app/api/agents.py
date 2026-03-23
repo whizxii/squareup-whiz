@@ -778,7 +778,7 @@ PREBUILT_AGENTS = [
             "- Schedule: check availability first, then create event.\n"
             "- Something you lack a tool for: explain what you CAN do and suggest the closest action.\n"
         ),
-        "model": "gemini-3-flash",
+        "model": "gemini-2.5-flash-lite",
         "tools": json.dumps([
             "crm_search_contacts", "crm_get_contact", "crm_create_contact",
             "crm_update_contact", "crm_count_contacts", "crm_add_note",
@@ -820,7 +820,7 @@ PREBUILT_AGENTS = [
             "existing contacts, and logging activities like calls, emails, and meetings. "
             "Always be concise and confirm actions taken."
         ),
-        "model": "gemini-3-flash",
+        "model": "gemini-2.5-flash-lite",
         "tools": json.dumps([
             "crm_search_contacts", "crm_get_contact", "crm_create_contact",
             "crm_update_contact", "crm_count_contacts", "crm_add_note",
@@ -842,7 +842,7 @@ PREBUILT_AGENTS = [
             "manage calendar events, transcribe meeting recordings, and sync meeting notes "
             "back to the CRM. Proactively suggest optimal times and always include an agenda."
         ),
-        "model": "gemini-3-flash",
+        "model": "gemini-2.5-flash-lite",
         "tools": json.dumps([
             "list_calendar_events", "create_calendar_event", "update_calendar_event",
             "check_availability",
@@ -864,7 +864,7 @@ PREBUILT_AGENTS = [
             "search conversations, look up team member profiles, and create tasks from your findings. "
             "Always cite the source channel or message when presenting search results."
         ),
-        "model": "gemini-3-flash",
+        "model": "gemini-2.5-flash-lite",
         "tools": json.dumps([
             "search_workspace", "search_messages", "list_channels",
             "get_channel_info", "list_team_members", "get_user_profile",
@@ -884,7 +884,7 @@ PREBUILT_AGENTS = [
             "and finding optimal meeting times across time zones. Always confirm bookings and "
             "send reminders before events."
         ),
-        "model": "gemini-3-flash",
+        "model": "gemini-2.5-flash-lite",
         "tools": json.dumps([
             "list_calendar_events", "create_calendar_event", "update_calendar_event",
             "check_availability",
@@ -917,6 +917,13 @@ async def seed_prebuilt_agents(
         existing = result.scalar_one_or_none()
 
         if existing:
+            # Update model if it changed (e.g. migrating away from rate-limited models)
+            new_model = agent_data.get("model")
+            if new_model and existing.model != new_model:
+                existing.model = new_model
+                session.add(existing)
+                await session.flush()
+                await session.refresh(existing)
             created.append(existing)
             continue
 

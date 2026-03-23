@@ -57,6 +57,7 @@ from app.services.llm_service import (
     calculate_cost,
     get_fallback_client,
     get_llm_client,
+    is_quota_exhausted,
     is_rate_limit_error,
     resolve_model_for_client,
 )
@@ -567,10 +568,13 @@ async def run_agent(
                             total_input_tokens += event.input_tokens
                             total_output_tokens += event.output_tokens
 
-            RATE_LIMIT_BACKOFFS = [5, 15, 30]  # seconds
+            RATE_LIMIT_BACKOFFS = [1, 3, 5]  # seconds
 
             async def _stream_with_retry(client, model) -> tuple[list[str], list[ToolUseComplete]]:
-                """Try streaming, retrying with backoff on rate limits."""
+                """Try streaming, retrying with backoff on transient rate limits.
+
+                Quota exhaustion (daily/monthly cap) skips retries entirely.
+                """
                 last_exc: Exception | None = None
                 for attempt, delay in enumerate([0] + RATE_LIMIT_BACKOFFS):
                     if delay:
@@ -593,7 +597,9 @@ async def run_agent(
                     except Exception as exc:
                         last_exc = exc
                         if not is_rate_limit_error(exc):
-                            raise  # Non-rate-limit error — don't retry, fall through
+                            raise  # Non-rate-limit error — don't retry
+                        if is_quota_exhausted(exc):
+                            raise  # Daily quota burned — retrying won't help
                 assert last_exc is not None
                 raise last_exc  # All retries exhausted
 
@@ -1054,7 +1060,7 @@ async def invoke_agent_sync(
             tool_use_blocks: list[ToolUseComplete] = []
 
             # Stream LLM response (with rate-limit retry + provider fallback)
-            RATE_LIMIT_BACKOFFS_SYNC = [5, 15, 30]
+            RATE_LIMIT_BACKOFFS_SYNC = [1, 3, 5]
 
             async def _sync_stream_once(client, model):
                 tp: list[str] = []
@@ -1095,6 +1101,8 @@ async def invoke_agent_sync(
                         last_exc = exc
                         if not is_rate_limit_error(exc):
                             raise
+                        if is_quota_exhausted(exc):
+                            raise  # Daily quota burned — skip to fallback
                 assert last_exc is not None
                 raise last_exc
 
@@ -1528,7 +1536,7 @@ async def resume_after_confirmation(
             text_parts: list[str] = []
             tool_use_blocks: list[ToolUseComplete] = []
 
-            RATE_LIMIT_BACKOFFS_CONF = [5, 15, 30]
+            RATE_LIMIT_BACKOFFS_CONF = [1, 3, 5]
 
             async def _conf_stream_once(client, model):
                 tp: list[str] = []
@@ -1567,6 +1575,8 @@ async def resume_after_confirmation(
                         last_exc = exc
                         if not is_rate_limit_error(exc):
                             raise
+                        if is_quota_exhausted(exc):
+                            raise  # Daily quota burned — skip to fallback
                 assert last_exc is not None
                 raise last_exc
 
