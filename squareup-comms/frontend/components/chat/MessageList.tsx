@@ -200,32 +200,50 @@ export function MessageList({ loading = false, onConfirmationRespond }: MessageL
     }
   }, [hasActiveStreams, streamingMessages]);
 
-  // Scroll to bottom on channel switch.
-  // The scroll container re-mounts (key={activeChannelId}) so we must wait
-  // for the virtualizer to measure the new element before scrolling.
+  // Track whether we still need to perform the initial scroll-to-bottom after
+  // a channel switch.  The effect below sets this to true; once the scroll
+  // actually happens (possibly deferred until rows are available) it is cleared.
+  const needsInitialScrollRef = useRef(false);
+
+  // Reset state on channel switch.
   useEffect(() => {
     setIsScrolledUp(false);
     setUnreadCount(0);
     isNearBottomRef.current = true;
+    needsInitialScrollRef.current = true;
+  }, [activeChannelId]);
 
-    if (rows.length === 0) return;
+  // Perform the actual scroll-to-bottom.  Runs whenever the channel changes
+  // OR when rows first populate (messages loaded after channel switch).
+  useEffect(() => {
+    if (!needsInitialScrollRef.current) return;
+    if (rows.length === 0) return; // wait until rows are available
 
-    // Defer until the browser has painted and the virtualizer re-measured.
+    needsInitialScrollRef.current = false;
+
+    // Double-rAF: first frame lets the virtualizer measure, second scrolls.
     let cancelled = false;
-    const frame = requestAnimationFrame(() => {
+    const frame1 = requestAnimationFrame(() => {
       if (cancelled) return;
-      virtualizer.scrollToIndex(rows.length - 1, { align: "end", behavior: "auto" });
-      // Fallback: also set scrollTop directly in case virtualizer hasn't settled
-      const el = scrollRef.current;
-      if (el) {
-        el.scrollTop = el.scrollHeight;
-      }
+      const frame2 = requestAnimationFrame(() => {
+        if (cancelled) return;
+        virtualizer.scrollToIndex(rows.length - 1, { align: "end", behavior: "auto" });
+        // Fallback: also set scrollTop directly in case virtualizer hasn't settled
+        const el = scrollRef.current;
+        if (el) {
+          el.scrollTop = el.scrollHeight;
+        }
+      });
+      // Store frame2 ID for cleanup
+      cleanupFrame2 = frame2;
     });
+    let cleanupFrame2: number | undefined;
     return () => {
       cancelled = true;
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(frame1);
+      if (cleanupFrame2 !== undefined) cancelAnimationFrame(cleanupFrame2);
     };
-  }, [activeChannelId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeChannelId, rows.length, virtualizer]);
 
   const jumpToBottom = useCallback(() => {
     virtualizer.scrollToIndex(rows.length - 1, { align: "end", behavior: "smooth" });
@@ -256,9 +274,8 @@ export function MessageList({ loading = false, onConfirmationRespond }: MessageL
   }
 
   return (
-    <div className="relative flex-1">
-      <AnimatePresence mode="wait">
-      <motion.div
+    <div className="relative flex-1 min-h-0 overflow-hidden">
+      <div
         key={activeChannelId}
         ref={scrollRef}
         className="h-full overflow-y-auto scrollbar-thin"
@@ -267,10 +284,6 @@ export function MessageList({ loading = false, onConfirmationRespond }: MessageL
         aria-label="Message history"
         aria-live="polite"
         aria-relevant="additions"
-        initial={prefersReducedMotion ? false : { opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={prefersReducedMotion ? undefined : { opacity: 0 }}
-        transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.15, ease: "easeInOut" }}
       >
         {/* AI conversation summary */}
         <ConversationSummary />
@@ -389,8 +402,7 @@ export function MessageList({ loading = false, onConfirmationRespond }: MessageL
           )}
         </AnimatePresence>
         </div>
-      </motion.div>
-      </AnimatePresence>
+      </div>
 
       {/* Jump to bottom button */}
       {isScrolledUp && (
