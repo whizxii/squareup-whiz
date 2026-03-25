@@ -917,10 +917,14 @@ async def seed_prebuilt_agents(
         existing = result.scalar_one_or_none()
 
         if existing:
-            # Update model if it changed (e.g. migrating away from rate-limited models)
-            new_model = agent_data.get("model")
-            if new_model and existing.model != new_model:
-                existing.model = new_model
+            # Update key fields if they changed (model, tools, system_prompt)
+            changed = False
+            for field in ("model", "tools", "system_prompt"):
+                new_val = agent_data.get(field)
+                if new_val and getattr(existing, field) != new_val:
+                    setattr(existing, field, new_val)
+                    changed = True
+            if changed:
                 session.add(existing)
                 await session.flush()
                 await session.refresh(existing)
