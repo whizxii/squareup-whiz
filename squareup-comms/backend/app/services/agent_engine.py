@@ -55,10 +55,12 @@ from app.services.llm_service import (
     ToolUseComplete,
     UsageUpdate,
     calculate_cost,
+    clear_provider_cooldown,
     get_fallback_client,
     get_llm_client,
     is_quota_exhausted,
     is_rate_limit_error,
+    mark_provider_rate_limited,
     resolve_model_for_client,
 )
 from app.services.intent_router import classify_intent, filter_tools_by_categories
@@ -629,49 +631,40 @@ async def run_agent(
                 assert last_exc is not None
                 raise last_exc  # All retries exhausted
 
-            try:
-                text_parts, tool_use_blocks = await _stream_with_retry(llm, resolved_model)
-            except (TimeoutError, asyncio.TimeoutError):
-                raise  # Let outer handler deal with timeouts
-            except Exception as stream_exc:
-                logger.error(
-                    "Agent %s: primary provider %s failed "
-                    "(model=%s, tools=%d, sys_prompt=%d chars, msgs=%d, iteration=%d): %s [%s]",
-                    agent.id, llm.PROVIDER, resolved_model, len(tool_schemas),
-                    len(system_prompt), len(messages), iteration,
-                    type(stream_exc).__name__, stream_exc,
-                )
-                failed_providers.add(llm.PROVIDER)
-                fallback = get_fallback_client(failed_providers)
-                if not fallback:
-                    raise RuntimeError(
-                        "All LLM providers are unavailable (rate-limited or misconfigured). "
-                        "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
-                    ) from stream_exc
-                logger.warning(
-                    "Agent %s: switching from %s to fallback %s (iteration %d).",
-                    agent.id, llm.PROVIDER, fallback.PROVIDER, iteration,
-                )
-                await _broadcast_status(channel_id, agent.id, "thinking", "Switching providers...")
-                llm = fallback
-                resolved_model = fallback.DEFAULT_MODEL
+            # --- Provider cascade: try current provider, then ALL fallbacks ---
+            last_provider_exc: Exception | None = None
+            while True:
                 try:
                     text_parts, tool_use_blocks = await _stream_with_retry(llm, resolved_model)
+                    clear_provider_cooldown(llm.PROVIDER)
+                    break  # Success — exit the cascade loop
                 except (TimeoutError, asyncio.TimeoutError):
-                    raise
-                except Exception as fallback_exc:
+                    raise  # Timeouts are not provider-specific
+                except Exception as exc:
+                    last_provider_exc = exc
                     logger.error(
-                        "Agent %s: fallback provider %s also failed "
-                        "(model=%s, tools=%d, sys_prompt=%d chars, msgs=%d): %s [%s]",
+                        "Agent %s: provider %s failed "
+                        "(model=%s, tools=%d, sys_prompt=%d chars, msgs=%d, iteration=%d): %s [%s]",
                         agent.id, llm.PROVIDER, resolved_model, len(tool_schemas),
-                        len(system_prompt), len(messages),
-                        type(fallback_exc).__name__, fallback_exc,
+                        len(system_prompt), len(messages), iteration,
+                        type(exc).__name__, exc,
                     )
                     failed_providers.add(llm.PROVIDER)
-                    raise RuntimeError(
-                        "All LLM providers are unavailable (rate-limited or misconfigured). "
-                        "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
-                    ) from fallback_exc
+                    if is_rate_limit_error(exc):
+                        mark_provider_rate_limited(llm.PROVIDER)
+                    fallback = get_fallback_client(failed_providers)
+                    if not fallback:
+                        raise RuntimeError(
+                            "All LLM providers are unavailable (rate-limited or misconfigured). "
+                            "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
+                        ) from last_provider_exc
+                    logger.warning(
+                        "Agent %s: switching from %s to fallback %s (iteration %d).",
+                        agent.id, llm.PROVIDER, fallback.PROVIDER, iteration,
+                    )
+                    await _broadcast_status(channel_id, agent.id, "thinking", "Switching providers...")
+                    llm = fallback
+                    resolved_model = fallback.DEFAULT_MODEL
 
             full_text = "".join(text_parts)
 
@@ -1153,34 +1146,37 @@ async def invoke_agent_sync(
                 assert last_exc is not None
                 raise last_exc
 
-            try:
-                text_parts, tool_use_blocks = await _sync_stream_with_retry(llm, resolved_model)
-            except (TimeoutError, asyncio.TimeoutError):
-                raise
-            except Exception as stream_exc:
-                failed_providers.add(llm.PROVIDER)
-                fallback = get_fallback_client(failed_providers)
-                if not fallback:
-                    raise RuntimeError(
-                        "All LLM providers are unavailable (rate-limited or misconfigured). "
-                        "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
-                    ) from stream_exc
-                logger.warning(
-                    "Agent %s sync LLM (%s) failed on iteration %d: %s. Switching to fallback (%s).",
-                    agent.id, llm.PROVIDER, iteration, stream_exc, fallback.PROVIDER,
-                )
-                llm = fallback
-                resolved_model = fallback.DEFAULT_MODEL
+            # --- Provider cascade: try current provider, then ALL fallbacks ---
+            last_provider_exc: Exception | None = None
+            while True:
                 try:
                     text_parts, tool_use_blocks = await _sync_stream_with_retry(llm, resolved_model)
+                    clear_provider_cooldown(llm.PROVIDER)
+                    break  # Success
                 except (TimeoutError, asyncio.TimeoutError):
                     raise
-                except Exception as fallback_exc:
+                except Exception as exc:
+                    last_provider_exc = exc
+                    logger.error(
+                        "Agent %s sync: provider %s failed on iteration %d: %s [%s]",
+                        agent.id, llm.PROVIDER, iteration,
+                        type(exc).__name__, exc,
+                    )
                     failed_providers.add(llm.PROVIDER)
-                    raise RuntimeError(
-                        "All LLM providers are unavailable (rate-limited or misconfigured). "
-                        "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
-                    ) from fallback_exc
+                    if is_rate_limit_error(exc):
+                        mark_provider_rate_limited(llm.PROVIDER)
+                    fallback = get_fallback_client(failed_providers)
+                    if not fallback:
+                        raise RuntimeError(
+                            "All LLM providers are unavailable (rate-limited or misconfigured). "
+                            "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
+                        ) from last_provider_exc
+                    logger.warning(
+                        "Agent %s sync: switching from %s to fallback %s (iteration %d).",
+                        agent.id, llm.PROVIDER, fallback.PROVIDER, iteration,
+                    )
+                    llm = fallback
+                    resolved_model = fallback.DEFAULT_MODEL
 
             full_text = "".join(text_parts)
 

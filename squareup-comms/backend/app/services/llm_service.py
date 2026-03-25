@@ -11,12 +11,43 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Union
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Provider cooldown tracking
+# ---------------------------------------------------------------------------
+# When a provider returns a rate-limit error, we record the timestamp.
+# Subsequent requests skip that provider until the cooldown expires.
+# This prevents wasting time retrying a provider that just 429'd.
+
+_PROVIDER_COOLDOWN_SECONDS = 60  # skip provider for 60s after rate-limit
+
+_provider_cooldown: dict[str, float] = {}  # provider_name → last_rate_limited_at
+
+
+def mark_provider_rate_limited(provider: str) -> None:
+    """Record that a provider just returned a rate-limit error."""
+    _provider_cooldown[provider] = time.monotonic()
+    logger.info("Provider %s marked as rate-limited for %ds", provider, _PROVIDER_COOLDOWN_SECONDS)
+
+
+def is_provider_cooled_down(provider: str) -> bool:
+    """Return True if the provider is still in cooldown (should be skipped)."""
+    last_hit = _provider_cooldown.get(provider)
+    if last_hit is None:
+        return False
+    return (time.monotonic() - last_hit) < _PROVIDER_COOLDOWN_SECONDS
+
+
+def clear_provider_cooldown(provider: str) -> None:
+    """Clear cooldown for a provider (e.g., after a successful call)."""
+    _provider_cooldown.pop(provider, None)
 
 
 # ---------------------------------------------------------------------------
@@ -725,6 +756,8 @@ def get_fallback_client(
     ``exclude_providers`` can be a single provider name (str) for backwards
     compatibility, or a set of provider names to skip.
 
+    Also skips providers that are in cooldown (recently rate-limited).
+
     Returns None if no fallback is available.
     """
     if isinstance(exclude_providers, str):
@@ -737,8 +770,14 @@ def get_fallback_client(
     ]
 
     for provider_name, api_key, client_cls in fallback_order:
-        if provider_name not in exclude_providers and api_key:
-            return client_cls(api_key)
+        if provider_name in exclude_providers:
+            continue
+        if not api_key:
+            continue
+        if is_provider_cooled_down(provider_name):
+            logger.info("Skipping %s — still in cooldown", provider_name)
+            continue
+        return client_cls(api_key)
 
     return None
 
