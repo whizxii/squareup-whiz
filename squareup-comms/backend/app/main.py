@@ -314,6 +314,8 @@ app.include_router(crm_graph_router)
 
 @app.get("/health")
 async def health():
+    import os
+
     db_status = "connected"
     try:
         async with async_session() as session:
@@ -322,7 +324,12 @@ async def health():
         db_status = "unreachable"
 
     status = "ok" if db_status == "connected" else "degraded"
-    return {"status": status, "service": "squareup-comms", "database": db_status}
+    return {
+        "status": status,
+        "service": "squareup-comms",
+        "database": db_status,
+        "version": os.environ.get("RENDER_GIT_COMMIT", "local")[:7],
+    }
 
 
 @app.websocket("/ws")

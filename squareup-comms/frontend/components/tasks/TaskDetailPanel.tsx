@@ -8,6 +8,7 @@ import { InlineEdit } from "@/components/ui/InlineEdit";
 import { SubtaskList } from "@/components/tasks/SubtaskList";
 import { CommentThread } from "@/components/tasks/CommentThread";
 import { ActivityTimeline } from "@/components/tasks/ActivityTimeline";
+import { UserPicker } from "@/components/tasks/UserPicker";
 import { Badge } from "@/components/ui/Badge";
 import { formatRelativeTime } from "@/lib/format";
 import {
@@ -230,9 +231,11 @@ export function TaskDetailPanel() {
                       <User className="w-3 h-3" />
                       Assignee
                     </label>
-                    <div className="text-sm text-foreground bg-background border border-border rounded-md px-2.5 py-1.5">
-                      {task.assigned_to}
-                    </div>
+                    <UserPicker
+                      value={task.assigned_to ?? ""}
+                      onChange={(userId) => handleUpdateField("assigned_to", userId || null)}
+                      placeholder="Unassigned"
+                    />
                   </div>
 
                   {/* Due date */}

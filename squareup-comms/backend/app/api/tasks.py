@@ -211,6 +211,64 @@ async def bulk_update_tasks(
 
 
 # ---------------------------------------------------------------------------
+# One-time fix for old tasks created by agents with wrong ownership
+# (must be before /{task_id} to avoid path param capture)
+# ---------------------------------------------------------------------------
+
+@router.post("/fix-ownership", status_code=status.HTTP_200_OK)
+async def fix_task_ownership(
+    user_id: str = Depends(get_current_user),
+):
+    """Fix old tasks created by agents that have wrong created_by/assigned_to.
+
+    Agent-created tasks used to store agent_id as created_by and display names
+    as assigned_to, making them invisible to the user.  This endpoint claims
+    all such orphaned tasks for the requesting user.
+    """
+    from sqlmodel import select
+    from app.core.db import async_session
+    from app.models.users import UserProfile
+
+    async with async_session() as session:
+        # Collect all known user UIDs for matching
+        user_result = await session.execute(select(UserProfile.firebase_uid))
+        known_uids = {row[0] for row in user_result.all()}
+
+        # Find agent-created tasks
+        stmt = select(Task).where(
+            Task.created_by_type == "agent",
+            Task.is_deleted == False,  # noqa: E712
+        )
+        result = await session.execute(stmt)
+        tasks = result.scalars().all()
+
+        fixed = []
+        for task in tasks:
+            changed = False
+            # Fix assigned_to if it doesn't match any known user UUID
+            if task.assigned_to not in known_uids:
+                task.assigned_to = user_id
+                changed = True
+            # Fix created_by if it doesn't match any known user UUID
+            if task.created_by not in known_uids:
+                task.created_by = user_id
+                changed = True
+            if changed:
+                task.updated_at = datetime.utcnow()
+                session.add(task)
+                fixed.append({"id": task.id, "title": task.title})
+
+        if fixed:
+            await session.commit()
+
+    return success_response({
+        "fixed_count": len(fixed),
+        "fixed_tasks": fixed,
+        "message": f"Fixed {len(fixed)} orphaned task(s)",
+    })
+
+
+# ---------------------------------------------------------------------------
 # Single task CRUD (/{task_id} routes)
 # ---------------------------------------------------------------------------
 

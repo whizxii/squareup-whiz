@@ -17,6 +17,53 @@ from app.services.tools.registry import ToolDefinition, ToolResult, ToolContext,
 # Helpers
 # ---------------------------------------------------------------------------
 
+async def _resolve_user_id(raw: str | None, fallback_user_id: str) -> str:
+    """Resolve an LLM-provided user reference to a valid user UUID.
+
+    The LLM may pass a display name (e.g. "Kunj"), an email, or nothing.
+    We try to look up by firebase_uid first (exact match), then by
+    display_name (case-insensitive).  If nothing matches, return the
+    fallback (the requesting user's own ID).
+    """
+    if not raw or not raw.strip():
+        return fallback_user_id
+
+    raw = raw.strip()
+
+    # If it already matches the requesting user, fast-path
+    if raw == fallback_user_id:
+        return fallback_user_id
+
+    # Try DB lookup — by exact firebase_uid first, then by display_name
+    try:
+        from sqlalchemy import func
+        from sqlmodel import select
+        from app.models.users import UserProfile
+
+        async with async_session() as session:
+            # Exact ID match
+            stmt = select(UserProfile.firebase_uid).where(
+                UserProfile.firebase_uid == raw
+            )
+            result = await session.execute(stmt)
+            row = result.scalar_one_or_none()
+            if row:
+                return row
+
+            # Case-insensitive display name match
+            stmt = select(UserProfile.firebase_uid).where(
+                func.lower(UserProfile.display_name) == func.lower(raw)
+            )
+            result = await session.execute(stmt)
+            row = result.scalar_one_or_none()
+            if row:
+                return row
+    except Exception:
+        pass  # DB lookup failed — fall back to requesting user
+
+    return fallback_user_id
+
+
 def _task_to_dict(t: Task) -> dict:
     return {
         "id": t.id,
@@ -45,7 +92,11 @@ async def create_task(inp: dict, ctx: ToolContext) -> ToolResult:
     if not title:
         return ToolResult(success=False, output=None, error="title is required")
 
-    assigned_to = inp.get("assigned_to", ctx.user_id)
+    # Always use the requesting user's ID for assigned_to.
+    # The LLM doesn't have access to user UUIDs and may pass display
+    # names (e.g. "Kunj") which would make tasks invisible in the UI.
+    raw_assigned = inp.get("assigned_to")
+    assigned_to = await _resolve_user_id(raw_assigned, ctx.user_id)
     priority = inp.get("priority", "medium")
     if priority not in ("low", "medium", "high", "urgent"):
         return ToolResult(success=False, output=None, error=f"Invalid priority: {priority}")
@@ -172,11 +223,13 @@ async def complete_task(inp: dict, ctx: ToolContext) -> ToolResult:
 async def assign_task(inp: dict, ctx: ToolContext) -> ToolResult:
     """Reassign a task to a different user."""
     task_id = inp.get("task_id", "")
-    assigned_to = inp.get("assigned_to", "")
+    raw_assigned = inp.get("assigned_to", "")
     if not task_id:
         return ToolResult(success=False, output=None, error="task_id is required")
-    if not assigned_to:
+    if not raw_assigned:
         return ToolResult(success=False, output=None, error="assigned_to is required")
+
+    resolved_assigned = await _resolve_user_id(raw_assigned, ctx.user_id)
 
     async with async_session() as session:
         task = await session.get(Task, task_id)
@@ -187,14 +240,14 @@ async def assign_task(inp: dict, ctx: ToolContext) -> ToolResult:
         if task.created_by != ctx.user_id and task.assigned_to != ctx.user_id:
             return ToolResult(success=False, output=None, error="Only the task creator or assignee can reassign it")
 
-        task.assigned_to = assigned_to
+        task.assigned_to = resolved_assigned
         task.updated_at = datetime.utcnow()
         session.add(task)
         await session.commit()
 
     return ToolResult(
         success=True,
-        output={"message": f"Task '{task.title}' assigned to {assigned_to}", "task_id": task.id},
+        output={"message": f"Task '{task.title}' assigned to {resolved_assigned}", "task_id": task.id},
     )
 
 

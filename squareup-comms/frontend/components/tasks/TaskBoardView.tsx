@@ -19,6 +19,7 @@ import {
 import type { Task, TaskStatus } from "@/lib/types/tasks";
 import { formatDueDate } from "@/lib/format";
 import { PRIORITY_VARIANT, PRIORITY_LABEL } from "@/lib/constants/task-config";
+import { useUsers } from "@/lib/hooks/use-users";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -30,7 +31,7 @@ const COLUMNS: { status: TaskStatus; label: string; icon: React.ReactNode; dotCo
 
 // ─── Task Card ───────────────────────────────────────────────────
 
-function TaskCard({ task, isDragging }: { task: Task; isDragging: boolean }) {
+function TaskCard({ task, isDragging, usersMap }: { task: Task; isDragging: boolean; usersMap: Map<string, string> }) {
   const openDetailPanel = useTasksUIStore((s) => s.openDetailPanel);
   const dueInfo = formatDueDate(task.due_date);
 
@@ -81,7 +82,7 @@ function TaskCard({ task, isDragging }: { task: Task; isDragging: boolean }) {
       {task.assigned_to && (
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <User className="w-3 h-3" />
-          <span className="truncate">{task.assigned_to}</span>
+          <span className="truncate">{usersMap.get(task.assigned_to) || task.assigned_to}</span>
         </div>
       )}
     </button>
@@ -96,12 +97,14 @@ function BoardColumn({
   icon,
   dotColor,
   tasks,
+  usersMap,
 }: {
   status: TaskStatus;
   label: string;
   icon: React.ReactNode;
   dotColor: string;
   tasks: Task[];
+  usersMap: Map<string, string>;
 }) {
   const openDialog = useTasksUIStore((s) => s.openDialog);
 
@@ -144,7 +147,7 @@ function BoardColumn({
                     {...dragProvided.draggableProps}
                     {...dragProvided.dragHandleProps}
                   >
-                    <TaskCard task={task} isDragging={dragSnapshot.isDragging} />
+                    <TaskCard task={task} isDragging={dragSnapshot.isDragging} usersMap={usersMap} />
                   </div>
                 )}
               </Draggable>
@@ -171,6 +174,7 @@ export function TaskBoardView() {
   const statusFilter = useTasksUIStore((s) => s.statusFilter);
   const priorityFilter = useTasksUIStore((s) => s.priorityFilter);
   const openDialog = useTasksUIStore((s) => s.openDialog);
+  const { usersMap } = useUsers();
 
   const apiFilters = useMemo(
     () => ({
@@ -255,6 +259,7 @@ export function TaskBoardView() {
             icon={col.icon}
             dotColor={col.dotColor}
             tasks={grouped[col.status]}
+            usersMap={usersMap}
           />
         ))}
       </div>

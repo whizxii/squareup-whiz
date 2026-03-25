@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X, Trash2 } from "lucide-react";
 import { useUpdateTask, useDeleteTask } from "@/lib/hooks/use-tasks-queries";
+import { UserPicker } from "@/components/tasks/UserPicker";
 import type { TaskPriority, TaskStatus } from "@/lib/types/tasks";
 
 // ─── Constants ───────────────────────────────────────────────────
@@ -190,11 +191,10 @@ export function EditTaskDialog({ open, onOpenChange, data }: EditTaskDialogProps
               <label className="block text-xs text-muted-foreground mb-1 pl-0.5">
                 Assign to
               </label>
-              <input
+              <UserPicker
                 value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                placeholder="User ID or name (optional)"
-                className={inputCls}
+                onChange={setAssignedTo}
+                placeholder="Select team member (optional)"
               />
             </div>
 
