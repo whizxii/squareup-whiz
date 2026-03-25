@@ -458,7 +458,7 @@ class GroqLLMClient:
     """Groq via OpenAI-compatible API for llama models — with tool calling."""
 
     PROVIDER = "groq"
-    DEFAULT_MODEL = "llama-3.3-70b-versatile"
+    DEFAULT_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
     def __init__(self, api_key: str) -> None:
         from openai import AsyncOpenAI

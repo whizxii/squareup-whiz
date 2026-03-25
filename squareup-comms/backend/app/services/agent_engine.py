@@ -608,6 +608,11 @@ async def run_agent(
             except (TimeoutError, asyncio.TimeoutError):
                 raise  # Let outer handler deal with timeouts
             except Exception as stream_exc:
+                logger.error(
+                    "Agent %s: primary provider %s failed (model=%s, tools=%d, iteration=%d): %s [%s]",
+                    agent.id, llm.PROVIDER, resolved_model, len(tool_schemas),
+                    iteration, type(stream_exc).__name__, stream_exc,
+                )
                 failed_providers.add(llm.PROVIDER)
                 fallback = get_fallback_client(failed_providers)
                 if not fallback:
@@ -616,8 +621,8 @@ async def run_agent(
                         "Please try again in a few minutes or add an ANTHROPIC_API_KEY."
                     ) from stream_exc
                 logger.warning(
-                    "Agent %s LLM (%s) failed on iteration %d: %s. Switching to fallback (%s).",
-                    agent.id, llm.PROVIDER, iteration, stream_exc, fallback.PROVIDER,
+                    "Agent %s: switching from %s to fallback %s (iteration %d).",
+                    agent.id, llm.PROVIDER, fallback.PROVIDER, iteration,
                 )
                 await _broadcast_status(channel_id, agent.id, "thinking", "Switching providers...")
                 llm = fallback
@@ -627,6 +632,11 @@ async def run_agent(
                 except (TimeoutError, asyncio.TimeoutError):
                     raise
                 except Exception as fallback_exc:
+                    logger.error(
+                        "Agent %s: fallback provider %s also failed (model=%s, tools=%d): %s [%s]",
+                        agent.id, llm.PROVIDER, resolved_model, len(tool_schemas),
+                        type(fallback_exc).__name__, fallback_exc,
+                    )
                     failed_providers.add(llm.PROVIDER)
                     raise RuntimeError(
                         "All LLM providers are unavailable (rate-limited or misconfigured). "

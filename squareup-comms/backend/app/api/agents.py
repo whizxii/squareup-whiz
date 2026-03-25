@@ -779,29 +779,29 @@ PREBUILT_AGENTS = [
             "- Something you lack a tool for: explain what you CAN do and suggest the closest action.\n"
         ),
         "model": "gemini-2.5-flash-lite",
+        # 32 tools — kept lean to stay within Groq's 30K TPM fallback limit.
+        # (57 tools ≈ 20K+ input tokens, which exceeded Groq's old 12K TPM cap.)
         "tools": json.dumps([
+            # CRM (11)
             "crm_search_contacts", "crm_get_contact", "crm_create_contact",
             "crm_update_contact", "crm_count_contacts", "crm_add_note",
             "crm_list_deals", "crm_create_deal", "crm_update_deal_stage",
-            "crm_log_activity", "crm_get_pipeline", "crm_search_companies",
-            "list_calendar_events", "create_calendar_event", "update_calendar_event",
-            "check_availability",
+            "crm_log_activity", "crm_get_pipeline",
+            # Calendar (3)
+            "list_calendar_events", "create_calendar_event", "check_availability",
+            # Tasks & Reminders (6)
             "create_task", "list_tasks", "update_task", "complete_task",
-            "assign_task", "set_reminder", "list_reminders", "cancel_reminder",
+            "set_reminder", "list_reminders",
+            # Communication (3)
             "search_messages", "send_channel_message", "draft_email",
-            "send_email", "search_emails", "get_email_thread",
+            # Knowledge (3)
             "search_workspace", "search_crm_notes", "get_contact_history",
-            "list_team_members", "get_user_profile", "get_user_status",
-            "list_channels", "get_channel_info", "get_channel_members",
-            "get_deal_metrics", "get_pipeline_summary", "get_contact_stats",
-            "get_current_time", "parse_relative_date", "calculate_date",
-            "invoke_agent", "list_agents", "delegate_to_agent",
-            "ai_get_daily_brief", "ai_get_evening_brief", "ai_deal_coaching", "ai_pipeline_report",
-            "ai_relationship_analysis", "ai_suggest_next_actions",
-            "analyze_email_chain", "process_email_chain",
-            "entity_360_view", "relationship_map",
-            "report_progress",
-            "generate_weekly_report", "catch_up_summary",
+            # Channels & Users (3)
+            "list_channels", "get_channel_info", "list_team_members",
+            # Analytics (2)
+            "get_deal_metrics", "get_pipeline_summary",
+            # DateTime (1)
+            "get_current_time",
         ]),
         "mcp_servers": json.dumps([]),
         "trigger_mode": "mention",
