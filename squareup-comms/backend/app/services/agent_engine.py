@@ -61,6 +61,7 @@ from app.services.llm_service import (
     is_rate_limit_error,
     resolve_model_for_client,
 )
+from app.services.intent_router import classify_intent, filter_tools_by_categories
 from app.services.plan_and_execute import (
     PLAN_EXECUTION_INSTRUCTION,
     PLAN_REJECTED_INSTRUCTION,
@@ -443,30 +444,51 @@ async def run_agent(
     # Ensure messages alternate roles (Claude API requirement)
     messages = _ensure_alternating_roles(messages)
 
-    # 3. Build tools (built-in + custom + MCP)
-    try:
-        tools = await tool_registry.get_tools_for_agent(
-            agent.tools or "[]",
-            user_id,
-            custom_tools_json=agent.custom_tools,
-            mcp_servers_json=agent.mcp_servers,
+    # 3. Two-phase intent routing: classify message, then load only needed tools.
+    #    Phase 1 — lightweight LLM call (~200 tokens) to decide if tools are needed.
+    #    Phase 2 — load + filter tools to the relevant categories (or none for chat).
+    intent_result = await classify_intent(llm, content, history[-2:] if history else None)
+
+    if intent_result.intent == "chat":
+        # Pure chat — skip tool loading entirely (saves ~10-20K tokens)
+        tools: list = []
+        tool_schemas: list[dict] = []
+        logger.info(
+            "Agent %s (%s): chat intent — 0 tools loaded",
+            agent.id, agent.name,
         )
-        tool_schemas = [t.to_claude_schema() for t in tools]
-    except Exception as tool_exc:
-        logger.error("Agent %s (%s): tool build failed: %s", agent.id, agent.name, tool_exc, exc_info=True)
-        await _broadcast_error(
-            channel_id, agent.id,
-            "Something went wrong loading my tools. Please try again.",
-        )
-        async with async_session() as session:
-            db_agent = await session.get(Agent, agent.id)
-            if db_agent:
-                db_agent.status = "idle"
-                db_agent.current_task = None
-                session.add(db_agent)
-                await session.commit()
-        await _broadcast_status(channel_id, agent.id, "idle")
-        return
+    else:
+        # Task intent — load tools, then filter to relevant categories
+        try:
+            tools = await tool_registry.get_tools_for_agent(
+                agent.tools or "[]",
+                user_id,
+                custom_tools_json=agent.custom_tools,
+                mcp_servers_json=agent.mcp_servers,
+            )
+            all_count = len(tools)
+            tools = filter_tools_by_categories(tools, intent_result.categories)
+            tool_schemas = [t.to_claude_schema() for t in tools]
+            logger.info(
+                "Agent %s (%s): task intent — %d/%d tools loaded (categories=%s)",
+                agent.id, agent.name, len(tools), all_count,
+                intent_result.categories,
+            )
+        except Exception as tool_exc:
+            logger.error("Agent %s (%s): tool build failed: %s", agent.id, agent.name, tool_exc, exc_info=True)
+            await _broadcast_error(
+                channel_id, agent.id,
+                "Something went wrong loading my tools. Please try again.",
+            )
+            async with async_session() as session:
+                db_agent = await session.get(Agent, agent.id)
+                if db_agent:
+                    db_agent.status = "idle"
+                    db_agent.current_task = None
+                    session.add(db_agent)
+                    await session.commit()
+            await _broadcast_status(channel_id, agent.id, "idle")
+            return
     tool_context = ToolContext(user_id=user_id, channel_id=channel_id, agent_id=agent.id)
 
     # ---------------------------------------------------------------
@@ -1020,31 +1042,38 @@ async def invoke_agent_sync(
         )
     messages: list[dict] = [{"role": "user", "content": content}]
 
-    # 3. Build tools
-    try:
-        tools = await tool_registry.get_tools_for_agent(
-            agent.tools or "[]",
-            user_id,
-            custom_tools_json=agent.custom_tools,
-            mcp_servers_json=agent.mcp_servers,
-        )
-        tool_schemas = [t.to_claude_schema() for t in tools]
-    except Exception as tool_exc:
-        logger.error("Agent %s (%s): sync tool build failed: %s", agent.id, agent.name, tool_exc, exc_info=True)
-        async with async_session() as session:
-            db_agent = await session.get(Agent, agent.id)
-            if db_agent:
-                db_agent.status = "idle"
-                db_agent.current_task = None
-                session.add(db_agent)
-                await session.commit()
-        elapsed_ms = int((time.monotonic() - start_time) * 1000)
-        return InvokeResult(
-            response_text="Something went wrong loading my tools. Please try again.",
-            tool_calls_log=[], input_tokens=0, output_tokens=0,
-            total_cost_usd=0, duration_ms=elapsed_ms, status="error",
-            error_message=str(tool_exc)[:500],
-        )
+    # 3. Two-phase intent routing (same as streaming path)
+    intent_result = await classify_intent(llm, content)
+
+    if intent_result.intent == "chat":
+        tools: list = []
+        tool_schemas: list[dict] = []
+    else:
+        try:
+            tools = await tool_registry.get_tools_for_agent(
+                agent.tools or "[]",
+                user_id,
+                custom_tools_json=agent.custom_tools,
+                mcp_servers_json=agent.mcp_servers,
+            )
+            tools = filter_tools_by_categories(tools, intent_result.categories)
+            tool_schemas = [t.to_claude_schema() for t in tools]
+        except Exception as tool_exc:
+            logger.error("Agent %s (%s): sync tool build failed: %s", agent.id, agent.name, tool_exc, exc_info=True)
+            async with async_session() as session:
+                db_agent = await session.get(Agent, agent.id)
+                if db_agent:
+                    db_agent.status = "idle"
+                    db_agent.current_task = None
+                    session.add(db_agent)
+                    await session.commit()
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+            return InvokeResult(
+                response_text="Something went wrong loading my tools. Please try again.",
+                tool_calls_log=[], input_tokens=0, output_tokens=0,
+                total_cost_usd=0, duration_ms=elapsed_ms, status="error",
+                error_message=str(tool_exc)[:500],
+            )
     tool_context = ToolContext(user_id=user_id, channel_id=channel_id or "direct", agent_id=agent.id)
 
     tool_calls_log: list[dict] = []

@@ -779,29 +779,51 @@ PREBUILT_AGENTS = [
             "- Something you lack a tool for: explain what you CAN do and suggest the closest action.\n"
         ),
         "model": "gemini-2.5-flash-lite",
-        # 32 tools — kept lean to stay within Groq's 30K TPM fallback limit.
-        # (57 tools ≈ 20K+ input tokens, which exceeded Groq's old 12K TPM cap.)
+        # Full tool list — the intent router filters to relevant categories per-request,
+        # so only ~5-15 tool schemas are sent to the LLM instead of all 66.
         "tools": json.dumps([
-            # CRM (11)
+            # CRM (12)
             "crm_search_contacts", "crm_get_contact", "crm_create_contact",
             "crm_update_contact", "crm_count_contacts", "crm_add_note",
             "crm_list_deals", "crm_create_deal", "crm_update_deal_stage",
-            "crm_log_activity", "crm_get_pipeline",
-            # Calendar (3)
-            "list_calendar_events", "create_calendar_event", "check_availability",
-            # Tasks & Reminders (6)
-            "create_task", "list_tasks", "update_task", "complete_task",
-            "set_reminder", "list_reminders",
-            # Communication (3)
-            "search_messages", "send_channel_message", "draft_email",
+            "crm_log_activity", "crm_get_pipeline", "crm_search_companies",
+            # Calendar (4)
+            "list_calendar_events", "create_calendar_event",
+            "check_availability", "update_calendar_event",
+            # Tasks (5)
+            "create_task", "list_tasks", "update_task", "complete_task", "assign_task",
+            # Reminders (3)
+            "set_reminder", "list_reminders", "cancel_reminder",
+            # Email (6)
+            "draft_email", "send_email", "search_emails", "get_email_thread",
+            "analyze_email_chain", "process_email_chain",
+            # Communication (5)
+            "list_channels", "search_messages", "get_channel_info",
+            "send_channel_message", "get_channel_members",
             # Knowledge (3)
             "search_workspace", "search_crm_notes", "get_contact_history",
-            # Channels & Users (3)
-            "list_channels", "get_channel_info", "list_team_members",
-            # Analytics (2)
-            "get_deal_metrics", "get_pipeline_summary",
-            # DateTime (1)
-            "get_current_time",
+            # Analytics (3)
+            "get_deal_metrics", "get_pipeline_summary", "get_contact_stats",
+            # DateTime (3)
+            "get_current_time", "calculate_date", "parse_relative_date",
+            # Team (3)
+            "list_team_members", "get_user_profile", "get_user_status",
+            # Agent delegation (3)
+            "list_agents", "invoke_agent", "delegate_to_agent",
+            # AI Insights (5)
+            "ai_get_daily_brief", "ai_get_evening_brief", "ai_deal_coaching",
+            "ai_pipeline_report", "ai_relationship_analysis",
+            # AI Autonomous (4)
+            "ai_suggest_next_actions", "ai_smart_search",
+            "ai_forecast_deal", "ai_draft_email",
+            # Intelligence (2)
+            "entity_360_view", "relationship_map",
+            # Reports (2)
+            "generate_weekly_report", "catch_up_summary",
+            # Workflow (2)
+            "list_workflows", "trigger_workflow",
+            # System (1)
+            "report_progress",
         ]),
         "mcp_servers": json.dumps([]),
         "trigger_mode": "mention",
