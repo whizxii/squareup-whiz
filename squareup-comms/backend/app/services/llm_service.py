@@ -779,12 +779,16 @@ def is_quota_exhausted(exc: Exception) -> bool:
 
     Quota exhaustion means retrying on the same provider won't help — skip
     straight to fallback instead of wasting time on backoff retries.
+
+    NOTE: ``resource_exhausted`` is intentionally NOT included here.
+    Gemini uses ``ResourceExhausted`` for ALL rate limits — including
+    transient per-minute limits that WILL resolve with a short backoff.
+    Only truly quota-specific strings belong here.
     """
     msg = str(exc).lower()
     quota_signals = [
         "quota exceeded",
         "exceeded your current quota",
-        "resource_exhausted",
         "generaterequestsperday",
         "requests_per_day",
         "daily limit",

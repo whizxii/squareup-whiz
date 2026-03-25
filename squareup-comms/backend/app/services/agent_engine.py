@@ -416,8 +416,12 @@ async def run_agent(
     # 2. Build context — wrapped in try/except so a crash here (e.g. unmigrated
     #    models in load_crm_intelligence) doesn't leave the agent stuck "working".
     try:
+        # deep_context=False avoids an extra LLM call per message for
+        # summarising older messages.  With the intent router already
+        # consuming one LLM call, keeping context cheap (20 verbatim
+        # messages, no summarisation) prevents Gemini rate-limit cascades.
         history = await load_conversation_context(
-            channel_id, agent.id, limit=20, deep_context=True, total_messages=80,
+            channel_id, agent.id, limit=20, deep_context=False,
         )
         memory_facts = await load_agent_memory(agent.id, user_id)
         crm_intelligence = await load_crm_intelligence(user_id)
@@ -631,9 +635,11 @@ async def run_agent(
                 raise  # Let outer handler deal with timeouts
             except Exception as stream_exc:
                 logger.error(
-                    "Agent %s: primary provider %s failed (model=%s, tools=%d, iteration=%d): %s [%s]",
+                    "Agent %s: primary provider %s failed "
+                    "(model=%s, tools=%d, sys_prompt=%d chars, msgs=%d, iteration=%d): %s [%s]",
                     agent.id, llm.PROVIDER, resolved_model, len(tool_schemas),
-                    iteration, type(stream_exc).__name__, stream_exc,
+                    len(system_prompt), len(messages), iteration,
+                    type(stream_exc).__name__, stream_exc,
                 )
                 failed_providers.add(llm.PROVIDER)
                 fallback = get_fallback_client(failed_providers)
@@ -655,8 +661,10 @@ async def run_agent(
                     raise
                 except Exception as fallback_exc:
                     logger.error(
-                        "Agent %s: fallback provider %s also failed (model=%s, tools=%d): %s [%s]",
+                        "Agent %s: fallback provider %s also failed "
+                        "(model=%s, tools=%d, sys_prompt=%d chars, msgs=%d): %s [%s]",
                         agent.id, llm.PROVIDER, resolved_model, len(tool_schemas),
+                        len(system_prompt), len(messages),
                         type(fallback_exc).__name__, fallback_exc,
                     )
                     failed_providers.add(llm.PROVIDER)

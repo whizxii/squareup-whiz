@@ -49,8 +49,71 @@ CATEGORY_MAP: dict[str, list[str]] = {
 
 VALID_CATEGORIES = frozenset(CATEGORY_MAP.keys())
 
-# Fall back to all categories when classification fails
-_ALL_CATEGORIES = tuple(VALID_CATEGORIES)
+
+# ---------------------------------------------------------------------------
+# Keyword-based fallback — used when the LLM classification call fails
+# (e.g. rate-limited). Picks 1-2 categories instead of loading ALL tools.
+# ---------------------------------------------------------------------------
+
+_KEYWORD_HINTS: list[tuple[str, list[str]]] = [
+    # (keyword/phrase, categories to assign)
+    ("contact", ["crm"]),
+    ("lead", ["crm"]),
+    ("deal", ["crm"]),
+    ("pipeline", ["crm"]),
+    ("company", ["crm"]),
+    ("note", ["crm"]),
+    ("activity", ["crm"]),
+    ("stage", ["crm"]),
+    ("crm", ["crm"]),
+    ("calendar", ["calendar"]),
+    ("meeting", ["calendar"]),
+    ("event", ["calendar"]),
+    ("schedule", ["calendar"]),
+    ("availability", ["calendar"]),
+    ("email", ["email"]),
+    ("draft", ["email"]),
+    ("send", ["email"]),
+    ("task", ["tasks"]),
+    ("reminder", ["tasks"]),
+    ("to-do", ["tasks"]),
+    ("todo", ["tasks"]),
+    ("channel", ["communication"]),
+    ("message", ["communication"]),
+    ("search", ["knowledge"]),
+    ("find", ["knowledge"]),
+    ("analytics", ["analytics"]),
+    ("metric", ["analytics"]),
+    ("report", ["analytics"]),
+    ("stats", ["analytics"]),
+    ("summary", ["analytics"]),
+    ("team", ["team"]),
+    ("member", ["team"]),
+    ("user", ["team", "crm"]),
+    ("time", ["utility"]),
+    ("date", ["utility"]),
+    ("forecast", ["ai"]),
+    ("insight", ["ai"]),
+    ("brief", ["ai"]),
+]
+
+
+def _keyword_fallback(message: str) -> tuple[str, ...]:
+    """Pick categories from simple keyword matching on the message text.
+
+    Always includes 'utility'. Returns at most 3 categories to keep tool
+    count small even in the worst-case fallback path.
+    """
+    lower = message.lower()
+    matched: set[str] = set()
+    for keyword, cats in _KEYWORD_HINTS:
+        if keyword in lower:
+            matched.update(cats)
+    # If no keywords matched, default to crm + knowledge (most common tasks)
+    if not matched:
+        matched = {"crm", "knowledge"}
+    matched.add("utility")
+    return tuple(sorted(matched)[:4])  # cap at 4 categories max
 
 
 # ---------------------------------------------------------------------------
@@ -141,9 +204,13 @@ async def classify_intent(
         return IntentResult(intent="task", categories=tuple(cats))
 
     except Exception as exc:
-        # Safe fallback: load ALL tools (same behaviour as before this feature)
-        logger.warning("Intent router failed, loading all tools: %s", exc)
-        return IntentResult(intent="task", categories=_ALL_CATEGORIES)
+        # Smart fallback: keyword-based category selection (NOT all tools).
+        # Loading all 66 tools on failure is what caused the cascade rate-limit.
+        cats = _keyword_fallback(message)
+        logger.warning(
+            "Intent router failed (%s), keyword fallback → categories=%s", exc, cats,
+        )
+        return IntentResult(intent="task", categories=cats)
 
 
 def filter_tools_by_categories(
