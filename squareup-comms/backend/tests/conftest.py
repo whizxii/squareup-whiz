@@ -73,6 +73,8 @@ async def _setup_tables():
     import app.models.files  # noqa: F401
     import app.models.notifications  # noqa: F401
     import app.models.tasks  # noqa: F401
+    import app.models.task_comments  # noqa: F401
+    import app.models.task_activity  # noqa: F401
     import app.models.reminders  # noqa: F401
     import app.models.custom_tools  # noqa: F401
     import app.models.office  # noqa: F401

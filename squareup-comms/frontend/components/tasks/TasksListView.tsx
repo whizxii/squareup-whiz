@@ -5,6 +5,7 @@ import { useTasksUIStore } from "@/lib/stores/tasks-ui-store";
 import { useTasks, useUpdateTask, useDeleteTask } from "@/lib/hooks/use-tasks-queries";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { cn } from "@/lib/utils";
 import {
   CheckCircle2,
   Circle,
@@ -13,25 +14,12 @@ import {
   Bot,
   Clock,
   AlertTriangle,
+  Square,
+  CheckSquare,
 } from "lucide-react";
-import type { Task, TaskStatus, TaskPriority } from "@/lib/types/tasks";
-import { APP_LOCALE, APP_TIMEZONE } from "@/lib/format";
-
-// ─── Priority badge config ───────────────────────────────────────
-
-const PRIORITY_VARIANT: Record<TaskPriority, "danger" | "warning" | "primary" | "default"> = {
-  urgent: "danger",
-  high: "warning",
-  medium: "primary",
-  low: "default",
-};
-
-const PRIORITY_LABEL: Record<TaskPriority, string> = {
-  urgent: "Urgent",
-  high: "High",
-  medium: "Medium",
-  low: "Low",
-};
+import type { Task, TaskStatus } from "@/lib/types/tasks";
+import { formatDueDate } from "@/lib/format";
+import { PRIORITY_VARIANT, PRIORITY_LABEL } from "@/lib/constants/task-config";
 
 // ─── Status section config ───────────────────────────────────────
 
@@ -41,34 +29,19 @@ const STATUS_SECTIONS: { status: TaskStatus; label: string; icon: React.ReactNod
   { status: "done", label: "Done", icon: <CheckCircle2 className="w-4 h-4 text-green-500" /> },
 ];
 
-// ─── Due date helpers ────────────────────────────────────────────
-
-function formatDueDate(dateStr: string | null): { text: string; overdue: boolean } | null {
-  if (!dateStr) return null;
-
-  const due = new Date(dateStr);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
-  const diffDays = Math.round((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) return { text: `Overdue (${Math.abs(diffDays)}d)`, overdue: true };
-  if (diffDays === 0) return { text: "Today", overdue: false };
-  if (diffDays === 1) return { text: "Tomorrow", overdue: false };
-  if (diffDays <= 7) return { text: `In ${diffDays} days`, overdue: false };
-
-  return {
-    text: due.toLocaleDateString(APP_LOCALE, { month: "short", day: "numeric", timeZone: APP_TIMEZONE }),
-    overdue: false,
-  };
-}
-
 // ─── Task Row ────────────────────────────────────────────────────
 
 function TaskRow({ task }: { task: Task }) {
   const openDialog = useTasksUIStore((s) => s.openDialog);
+  const openDetailPanel = useTasksUIStore((s) => s.openDetailPanel);
+  const selectedTaskId = useTasksUIStore((s) => s.selectedTaskId);
+  const selectedTaskIds = useTasksUIStore((s) => s.selectedTaskIds);
+  const toggleTaskSelection = useTasksUIStore((s) => s.toggleTaskSelection);
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const isSelected = selectedTaskId === task.id;
+  const isBulkSelected = selectedTaskIds.has(task.id);
+  const hasBulkSelection = selectedTaskIds.size > 0;
 
   const dueInfo = formatDueDate(task.due_date);
   const isDone = task.status === "done";
@@ -95,8 +68,27 @@ function TaskRow({ task }: { task: Task }) {
   };
 
   return (
-    <div className="group flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 rounded-lg transition-colors">
-      {/* Checkbox */}
+    <div className={cn(
+      "group flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors",
+      isBulkSelected ? "bg-primary/10 ring-1 ring-primary/30" : isSelected ? "bg-accent ring-1 ring-primary/30" : "hover:bg-accent/50"
+    )}>
+      {/* Bulk selection checkbox */}
+      <button
+        onClick={() => toggleTaskSelection(task.id)}
+        className={cn(
+          "shrink-0 text-muted-foreground hover:text-foreground transition-all",
+          hasBulkSelection ? "opacity-100 w-5" : "opacity-0 w-0 group-hover:opacity-100 group-hover:w-5"
+        )}
+        title={isBulkSelected ? "Deselect" : "Select"}
+      >
+        {isBulkSelected ? (
+          <CheckSquare className="w-4 h-4 text-primary" />
+        ) : (
+          <Square className="w-4 h-4" />
+        )}
+      </button>
+
+      {/* Status toggle */}
       <button
         onClick={toggleStatus}
         className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
@@ -109,8 +101,11 @@ function TaskRow({ task }: { task: Task }) {
         )}
       </button>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
+      {/* Content — click to open detail panel */}
+      <button
+        onClick={() => openDetailPanel(task.id)}
+        className="flex-1 min-w-0 text-left cursor-pointer"
+      >
         <div className="flex items-center gap-2">
           <span
             className={`text-sm font-medium truncate ${
@@ -150,7 +145,7 @@ function TaskRow({ task }: { task: Task }) {
             </Badge>
           ))}
         </div>
-      </div>
+      </button>
 
       {/* Actions */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -219,7 +214,8 @@ export function TasksListView() {
     [statusFilter, priorityFilter]
   );
 
-  const { data: tasks, isLoading } = useTasks(apiFilters);
+  const { data: tasksResponse, isLoading } = useTasks(apiFilters);
+  const tasks = tasksResponse?.data;
 
   // Client-side search filter
   const filtered = useMemo(() => {

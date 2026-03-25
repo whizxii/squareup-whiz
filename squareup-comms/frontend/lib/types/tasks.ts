@@ -19,6 +19,12 @@ export interface Task {
   due_date: string | null;
   channel_id: string | null;
   tags: string[];
+  parent_id: string | null;
+  workspace_id: string | null;
+  position: number;
+  estimated_minutes: number | null;
+  completed_at: string | null;
+  is_deleted: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -38,7 +44,7 @@ export interface Reminder {
 export interface TaskFilters {
   status?: TaskStatus;
   priority?: TaskPriority;
-  assigned_to?: string;
+  cursor?: string;
   limit?: number;
 }
 
@@ -54,6 +60,8 @@ export interface CreateTaskBody {
   priority?: TaskPriority;
   due_date?: string;
   tags?: string[];
+  workspace_id?: string;
+  estimated_minutes?: number;
 }
 
 export interface UpdateTaskBody {
@@ -64,6 +72,7 @@ export interface UpdateTaskBody {
   assigned_to?: string;
   due_date?: string | null;
   tags?: string[];
+  estimated_minutes?: number | null;
 }
 
 export interface CreateReminderBody {
@@ -71,4 +80,68 @@ export interface CreateReminderBody {
   remind_at: string;
   channel_id?: string;
   recurrence?: string;
+}
+
+// ─── Comments ───────────────────────────────────────────────────
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  user_id: string;
+  content: string;
+  mentions: Array<{ id: string; label: string; type: string }>;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCommentBody {
+  content: string;
+  mentions?: Array<{ id: string; label: string; type: string }>;
+}
+
+// ─── Activity ───────────────────────────────────────────────────
+
+export type TaskActivityAction =
+  | "created"
+  | "updated"
+  | "assigned"
+  | "completed"
+  | "commented"
+  | "deleted";
+
+export interface TaskActivity {
+  id: string;
+  task_id: string;
+  user_id: string;
+  action: TaskActivityAction;
+  field_changed: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: string;
+}
+
+// ─── Reorder & Bulk ─────────────────────────────────────────────
+
+export interface ReorderBody {
+  task_id: string;
+  status: TaskStatus;
+  position: number;
+}
+
+export interface BulkUpdateBody {
+  task_ids: string[];
+  updates: UpdateTaskBody;
+}
+
+// ─── Pagination ─────────────────────────────────────────────────
+
+export interface PaginationMeta {
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+export interface PaginatedTasksResponse {
+  data: Task[];
+  meta: PaginationMeta;
 }

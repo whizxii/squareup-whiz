@@ -58,6 +58,8 @@ from app.api.crm_dedup import router as crm_dedup_router
 from app.api.users import router as users_router
 from app.api.seed import router as seed_router  # noqa: F401 — seed upsert endpoint
 from app.api.tasks import router as tasks_router
+from app.api.task_comments import router as task_comments_router
+from app.api.task_activity import router as task_activity_router
 from app.api.reminders import router as reminders_router
 from app.api.custom_tools import router as custom_tools_router
 from app.api.mcp import router as mcp_router
@@ -295,6 +297,8 @@ app.include_router(crm_dedup_router)
 app.include_router(users_router)
 app.include_router(seed_router)
 app.include_router(tasks_router)
+app.include_router(task_comments_router)
+app.include_router(task_activity_router)
 app.include_router(reminders_router)
 app.include_router(custom_tools_router)
 app.include_router(mcp_router)

@@ -1,7 +1,8 @@
 "use client";
 
 import { useTasksUIStore } from "@/lib/stores/tasks-ui-store";
-import { Search, Plus, Filter } from "lucide-react";
+import { Search, Plus, List, LayoutGrid } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { TaskStatus, TaskPriority } from "@/lib/types/tasks";
 
 // ─── Constants ───────────────────────────────────────────────────
@@ -32,6 +33,8 @@ export function TasksHeader() {
   const setStatusFilter = useTasksUIStore((s) => s.setStatusFilter);
   const priorityFilter = useTasksUIStore((s) => s.priorityFilter);
   const setPriorityFilter = useTasksUIStore((s) => s.setPriorityFilter);
+  const viewMode = useTasksUIStore((s) => s.viewMode);
+  const setViewMode = useTasksUIStore((s) => s.setViewMode);
   const openDialog = useTasksUIStore((s) => s.openDialog);
 
   const selectCls =
@@ -65,15 +68,47 @@ export function TasksHeader() {
           </button>
         </div>
 
-        <button
-          onClick={() =>
-            openDialog(activeTab === "tasks" ? "create-task" : "create-reminder")
-          }
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-primary text-primary-foreground hover:bg-primary/90 font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          {activeTab === "tasks" ? "New Task" : "New Reminder"}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* View toggle (tasks tab only) */}
+          {activeTab === "tasks" && (
+            <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+              <button
+                onClick={() => setViewMode("list")}
+                title="List view"
+                className={cn(
+                  "p-1.5 rounded-md transition-colors",
+                  viewMode === "list"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("board")}
+                title="Board view"
+                className={cn(
+                  "p-1.5 rounded-md transition-colors",
+                  viewMode === "board"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <button
+            onClick={() =>
+              openDialog(activeTab === "tasks" ? "create-task" : "create-reminder")
+            }
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-primary text-primary-foreground hover:bg-primary/90 font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            {activeTab === "tasks" ? "New Task" : "New Reminder"}
+          </button>
+        </div>
       </div>
 
       {/* Bottom row: search + filters */}

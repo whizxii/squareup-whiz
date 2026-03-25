@@ -23,3 +23,12 @@ class Task(SQLModel, table=True):
     tags: Optional[str] = Field(default="[]")  # JSON array of strings
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow(), index=True)
     updated_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+
+    # Phase 2 additions
+    parent_id: Optional[str] = Field(default=None, foreign_key="tasks.id", index=True)
+    workspace_id: Optional[str] = Field(default=None, max_length=128, index=True)
+    position: int = Field(default=0)
+    estimated_minutes: Optional[int] = Field(default=None)
+    completed_at: Optional[datetime] = Field(default=None)
+    is_deleted: bool = Field(default=False)
+    deleted_at: Optional[datetime] = Field(default=None)

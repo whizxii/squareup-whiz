@@ -273,3 +273,15 @@ async def get_tag_service(
     from app.services.crm_tag_service import TagService
     events, background, cache = _get_infra(request)
     return TagService(session, events, background, cache)
+
+
+# ─── Task Service ────────────────────────────────────────────────────
+
+
+async def get_task_service(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> "TaskService":
+    from app.services.task_service import TaskService
+    events, background, cache = _get_infra(request)
+    return TaskService(session, events, background, cache)

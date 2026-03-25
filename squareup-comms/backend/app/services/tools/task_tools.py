@@ -115,6 +115,9 @@ async def update_task(inp: dict, ctx: ToolContext) -> ToolResult:
         if not task:
             return ToolResult(success=False, output=None, error=f"Task {task_id} not found")
 
+        if task.created_by != ctx.user_id and task.assigned_to != ctx.user_id:
+            return ToolResult(success=False, output=None, error="Not authorized to update this task")
+
         # Apply updates immutably — build new values then set
         if "title" in inp:
             task.title = inp["title"]
@@ -151,6 +154,10 @@ async def complete_task(inp: dict, ctx: ToolContext) -> ToolResult:
         task = await session.get(Task, task_id)
         if not task:
             return ToolResult(success=False, output=None, error=f"Task {task_id} not found")
+
+        if task.created_by != ctx.user_id and task.assigned_to != ctx.user_id:
+            return ToolResult(success=False, output=None, error="Not authorized to complete this task")
+
         if task.status == "done":
             return ToolResult(success=True, output={"message": f"Task '{task.title}' is already done"})
 
@@ -175,6 +182,10 @@ async def assign_task(inp: dict, ctx: ToolContext) -> ToolResult:
         task = await session.get(Task, task_id)
         if not task:
             return ToolResult(success=False, output=None, error=f"Task {task_id} not found")
+
+        # Only creator can reassign a task
+        if task.created_by != ctx.user_id:
+            return ToolResult(success=False, output=None, error="Only the task creator can reassign it")
 
         task.assigned_to = assigned_to
         task.updated_at = datetime.utcnow()

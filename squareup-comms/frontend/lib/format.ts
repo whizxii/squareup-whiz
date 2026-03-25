@@ -87,6 +87,39 @@ export function formatCurrency(value: number, currency = "INR"): string {
   }).format(value);
 }
 
+// ─── Due date formatting ────────────────────────────────────────
+
+export interface DueDateInfo {
+  text: string;
+  overdue: boolean;
+}
+
+/**
+ * Format a due-date string into a human-readable label with overdue flag.
+ * Returns null when no date is provided.
+ */
+export function formatDueDate(dateStr: string | null): DueDateInfo | null {
+  if (!dateStr) return null;
+
+  const due = parseUtcDate(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const diffDays = Math.round((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return { text: `Overdue (${Math.abs(diffDays)}d)`, overdue: true };
+  if (diffDays === 0) return { text: "Today", overdue: false };
+  if (diffDays === 1) return { text: "Tomorrow", overdue: false };
+  if (diffDays <= 7) return { text: `In ${diffDays} days`, overdue: false };
+
+  return {
+    text: due.toLocaleDateString(APP_LOCALE, { month: "short", day: "numeric", timeZone: APP_TIMEZONE }),
+    overdue: false,
+  };
+}
+
+// ─── Relative time ──────────────────────────────────────────────
+
 export function formatRelativeTime(iso: string): string {
   try {
     const now = Date.now();

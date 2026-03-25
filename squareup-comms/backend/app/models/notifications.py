@@ -17,6 +17,7 @@ class Notification(SQLModel, table=True):
     message_id: Optional[str] = Field(default=None, foreign_key="messages.id")
     agent_id: Optional[str] = Field(default=None, foreign_key="agents.id")
     contact_id: Optional[str] = Field(default=None, foreign_key="crm_contacts.id")
+    task_id: Optional[str] = Field(default=None, foreign_key="tasks.id")
     read: bool = Field(default=False)
     pushed: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
