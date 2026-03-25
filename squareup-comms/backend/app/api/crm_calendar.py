@@ -11,8 +11,11 @@ import logging
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field, model_validator
 
+from sqlalchemy import select
+
 from app.core.auth import get_current_user
 from app.core.responses import ApiError, success_response
+from app.models.crm import CRMContact
 
 logger = logging.getLogger(__name__)
 from app.api.deps import get_calendar_event_service, get_followup_service
@@ -165,6 +168,13 @@ async def create_event(
     user_id: str = Depends(get_current_user),
 ):
     """Create a new calendar event."""
+    # Validate contact exists before attempting DB insert
+    result = await svc.session.execute(
+        select(CRMContact.id).where(CRMContact.id == body.contact_id)
+    )
+    if result.scalar_one_or_none() is None:
+        raise ApiError(status_code=404, detail="Contact not found")
+
     data = body.model_dump(exclude_unset=True)
     # Serialize attendees to dicts for service layer
     if "attendees" in data:

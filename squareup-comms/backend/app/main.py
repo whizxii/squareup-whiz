@@ -45,6 +45,7 @@ from app.api.crm_deals import router as crm_deals_router
 from app.api.crm_emails import router as crm_emails_router
 from app.api.crm_sequences import router as crm_sequences_router
 from app.api.crm_calendar import router as crm_calendar_router
+from app.api.crm_activities import router as crm_activities_router
 from app.api.drive import router as drive_router
 from app.api.crm_recordings import router as crm_recordings_router
 from app.api.calls import router as calls_router
@@ -251,6 +252,7 @@ app.include_router(crm_deals_router)
 app.include_router(crm_emails_router)
 app.include_router(crm_sequences_router)
 app.include_router(crm_calendar_router)
+app.include_router(crm_activities_router)
 app.include_router(crm_recordings_router)
 app.include_router(drive_router)
 app.include_router(calls_router)
