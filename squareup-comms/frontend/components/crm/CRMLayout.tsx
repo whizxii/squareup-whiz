@@ -263,7 +263,7 @@ export function CRMLayout({ children }: CRMLayoutProps) {
             animate="animate"
             exit="exit"
             transition={viewTransitionConfig}
-            className="flex-1 overflow-hidden"
+            className="flex-1 overflow-auto"
           >
             {children}
           </motion.div>
