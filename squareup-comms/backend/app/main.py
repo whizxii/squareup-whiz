@@ -113,6 +113,36 @@ async def lifespan(application: FastAPI):
     except Exception:
         logger.warning("Failed to reset stuck agents (non-fatal)", exc_info=True)
 
+    # Auto-seed / update prebuilt agents (tools, model, system_prompt)
+    try:
+        from app.api.agents import PREBUILT_AGENTS
+        from app.models.agents import Agent
+        import json as _json
+
+        async def _auto_seed_agents():
+            async with async_session() as session:
+                for agent_data in PREBUILT_AGENTS:
+                    stmt = select(Agent).where(Agent.name == agent_data["name"])
+                    result = await session.execute(stmt)
+                    existing = result.scalar_one_or_none()
+                    if not existing:
+                        continue  # Only update existing agents; seed endpoint creates new ones
+                    changed = False
+                    for field in ("model", "tools", "system_prompt"):
+                        new_val = agent_data.get(field)
+                        if new_val and getattr(existing, field) != new_val:
+                            setattr(existing, field, new_val)
+                            changed = True
+                    if changed:
+                        session.add(existing)
+                        logger.info("Auto-updated prebuilt agent %s (%s)", existing.name, existing.id)
+                await session.commit()
+
+        await _aio.wait_for(_auto_seed_agents(), timeout=15)
+        logger.info("Prebuilt agents auto-seed complete.")
+    except Exception:
+        logger.warning("Auto-seed of prebuilt agents failed (non-fatal)", exc_info=True)
+
     # Register all built-in agent tools at startup
     import app.services.tools  # noqa: F401 — triggers auto-registration
     logger.info("Agent tool registry initialized.")
