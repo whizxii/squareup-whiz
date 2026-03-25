@@ -29,6 +29,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [dueDate, setDueDate] = useState("");
+  const [assignedTo, setAssignedTo] = useState("");
   const [tags, setTags] = useState("");
   const [error, setError] = useState("");
 
@@ -37,6 +38,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
     setDescription("");
     setPriority("medium");
     setDueDate("");
+    setAssignedTo("");
     setTags("");
     setError("");
   };
@@ -51,6 +53,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
         description: description.trim() || undefined,
         priority,
         due_date: dueDate || undefined,
+        assigned_to: assignedTo.trim() || undefined,
         tags: tags
           .split(",")
           .map((t) => t.trim())
@@ -129,6 +132,19 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
                   className={inputCls}
                 />
               </div>
+            </div>
+
+            {/* Assign to */}
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1 pl-0.5">
+                Assign to
+              </label>
+              <input
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                placeholder="User ID or name (optional)"
+                className={inputCls}
+              />
             </div>
 
             {/* Tags */}

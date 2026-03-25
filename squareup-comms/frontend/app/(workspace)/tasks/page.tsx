@@ -1,18 +1,24 @@
 "use client";
 
 import { useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useTasksUIStore } from "@/lib/stores/tasks-ui-store";
 import { useTasks } from "@/lib/hooks/use-tasks-queries";
 import { useKeyboardShortcuts, type ShortcutAction } from "@/hooks/use-keyboard-shortcuts";
 import { TasksHeader } from "@/components/tasks/TasksHeader";
 import { TasksListView } from "@/components/tasks/TasksListView";
-import { TaskBoardView } from "@/components/tasks/TaskBoardView";
 import { RemindersListView } from "@/components/tasks/RemindersListView";
 import { CreateTaskDialog } from "@/components/tasks/dialogs/CreateTaskDialog";
 import { CreateReminderDialog } from "@/components/tasks/dialogs/CreateReminderDialog";
 import { EditTaskDialog } from "@/components/tasks/dialogs/EditTaskDialog";
 import { TaskDetailPanel } from "@/components/tasks/TaskDetailPanel";
 import { BulkActionBar } from "@/components/tasks/BulkActionBar";
+
+// @hello-pangea/dnd uses browser APIs not available during SSR
+const TaskBoardView = dynamic(
+  () => import("@/components/tasks/TaskBoardView").then((m) => m.TaskBoardView),
+  { ssr: false }
+);
 
 // ─── Main Tasks Page ─────────────────────────────────────────────
 

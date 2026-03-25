@@ -64,7 +64,7 @@ async def create_task(inp: dict, ctx: ToolContext) -> ToolResult:
         title=title,
         description=inp.get("description"),
         assigned_to=assigned_to,
-        created_by=ctx.agent_id,
+        created_by=ctx.user_id,
         created_by_type="agent",
         status="todo",
         priority=priority,
@@ -183,9 +183,9 @@ async def assign_task(inp: dict, ctx: ToolContext) -> ToolResult:
         if not task:
             return ToolResult(success=False, output=None, error=f"Task {task_id} not found")
 
-        # Only creator can reassign a task
-        if task.created_by != ctx.user_id:
-            return ToolResult(success=False, output=None, error="Only the task creator can reassign it")
+        # Creator or current assignee can reassign a task
+        if task.created_by != ctx.user_id and task.assigned_to != ctx.user_id:
+            return ToolResult(success=False, output=None, error="Only the task creator or assignee can reassign it")
 
         task.assigned_to = assigned_to
         task.updated_at = datetime.utcnow()

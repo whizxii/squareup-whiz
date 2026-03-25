@@ -40,6 +40,7 @@ export function EditTaskDialog({ open, onOpenChange, data }: EditTaskDialogProps
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [status, setStatus] = useState<TaskStatus>("todo");
   const [dueDate, setDueDate] = useState("");
+  const [assignedTo, setAssignedTo] = useState("");
   const [tags, setTags] = useState("");
   const [error, setError] = useState("");
 
@@ -50,6 +51,7 @@ export function EditTaskDialog({ open, onOpenChange, data }: EditTaskDialogProps
       setDescription((data.description as string) ?? "");
       setPriority((data.priority as TaskPriority) ?? "medium");
       setStatus((data.status as TaskStatus) ?? "todo");
+      setAssignedTo((data.assigned_to as string) ?? "");
       setTags(((data.tags as string[]) ?? []).join(", "));
       setError("");
 
@@ -80,6 +82,7 @@ export function EditTaskDialog({ open, onOpenChange, data }: EditTaskDialogProps
           priority,
           status,
           due_date: dueDate ? new Date(dueDate).toISOString() : null,
+          assigned_to: assignedTo.trim() || undefined,
           tags: tags
             .split(",")
             .map((t) => t.trim())
@@ -178,6 +181,19 @@ export function EditTaskDialog({ open, onOpenChange, data }: EditTaskDialogProps
                 type="datetime-local"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+
+            {/* Assign to */}
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1 pl-0.5">
+                Assign to
+              </label>
+              <input
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                placeholder="User ID or name (optional)"
                 className={inputCls}
               />
             </div>

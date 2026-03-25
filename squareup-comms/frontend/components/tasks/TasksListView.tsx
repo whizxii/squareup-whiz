@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useTasksUIStore } from "@/lib/stores/tasks-ui-store";
 import { useTasks, useUpdateTask, useDeleteTask } from "@/lib/hooks/use-tasks-queries";
+import { toast } from "@/lib/stores/toast-store";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,14 @@ function TaskRow({ task }: { task: Task }) {
 
   const toggleStatus = () => {
     const newStatus: TaskStatus = isDone ? "todo" : "done";
-    updateTask.mutate({ id: task.id, body: { status: newStatus } });
+    updateTask.mutate(
+      { id: task.id, body: { status: newStatus } },
+      {
+        onError: (err) => {
+          toast.error("Failed to update status", err instanceof Error ? err.message : "Unknown error");
+        },
+      }
+    );
   };
 
   const handleEdit = () => {
@@ -60,11 +68,19 @@ function TaskRow({ task }: { task: Task }) {
       status: task.status,
       due_date: task.due_date ?? "",
       tags: task.tags,
+      assigned_to: task.assigned_to ?? "",
     });
   };
 
   const handleDelete = () => {
-    deleteTask.mutate(task.id);
+    deleteTask.mutate(task.id, {
+      onSuccess: () => {
+        toast.success("Task deleted");
+      },
+      onError: (err) => {
+        toast.error("Failed to delete task", err instanceof Error ? err.message : "Unknown error");
+      },
+    });
   };
 
   return (

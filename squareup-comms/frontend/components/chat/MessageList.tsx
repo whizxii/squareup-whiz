@@ -180,8 +180,13 @@ export function MessageList({ loading = false, onConfirmationRespond }: MessageL
 
   // Auto-scroll to bottom on new messages (only if already near bottom)
   useEffect(() => {
+    if (rows.length === 0) return;
     if (isNearBottomRef.current) {
-      virtualizer.scrollToIndex(rows.length - 1, { align: "end", behavior: "smooth" });
+      // Defer so the virtualizer has measured the new rows first.
+      const frame = requestAnimationFrame(() => {
+        virtualizer.scrollToIndex(rows.length - 1, { align: "end", behavior: "smooth" });
+      });
+      return () => cancelAnimationFrame(frame);
     } else {
       setUnreadCount((prev) => prev + 1);
     }
@@ -195,13 +200,31 @@ export function MessageList({ loading = false, onConfirmationRespond }: MessageL
     }
   }, [hasActiveStreams, streamingMessages]);
 
-  // Scroll to bottom on channel switch
+  // Scroll to bottom on channel switch.
+  // The scroll container re-mounts (key={activeChannelId}) so we must wait
+  // for the virtualizer to measure the new element before scrolling.
   useEffect(() => {
-    if (rows.length > 0) {
-      virtualizer.scrollToIndex(rows.length - 1, { align: "end", behavior: "auto" });
-    }
     setIsScrolledUp(false);
     setUnreadCount(0);
+    isNearBottomRef.current = true;
+
+    if (rows.length === 0) return;
+
+    // Defer until the browser has painted and the virtualizer re-measured.
+    let cancelled = false;
+    const frame = requestAnimationFrame(() => {
+      if (cancelled) return;
+      virtualizer.scrollToIndex(rows.length - 1, { align: "end", behavior: "auto" });
+      // Fallback: also set scrollTop directly in case virtualizer hasn't settled
+      const el = scrollRef.current;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
   }, [activeChannelId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const jumpToBottom = useCallback(() => {
