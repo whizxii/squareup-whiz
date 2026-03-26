@@ -98,12 +98,21 @@ class RecordingService(BaseService):
                 f"Max allowed: {_MAX_FILE_SIZE_BYTES / (1024 * 1024):.0f} MB."
             )
 
-        # Mock file storage — save locally in dev (async I/O)
-        os.makedirs(_MOCK_UPLOAD_DIR, exist_ok=True)
-        file_path = os.path.join(_MOCK_UPLOAD_DIR, f"{recording_id}_{filename}")
-        await asyncio.to_thread(Path(file_path).write_bytes, content)
-
+        # File storage — save locally when possible (dev mode).
+        # On ephemeral filesystems (Render, etc.) the write may fail;
+        # we still create the DB record so the metadata is preserved.
         file_url = f"/uploads/recordings/{recording_id}_{filename}"
+        try:
+            os.makedirs(_MOCK_UPLOAD_DIR, exist_ok=True)
+            file_path = os.path.join(_MOCK_UPLOAD_DIR, f"{recording_id}_{filename}")
+            await asyncio.to_thread(Path(file_path).write_bytes, content)
+        except OSError:
+            logger.warning(
+                "File write failed for recording %s (no writable storage); "
+                "DB record will still be created.",
+                recording_id,
+                exc_info=True,
+            )
 
         recording = CRMCallRecording(
             id=recording_id,

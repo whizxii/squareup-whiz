@@ -143,6 +143,10 @@ async def upload_recording(
         )
     except ValueError as exc:
         raise ApiError(status_code=400, detail=str(exc))
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Recording upload failed: %s", exc, exc_info=True)
+        raise ApiError(status_code=500, detail="Recording upload failed") from exc
     return success_response(data=_to_response(recording))
 
 

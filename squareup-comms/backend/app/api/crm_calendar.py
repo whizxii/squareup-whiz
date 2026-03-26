@@ -208,18 +208,22 @@ async def list_events(
     user_id: str = Depends(get_current_user),
 ):
     """List calendar events with filters and cursor pagination."""
-    page = await svc.repo.search(
-        contact_id=contact_id,
-        deal_id=deal_id,
-        event_type=event_type,
-        status=status_filter,
-        start_date=start_date,
-        end_date=end_date,
-        sort_by=sort_by,
-        sort_dir=sort_dir,
-        cursor=cursor,
-        limit=limit,
-    )
+    try:
+        page = await svc.repo.search(
+            contact_id=contact_id,
+            deal_id=deal_id,
+            event_type=event_type,
+            status=status_filter,
+            start_date=start_date,
+            end_date=end_date,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            cursor=cursor,
+            limit=limit,
+        )
+    except Exception as exc:
+        logger.error("Failed to list calendar events: %s", exc, exc_info=True)
+        raise ApiError(status_code=500, detail="Failed to list calendar events") from exc
     return success_response({
         "items": [EventResponse.from_model(e).model_dump(mode="json") for e in page.items],
         "next_cursor": page.next_cursor,
@@ -235,7 +239,11 @@ async def get_upcoming(
     user_id: str = Depends(get_current_user),
 ):
     """Get upcoming scheduled events."""
-    events = await svc.get_upcoming(limit=limit)
+    try:
+        events = await svc.get_upcoming(limit=limit)
+    except Exception as exc:
+        logger.error("Failed to get upcoming events: %s", exc, exc_info=True)
+        raise ApiError(status_code=500, detail="Failed to get upcoming events") from exc
     return success_response([
         EventResponse.from_model(e).model_dump(mode="json") for e in events
     ])
@@ -248,7 +256,11 @@ async def get_overdue(
     user_id: str = Depends(get_current_user),
 ):
     """Get overdue follow-up events."""
-    events = await svc.get_overdue_follow_ups(limit=limit)
+    try:
+        events = await svc.get_overdue_follow_ups(limit=limit)
+    except Exception as exc:
+        logger.error("Failed to get overdue follow-ups: %s", exc, exc_info=True)
+        raise ApiError(status_code=500, detail="Failed to get overdue follow-ups") from exc
     return success_response([
         EventResponse.from_model(e).model_dump(mode="json") for e in events
     ])
