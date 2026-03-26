@@ -212,24 +212,24 @@ function ActivityItem({ activity }: { activity: Activity }) {
       <div className="flex-1 min-w-0 pb-5">
         <div className="flex items-center gap-2">
           <p className="text-xs font-medium">{activity.title || config.label}</p>
-          {meta?.sub_label && (
+          {meta?.sub_label ? (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
               {String(meta.sub_label)}
             </span>
-          )}
-          {meta?.duration_minutes && (
+          ) : null}
+          {meta?.duration_minutes ? (
             <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
               <Clock className="w-2.5 h-2.5" /> {String(meta.duration_minutes)}m
             </span>
-          )}
+          ) : null}
         </div>
 
         {/* TLDR summary */}
-        {meta?.tldr && (
+        {meta?.tldr ? (
           <p className="text-[11px] text-foreground/80 mt-1 px-2 py-1.5 rounded-md bg-muted/50 border border-border/50 leading-relaxed">
             {String(meta.tldr)}
           </p>
-        )}
+        ) : null}
 
         {/* Content / notes */}
         {activity.content && (
@@ -239,14 +239,14 @@ function ActivityItem({ activity }: { activity: Activity }) {
         )}
 
         {/* Transcript (expandable) */}
-        {expanded && meta?.transcript && (
+        {expanded && meta?.transcript ? (
           <div className="mt-1.5 px-2 py-1.5 rounded-md bg-muted/30 border border-border/40">
             <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Notes / Transcript</p>
             <p className="text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap">
               {String(meta.transcript)}
             </p>
           </div>
-        )}
+        ) : null}
 
         {/* Expand/collapse toggle */}
         {(hasMeta || (activity.content && activity.content.length > 120)) && (
