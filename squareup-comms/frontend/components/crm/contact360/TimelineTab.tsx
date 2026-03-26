@@ -257,14 +257,14 @@ function ActivityItem({ activity }: { activity: Activity }) {
 
         <div className="flex items-center gap-2 mt-1.5">
           <span className="text-[10px] text-muted-foreground">{formatRelativeTime(activity.created_at)}</span>
-          {meta?.activity_date && (
+          {meta?.activity_date ? (
             <>
               <span className="text-[10px] text-muted-foreground/40">&middot;</span>
               <span className="text-[10px] text-muted-foreground">
                 {new Date(String(meta.activity_date)).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               </span>
             </>
-          )}
+          ) : null}
           {activity.performer_name && (
             <>
               <span className="text-[10px] text-muted-foreground/40">&middot;</span>
