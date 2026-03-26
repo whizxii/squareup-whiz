@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
-import { useCreateCalendarEvent } from "@/lib/hooks/use-crm-queries";
-import type { CalendarEventType } from "@/lib/types/crm";
+import { useCreateCalendarEvent, useContact, useCRMSearch } from "@/lib/hooks/use-crm-queries";
+import type { CalendarEventType, Contact } from "@/lib/types/crm";
 import {
   X,
   Calendar,
@@ -15,6 +15,8 @@ import {
   Phone,
   CheckCircle2,
   Loader2,
+  Search,
+  User,
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────
@@ -108,13 +110,39 @@ export function CreateEventDialog({
   const createEvent = useCreateCalendarEvent();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Contact search state
+  const [contactQuery, setContactQuery] = useState("");
+  const [selectedContactName, setSelectedContactName] = useState("");
+  const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const contactPickerRef = useRef<HTMLDivElement>(null);
+  const { data: searchResults, isLoading: isSearching } = useCRMSearch(contactQuery);
+
+  // Pre-load display name for defaultContactId
+  const { data: defaultContact } = useContact(defaultContactId ?? "", {
+    enabled: !!defaultContactId,
+  });
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (contactPickerRef.current && !contactPickerRef.current.contains(e.target as Node)) {
+        setShowContactDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Reset form when dialog opens or default props change
   useEffect(() => {
     if (open) {
       setForm(INITIAL_FORM({ defaultContactId, defaultDealId, defaultDate }));
       setSubmitError(null);
+      setContactQuery("");
+      setSelectedContactName(defaultContact?.name ?? "");
+      setShowContactDropdown(false);
     }
-  }, [open, defaultContactId, defaultDealId, defaultDate]);
+  }, [open, defaultContactId, defaultDealId, defaultDate, defaultContact]);
 
   const updateField = useCallback(
     <K extends keyof FormState>(field: K, value: FormState[K]) => {
@@ -236,19 +264,84 @@ export function CreateEventDialog({
               </div>
             </div>
 
-            {/* Contact ID */}
-            <div>
+            {/* Contact Search */}
+            <div ref={contactPickerRef} className="relative">
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Contact ID *
+                Contact *
               </label>
-              <input
-                type="text"
-                value={form.contact_id}
-                onChange={(e) => updateField("contact_id", e.target.value)}
-                placeholder="Contact ID"
-                className={inputClass}
-                required
-              />
+              {selectedContactName ? (
+                <div className={cn(inputClass, "flex items-center justify-between")}>
+                  <span className="flex items-center gap-2">
+                    <User className="w-3.5 h-3.5 text-gray-400" />
+                    {selectedContactName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedContactName("");
+                      updateField("contact_id", "");
+                      setContactQuery("");
+                    }}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={contactQuery}
+                    onChange={(e) => {
+                      setContactQuery(e.target.value);
+                      setShowContactDropdown(e.target.value.length >= 2);
+                    }}
+                    onFocus={() => {
+                      if (contactQuery.length >= 2) setShowContactDropdown(true);
+                    }}
+                    placeholder="Search contacts by name, email..."
+                    className={cn(inputClass, "pl-9")}
+                  />
+                  {isSearching && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-gray-400" />
+                  )}
+                </div>
+              )}
+              {/* Dropdown */}
+              {showContactDropdown && !selectedContactName && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800 max-h-48 overflow-y-auto">
+                  {searchResults?.contacts && searchResults.contacts.length > 0 ? (
+                    searchResults.contacts.map((c: Contact) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          updateField("contact_id", c.id);
+                          setSelectedContactName(c.name);
+                          setContactQuery("");
+                          setShowContactDropdown(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="font-medium text-gray-900 dark:text-gray-100 truncate">{c.name}</div>
+                          {(c.email || c.company) && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                              {[c.email, c.company].filter(Boolean).join(" · ")}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+                      {contactQuery.length < 2 ? "Type at least 2 characters..." : "No contacts found"}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Deal ID (optional) */}

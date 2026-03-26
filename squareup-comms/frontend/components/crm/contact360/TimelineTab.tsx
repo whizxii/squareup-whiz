@@ -176,7 +176,7 @@ interface UnifiedEntry {
   email?: Email;
 }
 
-type FilterOption = ActivityType | "all" | "recordings" | "calendar" | "notes" | "emails";
+type FilterOption = ActivityType | "all" | "recordings" | "calendar" | "notes" | "emails" | "follow_up";
 
 // ─── Filter chips ───────────────────────────────────────────────
 
@@ -190,6 +190,7 @@ const FILTER_OPTIONS: { type: FilterOption; label: string }[] = [
   { type: "agent_action", label: "AI" },
   { type: "recordings", label: "Recordings" },
   { type: "calendar", label: "Events" },
+  { type: "follow_up", label: "Follow-ups" },
 ];
 
 // ─── Item renderers ─────────────────────────────────────────────
@@ -197,6 +198,8 @@ const FILTER_OPTIONS: { type: FilterOption; label: string }[] = [
 function ActivityItem({ activity }: { activity: Activity }) {
   const config = ACTIVITY_TYPE_CONFIG[activity.type];
   const [expanded, setExpanded] = useState(false);
+  const meta = activity.activity_metadata as Record<string, unknown> | undefined;
+  const hasMeta = meta && (meta.tldr || meta.transcript || meta.duration_minutes || meta.sub_label);
 
   return (
     <div className="flex gap-3 group">
@@ -207,19 +210,61 @@ function ActivityItem({ activity }: { activity: Activity }) {
         <div className="w-px flex-1 bg-border group-last:bg-transparent mt-1" />
       </div>
       <div className="flex-1 min-w-0 pb-5">
-        <p className="text-xs font-medium">{activity.title || config.label}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-medium">{activity.title || config.label}</p>
+          {meta?.sub_label && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+              {String(meta.sub_label)}
+            </span>
+          )}
+          {meta?.duration_minutes && (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+              <Clock className="w-2.5 h-2.5" /> {String(meta.duration_minutes)}m
+            </span>
+          )}
+        </div>
+
+        {/* TLDR summary */}
+        {meta?.tldr && (
+          <p className="text-[11px] text-foreground/80 mt-1 px-2 py-1.5 rounded-md bg-muted/50 border border-border/50 leading-relaxed">
+            {String(meta.tldr)}
+          </p>
+        )}
+
+        {/* Content / notes */}
         {activity.content && (
           <p className={cn("text-[11px] text-muted-foreground mt-0.5 leading-relaxed", !expanded && "line-clamp-2")}>
             {activity.content}
           </p>
         )}
-        {activity.content && activity.content.length > 120 && (
+
+        {/* Transcript (expandable) */}
+        {expanded && meta?.transcript && (
+          <div className="mt-1.5 px-2 py-1.5 rounded-md bg-muted/30 border border-border/40">
+            <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Notes / Transcript</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap">
+              {String(meta.transcript)}
+            </p>
+          </div>
+        )}
+
+        {/* Expand/collapse toggle */}
+        {(hasMeta || (activity.content && activity.content.length > 120)) && (
           <button onClick={() => setExpanded(!expanded)} className="text-[10px] text-primary hover:underline mt-0.5">
             {expanded ? "Show less" : "Show more"}
           </button>
         )}
+
         <div className="flex items-center gap-2 mt-1.5">
           <span className="text-[10px] text-muted-foreground">{formatRelativeTime(activity.created_at)}</span>
+          {meta?.activity_date && (
+            <>
+              <span className="text-[10px] text-muted-foreground/40">&middot;</span>
+              <span className="text-[10px] text-muted-foreground">
+                {new Date(String(meta.activity_date)).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              </span>
+            </>
+          )}
           {activity.performer_name && (
             <>
               <span className="text-[10px] text-muted-foreground/40">&middot;</span>
@@ -423,6 +468,9 @@ export function TimelineTab({
     if (filter === "calendar") return allEntries.filter((e) => e.kind === "calendar");
     if (filter === "notes") return allEntries.filter((e) => e.kind === "note");
     if (filter === "emails") return allEntries.filter((e) => e.kind === "email");
+    if (filter === "follow_up") return allEntries.filter(
+      (e) => e.kind === "calendar" && e.calendarEvent?.event_type === "follow_up"
+    );
     // activity type filter
     return allEntries.filter(
       (e) => e.kind === "activity" && e.activity?.type === filter

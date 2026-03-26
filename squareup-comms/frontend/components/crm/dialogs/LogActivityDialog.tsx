@@ -274,9 +274,9 @@ export function LogActivityDialog({
 
       // ── Step 2: Auto-schedule follow-up (parallel) ────────────
       if (followUpIso) {
-        const startAt  = followUpIso;
-        const endAt    = new Date(new Date(followUpIso).getTime() + 30 * 60_000).toISOString();
-        const remindAt = new Date(new Date(followUpIso).getTime() - 15 * 60_000).toISOString();
+        // Ensure both start and end are in consistent UTC ISO format
+        const startAt = new Date(followUpIso).toISOString();
+        const endAt   = new Date(new Date(followUpIso).getTime() + 30 * 60_000).toISOString();
         await Promise.all([
           createCalendar.mutateAsync({
             contact_id: contactId,
@@ -293,14 +293,6 @@ export function LogActivityDialog({
               next_follow_up_at: followUpIso,
               follow_up_note: followUpNote.trim() || undefined,
             },
-          }),
-          fetch(`${API_URL}/api/reminders`, {
-            method: "POST",
-            headers: getHeaders(),
-            body: JSON.stringify({
-              message: `Follow-up with ${contactName}`,
-              remind_at: remindAt,
-            }),
           }),
         ]);
       }
