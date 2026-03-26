@@ -7,6 +7,21 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export type UserStatus = "online" | "away" | "busy" | "dnd";
 export type FontSize = "Small" | "Medium" | "Large";
 
+export type ChannelPrefs = { in_app: boolean; browser_push: boolean; email: boolean };
+export type NotificationPrefs = Record<string, ChannelPrefs>;
+
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
+  mentions:          { in_app: true, browser_push: true,  email: false },
+  dms:               { in_app: true, browser_push: true,  email: false },
+  agent_updates:     { in_app: true, browser_push: false, email: false },
+  channel_messages:  { in_app: true, browser_push: false, email: false },
+  task_assigned:     { in_app: true, browser_push: true,  email: true },
+  task_completed:    { in_app: true, browser_push: true,  email: false },
+  task_commented:    { in_app: true, browser_push: false, email: false },
+  task_mention:      { in_app: true, browser_push: true,  email: true },
+  task_overdue:      { in_app: true, browser_push: true,  email: true },
+};
+
 interface SettingsState {
   // Profile
   displayName: string;
@@ -17,11 +32,8 @@ interface SettingsState {
   // Appearance
   fontSize: FontSize;
 
-  // Notifications
-  notifMentions: boolean;
-  notifDMs: boolean;
-  notifAgentUpdates: boolean;
-  notifChannelMessages: boolean;
+  // Notifications — structured per-channel prefs
+  notificationPrefs: NotificationPrefs;
   soundEnabled: boolean;
 
   // Actions
@@ -30,10 +42,7 @@ interface SettingsState {
   setStatusMessage: (message: string) => void;
   setStatusEmoji: (emoji: string) => void;
   setFontSize: (size: FontSize) => void;
-  setNotifMentions: (v: boolean) => void;
-  setNotifDMs: (v: boolean) => void;
-  setNotifAgentUpdates: (v: boolean) => void;
-  setNotifChannelMessages: (v: boolean) => void;
+  setNotificationPref: (type: string, channel: keyof ChannelPrefs, enabled: boolean) => void;
   setSoundEnabled: (v: boolean) => void;
   /** Hydrate profile fields from backend auth profile. */
   hydrateFromProfile: () => void;
@@ -64,7 +73,7 @@ function syncToBackend(fields: Record<string, unknown>) {
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // Profile defaults
       displayName: "",
       status: "online",
@@ -75,10 +84,7 @@ export const useSettingsStore = create<SettingsState>()(
       fontSize: "Medium",
 
       // Notification defaults
-      notifMentions: true,
-      notifDMs: true,
-      notifAgentUpdates: true,
-      notifChannelMessages: false,
+      notificationPrefs: { ...DEFAULT_NOTIFICATION_PREFS },
       soundEnabled: true,
 
       // Actions (immutable — always return new state)
@@ -99,11 +105,16 @@ export const useSettingsStore = create<SettingsState>()(
         syncToBackend({ status_emoji: statusEmoji });
       },
       setFontSize: (fontSize) => set({ fontSize }),
-      setNotifMentions: (notifMentions) => set({ notifMentions }),
-      setNotifDMs: (notifDMs) => set({ notifDMs }),
-      setNotifAgentUpdates: (notifAgentUpdates) => set({ notifAgentUpdates }),
-      setNotifChannelMessages: (notifChannelMessages) =>
-        set({ notifChannelMessages }),
+      setNotificationPref: (type, channel, enabled) => {
+        const current = get().notificationPrefs;
+        const typePrefs = current[type] ?? { in_app: true, browser_push: false, email: false };
+        const updated: NotificationPrefs = {
+          ...current,
+          [type]: { ...typePrefs, [channel]: enabled },
+        };
+        set({ notificationPrefs: updated });
+        syncToBackend({ notification_prefs: updated });
+      },
       setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
 
       hydrateFromProfile: () => {
@@ -114,6 +125,9 @@ export const useSettingsStore = create<SettingsState>()(
           status: (profile.status as UserStatus) || "online",
           statusMessage: profile.status_message || "",
           statusEmoji: profile.status_emoji || "",
+          ...(profile.notification_prefs
+            ? { notificationPrefs: profile.notification_prefs as NotificationPrefs }
+            : {}),
         });
       },
     }),
@@ -125,10 +139,7 @@ export const useSettingsStore = create<SettingsState>()(
         statusMessage: state.statusMessage,
         statusEmoji: state.statusEmoji,
         fontSize: state.fontSize,
-        notifMentions: state.notifMentions,
-        notifDMs: state.notifDMs,
-        notifAgentUpdates: state.notifAgentUpdates,
-        notifChannelMessages: state.notifChannelMessages,
+        notificationPrefs: state.notificationPrefs,
         soundEnabled: state.soundEnabled,
       }),
     }

@@ -1,6 +1,9 @@
 import { create } from "zustand";
 
-export type NotificationType = "mention" | "dm" | "agent_complete" | "agent_error" | "reminder" | "follow_up";
+export type NotificationType =
+  | "mention" | "dm" | "agent_complete" | "agent_error" | "reminder" | "follow_up"
+  | "task_assigned" | "task_completed" | "task_commented" | "task_mention" | "task_overdue"
+  | (string & {}); // Allow any backend type without breaking
 export type NotificationTier = "urgent" | "normal" | "low";
 
 export interface Notification {
@@ -32,7 +35,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   isOpen: false,
   setNotifications: (notifications) => set({ notifications }),
-  addNotification: (notification) => set((s) => ({ notifications: [notification, ...s.notifications] })),
+  addNotification: (notification) => set((s) => ({ notifications: [notification, ...s.notifications].slice(0, 200) })),
   markRead: (id) => set((s) => ({ notifications: s.notifications.map((n) => n.id === id ? { ...n, read: true } : n) })),
   markAllRead: () => set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) })),
   setOpen: (open) => set({ isOpen: open }),

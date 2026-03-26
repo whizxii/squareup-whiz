@@ -85,6 +85,16 @@ class Settings(BaseSettings):
     # Timezone (IANA identifier)
     TIMEZONE: str = "Asia/Kolkata"
 
+    # Email Notifications
+    EMAIL_ENABLED: bool = False
+    EMAIL_SMTP_HOST: str = "smtp.gmail.com"
+    EMAIL_SMTP_PORT: int = 587
+    EMAIL_SMTP_USERNAME: Optional[str] = None
+    EMAIL_SMTP_PASSWORD: Optional[str] = None
+    EMAIL_SMTP_USE_TLS: bool = True
+    EMAIL_FROM_ADDRESS: str = "noreply@squareup.app"
+    EMAIL_FROM_NAME: str = "SquareUp Comms"
+
     # Logging
     LOG_LEVEL: str = "INFO"
 

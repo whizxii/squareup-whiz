@@ -27,6 +27,7 @@ import ProactiveInsightsPanel from "@/components/insights/ProactiveInsightsPanel
 import { DonnaSidebar } from "@/components/donna/DonnaSidebar";
 import { DonnaTrigger } from "@/components/donna/DonnaTrigger";
 import { DealCelebration } from "@/components/DealCelebration";
+import { NotificationListener } from "@/components/NotificationListener";
 
 const navItems = [
   { href: "/office", icon: Building2, label: "Office" },
@@ -187,6 +188,9 @@ export default function WorkspaceLayout({
 
       {/* Deal win celebration — global confetti + banner */}
       <DealCelebration />
+
+      {/* Global notification listener — routes WS notifications to bell + browser push */}
+      <NotificationListener />
       </div>
     </AuthGuard>
   );

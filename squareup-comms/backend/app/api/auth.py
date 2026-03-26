@@ -56,6 +56,7 @@ class ProfileResponse(BaseModel):
     office_x: int
     office_y: int
     theme: str
+    notification_prefs: Optional[dict] = None
     last_seen_at: datetime
     created_at: datetime
 
@@ -70,6 +71,13 @@ class ProfileResponse(BaseModel):
             except (json.JSONDecodeError, TypeError):
                 avatar_config_dict = None
 
+        notif_prefs_dict: Optional[dict] = None
+        if user.notification_prefs:
+            try:
+                notif_prefs_dict = json.loads(user.notification_prefs)
+            except (json.JSONDecodeError, TypeError):
+                notif_prefs_dict = None
+
         return cls(
             firebase_uid=user.firebase_uid,
             display_name=user.display_name,
@@ -83,6 +91,7 @@ class ProfileResponse(BaseModel):
             office_x=user.office_x,
             office_y=user.office_y,
             theme=user.theme,
+            notification_prefs=notif_prefs_dict,
             last_seen_at=user.last_seen_at,
             created_at=user.created_at,
         )
@@ -96,6 +105,7 @@ class ProfileUpdate(BaseModel):
     status_message: Optional[str] = None
     status_emoji: Optional[str] = Field(default=None, max_length=10)
     theme: Optional[str] = Field(default=None, max_length=10)
+    notification_prefs: Optional[dict] = None
 
 
 # ---------------------------------------------------------------------------
@@ -329,6 +339,12 @@ async def update_my_profile(
                     detail=f"Invalid avatar_id '{avatar_id}'.",
                 )
             profile.avatar_config = _build_avatar_config(avatar_id)
+
+    # Handle notification_prefs dict -> JSON string
+    if "notification_prefs" in update_data:
+        prefs = update_data.pop("notification_prefs")
+        if prefs is not None:
+            profile.notification_prefs = json.dumps(prefs)
 
     for field, value in update_data.items():
         setattr(profile, field, value)

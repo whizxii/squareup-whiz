@@ -18,7 +18,7 @@ class UserProfile(SQLModel, table=True):
     status_emoji: Optional[str] = Field(default=None, max_length=10)
     office_x: int = Field(default=5)
     office_y: int = Field(default=5)
-    notification_prefs: Optional[str] = Field(default='{"mentions": true, "dms": true, "agent_updates": false}')
+    notification_prefs: Optional[str] = Field(default='{"mentions":{"in_app":true,"browser_push":true,"email":false},"dms":{"in_app":true,"browser_push":true,"email":false},"agent_updates":{"in_app":true,"browser_push":false,"email":false},"channel_messages":{"in_app":true,"browser_push":false,"email":false},"task_assigned":{"in_app":true,"browser_push":true,"email":true},"task_completed":{"in_app":true,"browser_push":true,"email":false},"task_commented":{"in_app":true,"browser_push":false,"email":false},"task_mention":{"in_app":true,"browser_push":true,"email":true},"task_overdue":{"in_app":true,"browser_push":true,"email":true}}')
     theme: str = Field(default="system", max_length=10)
     last_seen_at: datetime = Field(default_factory=lambda: datetime.utcnow())
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())

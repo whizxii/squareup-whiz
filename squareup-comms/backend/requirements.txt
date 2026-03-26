@@ -21,3 +21,4 @@ mcp>=1.0.0
 croniter>=1.4.0
 google-genai>=1.7.0,<2.0.0
 pgvector>=0.3.0
+aiosmtplib>=2.0.0

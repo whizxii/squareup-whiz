@@ -27,6 +27,7 @@ export interface UserProfile {
   office_x: number;
   office_y: number;
   theme: string;
+  notification_prefs: Record<string, { in_app: boolean; browser_push: boolean; email: boolean }> | null;
   last_seen_at: string;
   created_at: string;
 }

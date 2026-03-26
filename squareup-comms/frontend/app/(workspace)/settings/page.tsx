@@ -21,8 +21,10 @@ import {
   Server,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSettingsStore } from "@/lib/stores/settings-store";
+import { useSettingsStore, DEFAULT_NOTIFICATION_PREFS } from "@/lib/stores/settings-store";
+import type { ChannelPrefs } from "@/lib/stores/settings-store";
 import { useIntegrationStore } from "@/lib/stores/integration-store";
+import { useBrowserNotifications } from "@/hooks/use-browser-notifications";
 import CustomToolBuilder from "@/components/settings/CustomToolBuilder";
 import MCPServerManager from "@/components/settings/MCPServerManager";
 
@@ -282,6 +284,18 @@ const statusOptions = [
   { value: "dnd", label: "Do Not Disturb", dot: "bg-red-600" },
 ] as const;
 
+const NOTIFICATION_TYPE_LABELS = [
+  { key: "mentions",         label: "Mentions" },
+  { key: "dms",              label: "Direct Messages" },
+  { key: "agent_updates",    label: "Agent Updates" },
+  { key: "channel_messages", label: "Channel Messages" },
+  { key: "task_assigned",    label: "Task Assigned" },
+  { key: "task_completed",   label: "Task Completed" },
+  { key: "task_commented",   label: "Task Comments" },
+  { key: "task_mention",     label: "Task Mentions" },
+  { key: "task_overdue",     label: "Task Overdue" },
+] as const;
+
 
 /* ------------------------------------------------------------------ */
 /*  Settings Page                                                      */
@@ -298,16 +312,11 @@ export default function SettingsPage() {
   const setStatusEmoji = useSettingsStore((s) => s.setStatusEmoji);
   const fontSize = useSettingsStore((s) => s.fontSize);
   const setFontSize = useSettingsStore((s) => s.setFontSize);
-  const notifMentions = useSettingsStore((s) => s.notifMentions);
-  const setNotifMentions = useSettingsStore((s) => s.setNotifMentions);
-  const notifDMs = useSettingsStore((s) => s.notifDMs);
-  const setNotifDMs = useSettingsStore((s) => s.setNotifDMs);
-  const notifAgentUpdates = useSettingsStore((s) => s.notifAgentUpdates);
-  const setNotifAgentUpdates = useSettingsStore((s) => s.setNotifAgentUpdates);
-  const notifChannelMessages = useSettingsStore((s) => s.notifChannelMessages);
-  const setNotifChannelMessages = useSettingsStore((s) => s.setNotifChannelMessages);
+  const notificationPrefs = useSettingsStore((s) => s.notificationPrefs);
+  const setNotificationPref = useSettingsStore((s) => s.setNotificationPref);
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const setSoundEnabled = useSettingsStore((s) => s.setSoundEnabled);
+  const { permission: browserPermission, requestPermission } = useBrowserNotifications();
 
   // --- Local-only UI state ---
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -491,39 +500,69 @@ export default function SettingsPage() {
 
           {/* ========== NOTIFICATIONS ========== */}
           <Section icon={Bell} title="Notifications" delay={0.1}>
-            <FieldRow
-              label="Mentions"
-              description="When someone @mentions you"
-            >
-              <Toggle checked={notifMentions} onChange={setNotifMentions} />
-            </FieldRow>
+            {/* Browser Permission */}
+            <div className="p-3 rounded-xl border border-border bg-background/50 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Browser Notifications</p>
+                  <p className="text-xs text-muted-foreground">
+                    {browserPermission === "granted"
+                      ? "Enabled — you'll receive OS pop-ups when the app is in the background"
+                      : browserPermission === "denied"
+                      ? "Blocked — enable in your browser settings to receive pop-ups"
+                      : "Allow browser notifications for pop-up alerts"}
+                  </p>
+                </div>
+                {browserPermission === "default" && (
+                  <button
+                    onClick={requestPermission}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors shrink-0"
+                  >
+                    Enable
+                  </button>
+                )}
+                {browserPermission === "granted" && (
+                  <span className="text-xs font-medium text-sq-online shrink-0">Active</span>
+                )}
+                {browserPermission === "denied" && (
+                  <span className="text-xs font-medium text-red-500 shrink-0">Blocked</span>
+                )}
+              </div>
+            </div>
 
-            <FieldRow
-              label="Direct messages"
-              description="New messages in DMs"
-            >
-              <Toggle checked={notifDMs} onChange={setNotifDMs} />
-            </FieldRow>
-
-            <FieldRow
-              label="Agent updates"
-              description="When AI agents post results"
-            >
-              <Toggle
-                checked={notifAgentUpdates}
-                onChange={setNotifAgentUpdates}
-              />
-            </FieldRow>
-
-            <FieldRow
-              label="Channel messages"
-              description="All new messages in channels"
-            >
-              <Toggle
-                checked={notifChannelMessages}
-                onChange={setNotifChannelMessages}
-              />
-            </FieldRow>
+            {/* Toggle Matrix */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Type</th>
+                    <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">In-App</th>
+                    <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Browser Pop</th>
+                    <th className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Email</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {NOTIFICATION_TYPE_LABELS.map(({ key, label }) => {
+                    const prefs = notificationPrefs[key] ?? DEFAULT_NOTIFICATION_PREFS[key] ?? { in_app: true, browser_push: false, email: false };
+                    return (
+                      <tr key={key} className="border-b border-border/50">
+                        <td className="py-2.5 pr-4 text-foreground">{label}</td>
+                        {(["in_app", "browser_push", "email"] as const).map((ch) => (
+                          <td key={ch} className="text-center py-2.5 px-2">
+                            <div className="flex justify-center">
+                              <Toggle
+                                checked={prefs[ch]}
+                                onChange={(v) => setNotificationPref(key, ch, v)}
+                              />
+                            </div>
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
             <div className="border-t border-border pt-4">
               <FieldRow label="Sound" description="Play notification sounds">
