@@ -199,7 +199,10 @@ function ActivityItem({ activity }: { activity: Activity }) {
   const config = ACTIVITY_TYPE_CONFIG[activity.type];
   const [expanded, setExpanded] = useState(false);
   const meta = activity.activity_metadata as Record<string, unknown> | undefined;
-  const hasMeta = meta && (meta.tldr || meta.transcript || meta.duration_minutes || meta.sub_label);
+  // Only show "Show more" when there is ACTUALLY hidden content to reveal:
+  // - transcript exists (only shown when expanded)
+  // - content is long enough to be truncated by line-clamp-2
+  const hasExpandableContent = !!(meta?.transcript) || !!(activity.content && activity.content.length > 120);
 
   return (
     <div className="flex gap-3 group">
@@ -248,8 +251,33 @@ function ActivityItem({ activity }: { activity: Activity }) {
           </div>
         ) : null}
 
-        {/* Expand/collapse toggle */}
-        {(hasMeta || (activity.content && activity.content.length > 120)) && (
+        {/* Recording attachment indicator */}
+        {meta?.recording_id ? (
+          <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-md bg-red-50 dark:bg-red-900/10 border border-red-200/50 dark:border-red-800/30 w-fit">
+            <Mic className="w-3 h-3 text-red-500" />
+            <span className="text-[10px] font-medium text-red-700 dark:text-red-400">
+              {meta.recording_file_name ? String(meta.recording_file_name) : "Recording attached"}
+            </span>
+          </div>
+        ) : null}
+
+        {/* Follow-up indicator */}
+        {meta?.follow_up_date ? (
+          <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 rounded-md bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200/50 dark:border-yellow-800/30 w-fit">
+            <Calendar className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
+            <span className="text-[10px] font-medium text-yellow-700 dark:text-yellow-400">
+              Follow-up: {new Date(String(meta.follow_up_date)).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </span>
+            {meta.follow_up_note ? (
+              <span className="text-[10px] text-yellow-600/70 dark:text-yellow-500/70 truncate max-w-[160px]">
+                — {String(meta.follow_up_note)}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Expand/collapse toggle — only when there is hidden content */}
+        {hasExpandableContent && (
           <button onClick={() => setExpanded(!expanded)} className="text-[10px] text-primary hover:underline mt-0.5">
             {expanded ? "Show less" : "Show more"}
           </button>

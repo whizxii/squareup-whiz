@@ -256,7 +256,27 @@ export function LogActivityDialog({
     setSubmitting(true);
 
     try {
-      // ── Step 1: Log activity to backend ──────────────────────
+      // ── Step 1: Upload recording FIRST so we can link it ──────
+      let recordingId: string | undefined;
+      let recordingFileName: string | undefined;
+      if (recordingFile) {
+        try {
+          const rec = await uploadRecording.mutateAsync({
+            file: recordingFile,
+            metadata: {
+              contact_id: contactId,
+              title: title.trim() || "Recording",
+            },
+          });
+          recordingId = rec.id;
+          recordingFileName = recordingFile.name;
+        } catch {
+          // Non-blocking — log the activity even if upload fails
+          toast.error("Recording upload failed, but activity will still be logged");
+        }
+      }
+
+      // ── Step 2: Log activity with recording + follow-up refs ──
       const contentParts = [tldr.trim(), notes.trim()].filter(Boolean);
       await createActivity.mutateAsync({
         contact_id: contactId,
@@ -269,10 +289,16 @@ export function LogActivityDialog({
           transcript: notes.trim() || undefined,
           activity_date: activityDate,
           sub_label: moreLabel || undefined,
+          // Link the recording so it shows on the timeline entry
+          recording_id: recordingId || undefined,
+          recording_file_name: recordingFileName || undefined,
+          // Link the follow-up so it shows on the timeline entry
+          follow_up_date: followUpIso || undefined,
+          follow_up_note: followUpNote.trim() || undefined,
         },
       });
 
-      // ── Step 2: Auto-schedule follow-up (parallel) ────────────
+      // ── Step 3: Auto-schedule follow-up (parallel) ────────────
       if (followUpIso) {
         // Ensure both start and end are in consistent UTC ISO format
         const startAt = new Date(followUpIso).toISOString();
@@ -295,17 +321,6 @@ export function LogActivityDialog({
             },
           }),
         ]);
-      }
-
-      // ── Step 3: Upload recording in background (non-blocking) ─
-      if (recordingFile) {
-        uploadRecording.mutate({
-          file: recordingFile,
-          metadata: {
-            contact_id: contactId,
-            title: title.trim() || "Recording",
-          },
-        });
       }
 
       // ── Step 4: Success toast ─────────────────────────────────
