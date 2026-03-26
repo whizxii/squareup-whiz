@@ -256,7 +256,9 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 # Rate limiter state
 app.state.limiter = limiter
 
-# Middleware (order matters — outermost first)
+# Middleware (order matters — last added = outermost)
+# CORSMiddleware MUST be outermost so CORS headers are present on ALL responses,
+# including error responses from inner middleware (critical for file uploads).
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(LoggingMiddleware)
 app.add_middleware(RequestIdMiddleware)
@@ -267,6 +269,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-User-Id", "X-Request-Id"],
+    expose_headers=["X-Request-Id"],
 )
 
 # REST API routers
@@ -372,7 +375,7 @@ async def websocket_endpoint(
             except json.JSONDecodeError:
                 logger.warning("Invalid JSON from %s", user_id)
     except WebSocketDisconnect:
-        hub_manager.disconnect(user_id)
+        hub_manager.disconnect(websocket, user_id)
     except Exception:
         logger.error("WebSocket error for %s", user_id, exc_info=True)
-        hub_manager.disconnect(user_id)
+        hub_manager.disconnect(websocket, user_id)
